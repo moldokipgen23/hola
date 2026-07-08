@@ -83,7 +83,7 @@
 <!-- SerpAPI -->
 <div id="panel-serpapi" class="glass-card p-6 rounded-xl hidden">
     <h3 class="font-semibold text-white mb-3">Search via SerpAPI</h3>
-    <p class="text-sm text-slate-400 mb-4">Scrape real Google search results for businesses. More reliable than AI, broader than Google Maps.</p>
+    <p class="text-sm text-slate-400 mb-4">Scrapes real Google search results for businesses in your area.</p>
 
     <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
@@ -91,18 +91,18 @@
             <input type="text" id="serpapi-query" class="input-dark" placeholder="e.g., restaurants, hotels, shops">
         </div>
         <div>
-            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
-            <input type="text" id="serpapi-area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
-        </div>
-    </div>
-    <div class="grid grid-cols-2 gap-4 mb-4">
-        <div>
             <label class="block text-sm text-slate-400 mb-1">Agent</label>
             <select id="serpapi-agent" class="input-dark">
                 @foreach(\App\Models\AiAgent::whereJsonContains('skills', 'serpapi_business_search')->get() as $agent)
                     <option value="{{ $agent->id }}">{{ $agent->avatar }} {{ $agent->name }}</option>
                 @endforeach
             </select>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
+            <input type="text" id="serpapi-area" class="input-dark" value="Churachandpur, Manipur" placeholder="e.g., 795128 or Lamka, Churachandpur">
         </div>
         <div>
             <label class="block text-sm text-slate-400 mb-1">Max Results</label>
@@ -115,19 +115,13 @@
 <!-- AI Scraper -->
 <div id="panel-ai" class="glass-card p-6 rounded-xl hidden">
     <h3 class="font-semibold text-white mb-3">AI Business Discovery</h3>
-    <p class="text-sm text-slate-400 mb-4">Use AI to discover businesses from web sources. Results need review before publishing.</p>
+    <p class="text-sm text-slate-400 mb-4">Uses AI to discover businesses in your area. Results need review.</p>
 
     <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
-            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
-            <input type="text" id="ai-area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
-        </div>
-        <div>
-            <label class="block text-sm text-slate-400 mb-1">Category</label>
+            <label class="block text-sm text-slate-400 mb-1">Search Query / Category</label>
             <input type="text" id="ai-category" class="input-dark" placeholder="e.g., restaurants, all businesses">
         </div>
-    </div>
-    <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
             <label class="block text-sm text-slate-400 mb-1">Agent</label>
             <select id="ai-agent" class="input-dark">
@@ -135,6 +129,12 @@
                     <option value="{{ $agent->id }}">{{ $agent->avatar }} {{ $agent->name }}</option>
                 @endforeach
             </select>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
+            <input type="text" id="ai-area" class="input-dark" value="Churachandpur, Manipur" placeholder="e.g., 795128 or Lamka, Churachandpur">
         </div>
         <div>
             <label class="block text-sm text-slate-400 mb-1">Max Results</label>

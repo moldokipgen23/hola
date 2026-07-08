@@ -310,22 +310,23 @@ class AgentSkillService
         $categoryList = implode(', ', array_slice($categories, 0, 20));
 
         $prompt = <<<EOT
-List real, existing {$category} businesses in {$area}, Churachandpur district, Manipur, India.
+You are a business directory researcher. List ONLY verified, real businesses that physically exist in {$area}, Churachandpur district, Manipur, India. Category: {$category}.
 
-Return ONLY a JSON array. Each item must have:
-- name: business name
-- address: full address
-- phone: phone number (if known, otherwise null)
-- description: brief description of what they do
-- website: website URL (if known, otherwise null)
-- category: best matching category from this list: {$categoryList}
+CRITICAL RULES:
+- ONLY include businesses you are CERTAIN exist at this location
+- Include SPECIFIC addresses, real phone numbers, real names
+- If you don't know the phone number, use null — NEVER make one up
+- If you're unsure about any business, SKIP it entirely
+- Fewer REAL results is better than more FAKE results
+- Maximum {$maxResults} businesses
 
-Rules:
-- Only include REAL businesses that actually exist
-- Do NOT make up or hallucinate businesses
-- If you don't know many businesses, return fewer results
-- Return maximum {$maxResults} businesses
-- Return ONLY the JSON array, no other text
+Return ONLY a JSON array with these fields:
+- name: exact business name
+- address: full street address
+- phone: real phone number or null
+- description: what they do (1 sentence)
+- website: website URL or null
+- category: from this list: {$categoryList}
 EOT;
 
         $response = Http::withHeaders([
@@ -710,13 +711,14 @@ EOT;
         $area = $input['area'] ?? $input['zipcode'] ?? 'Lamka, Churachandpur, Manipur';
         $maxResults = min($input['max_results'] ?? 20, 50);
 
-        $searchQuery = "{$query} in {$area}";
+        $searchQuery = "{$query} in {$area} contact phone address";
 
         $response = Http::get('https://serpapi.com/search', [
-            'engine' => 'google_maps',
+            'engine' => 'google',
             'q' => $searchQuery,
             'api_key' => $apiKey,
             'hl' => 'en',
+            'gl' => 'in',
             'num' => min($maxResults, 20),
         ]);
 
@@ -725,10 +727,10 @@ EOT;
         }
 
         $data = $response->json();
-        $places = $data['local_results'] ?? $data['results'] ?? [];
+        $places = $data['organic_results'] ?? [];
 
-        if (empty($places)) {
-            $places = $data['organic_results'] ?? [];
+        if (empty($places) && !empty($data['local_results'])) {
+            $places = $data['local_results'];
         }
 
         $batch = ImportBatch::create([
@@ -745,13 +747,17 @@ EOT;
 
         foreach (array_slice($places, 0, $maxResults) as $place) {
             $name = $place['title'] ?? $place['name'] ?? '';
-            $address = $place['address'] ?? $place['snippet'] ?? '';
-            $phone = $place['phone'] ?? null;
-            $website = $place['website'] ?? $place['link'] ?? null;
-            $rating = $place['rating'] ?? null;
-            $reviews = $place['reviews'] ?? null;
+            $snippet = $place['snippet'] ?? $place['address'] ?? '';
+            $link = $place['link'] ?? $place['website'] ?? null;
 
-            if (empty($name)) {
+            // Extract phone from snippet if present
+            $phone = $place['phone'] ?? null;
+            if (!$phone && $snippet) {
+                preg_match('/(\+91[\s-]?\d{5}[\s-]?\d{5}|\d{5}[\s-]?\d{5}|\d{3}[\s-]?\d{3}[\s-]?\d{4})/', $snippet, $m);
+                $phone = $m[1] ?? null;
+            }
+
+            if (empty($name) || strlen($name) < 3) {
                 $skipped++;
                 continue;
             }
@@ -764,21 +770,21 @@ EOT;
 
             $placeData = [
                 'name' => $name,
-                'address' => $address,
+                'address' => $place['address'] ?? $snippet,
                 'phone' => $phone,
-                'website' => $website,
-                'rating' => $rating,
-                'total_ratings' => $reviews,
+                'website' => $link,
+                'description' => $snippet,
+                'rating' => $place['rating'] ?? null,
+                'total_ratings' => $place['reviews'] ?? null,
                 'latitude' => $place['gps_coordinates']['latitude'] ?? $place['latitude'] ?? null,
                 'longitude' => $place['gps_coordinates']['longitude'] ?? $place['longitude'] ?? null,
-                'types' => $place['type'] ? [$place['type']] : [],
             ];
 
             $confidence = 0.5;
             if ($phone) $confidence += 0.15;
-            if ($website) $confidence += 0.1;
-            if ($address) $confidence += 0.15;
-            if ($rating) $confidence += 0.1;
+            if ($link) $confidence += 0.1;
+            if ($placeData['address']) $confidence += 0.15;
+            if ($placeData['rating']) $confidence += 0.1;
             $confidence = min($confidence, 1.0);
 
             ImportItem::create([
