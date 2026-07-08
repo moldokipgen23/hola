@@ -59,9 +59,11 @@ class ImportController extends Controller
         if (!$existingBusiness && !empty($data['name'])) {
             $existingBusiness = Business::whereRaw('LOWER(name) = ?', [Str::lower($data['name'])])->first();
             if ($existingBusiness && !empty($data['address'])) {
-                // Verify address is also similar (at least 60% match)
-                $similarity = similar_text(Str::lower($existingBusiness->address), Str::lower($data['address']));
-                if ($similarity < strlen($data['address']) * 0.6) {
+                // Verify address is also similar
+                $existingAddr = Str::lower($existingBusiness->address);
+                $newAddr = Str::lower($data['address']);
+                similar_text($existingAddr, $newAddr, $percent);
+                if ($percent < 50) {
                     $existingBusiness = null; // Different address, allow import
                 }
             }

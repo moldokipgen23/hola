@@ -540,6 +540,41 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::post('/import/review/{id}/approve', function ($id) {
         $item = \App\Models\ImportItem::with('batch')->findOrFail($id);
         $data = $item->data;
+
+        // DUPLICATE CHECK
+        $existingBusiness = null;
+
+        // Check by external_id
+        if (!empty($item->external_id)) {
+            $existingBusiness = \App\Models\Business::where('external_id', $item->external_id)->first();
+        }
+
+        // Check by name + address
+        if (!$existingBusiness && !empty($data['name'])) {
+            $existingBusiness = \App\Models\Business::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->first();
+            if ($existingBusiness && !empty($data['address'])) {
+                similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
+                if ($percent < 50) {
+                    $existingBusiness = null;
+                }
+            }
+        }
+
+        // Check by phone
+        if (!$existingBusiness && !empty($data['phone'])) {
+            $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
+            $existingBusiness = \App\Models\Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+        }
+
+        if ($existingBusiness) {
+            $item->update(['status' => 'rejected', 'notes' => "Duplicate: {$existingBusiness->name}"]);
+            if ($item->batch) {
+                $item->batch->increment('rejected');
+                $item->batch->decrement('pending');
+            }
+            return back()->with('error', "Skipped: Business already exists ({$existingBusiness->name})");
+        }
+
         $categories = \App\Models\Category::pluck('id', 'name')->toArray();
 
         $categoryName = $data['category'] ?? $data['type'] ?? null;
@@ -622,10 +657,47 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if (empty($ids)) return back()->with('error', 'No items selected.');
 
         $approved = 0;
+        $skipped = 0;
         foreach ($ids as $id) {
             try {
                 $item = \App\Models\ImportItem::with('batch')->findOrFail($id);
                 $data = $item->data;
+
+                // DUPLICATE CHECK
+                $existingBusiness = null;
+
+                // Check by external_id
+                if (!empty($item->external_id)) {
+                    $existingBusiness = \App\Models\Business::where('external_id', $item->external_id)->first();
+                }
+
+                // Check by name + address
+                if (!$existingBusiness && !empty($data['name'])) {
+                    $existingBusiness = \App\Models\Business::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->first();
+                    if ($existingBusiness && !empty($data['address'])) {
+                        similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
+                        if ($percent < 50) {
+                            $existingBusiness = null;
+                        }
+                    }
+                }
+
+                // Check by phone
+                if (!$existingBusiness && !empty($data['phone'])) {
+                    $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
+                    $existingBusiness = \App\Models\Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+                }
+
+                if ($existingBusiness) {
+                    $item->update(['status' => 'rejected', 'notes' => "Duplicate: {$existingBusiness->name}"]);
+                    if ($item->batch) {
+                        $item->batch->increment('rejected');
+                        $item->batch->decrement('pending');
+                    }
+                    $skipped++;
+                    continue;
+                }
+
                 $categories = \App\Models\Category::pluck('id', 'name')->toArray();
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = null;
@@ -636,9 +708,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                             break;
                         }
                     }
-                }
-                if (!$categoryId) {
-                    $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
                 }
 
                 $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
@@ -673,7 +742,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'district' => 'Churachandpur',
                     'is_active' => true,
                     'source' => 'import',
+                    'external_id' => $item->external_id,
                     'import_batch_id' => $item->batch_id,
+                    'confidence' => $item->confidence,
                     'photos' => count($photos) > 0 ? $photos : null,
                 ]);
 
@@ -685,7 +756,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 $approved++;
             } catch (\Exception $e) { continue; }
         }
-        return back()->with('success', "Approved {$approved} items.");
+        $message = "Approved {$approved} items.";
+        if ($skipped > 0) $message .= " Skipped {$skipped} duplicates.";
+        return back()->with('success', $message);
     })->name('import.bulk-approve');
 
     Route::post('/import/bulk-reject', function (\Illuminate\Http\Request $request) {
