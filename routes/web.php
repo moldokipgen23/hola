@@ -518,15 +518,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('claims');
 
     Route::patch('/claims/{id}/approve', function ($id) {
-        $claim = ClaimRequest::findOrFail($id);
+        $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
         $claim->update(['status' => 'approved']);
         $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
+        \App\Services\NotificationService::claimApproved($claim);
         return redirect()->route('admin.claims')->with('success', 'Claim approved.');
     })->name('claims.approve');
 
     Route::patch('/claims/{id}/reject', function ($id) {
-        $claim = ClaimRequest::findOrFail($id);
+        $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
         $claim->update(['status' => 'rejected']);
+        \App\Services\NotificationService::claimRejected($claim);
         return redirect()->route('admin.claims')->with('success', 'Claim rejected.');
     })->name('claims.reject');
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\Review;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class ReviewController extends Controller
@@ -51,6 +52,8 @@ class ReviewController extends Controller
         ]);
 
         $review->load('user');
+
+        NotificationService::reviewCreated($review);
 
         return response()->json([
             'review' => $review,

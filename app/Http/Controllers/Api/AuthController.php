@@ -232,4 +232,45 @@ class AuthController extends Controller
             ? response()->json(['message' => __($status)])
             : response()->json(['message' => __($status)], 400);
     }
+
+    // ─── Change Password ───
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        if (!Hash::check($request->current_password, $request->user()->password)) {
+            return response()->json(['message' => 'Current password is incorrect.'], 422);
+        }
+
+        $request->user()->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        return response()->json(['message' => 'Password changed successfully.']);
+    }
+
+    // ─── Delete Account ───
+    public function deleteAccount(Request $request)
+    {
+        $request->validate([
+            'password' => 'required',
+        ]);
+
+        if (!Hash::check($request->password, $request->user()->password)) {
+            return response()->json(['message' => 'Password is incorrect.'], 422);
+        }
+
+        $user = $request->user();
+
+        // Revoke all tokens
+        $user->tokens()->delete();
+
+        // Delete user
+        $user->delete();
+
+        return response()->json(['message' => 'Account deleted successfully.']);
+    }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class ChatController extends Controller
@@ -81,6 +82,8 @@ class ChatController extends Controller
 
         $conversation->update(['last_message_at' => now()]);
 
+        NotificationService::messageReceived($conversation, $request->message);
+
         return response()->json([
             'conversation' => [
                 'id' => $conversation->id,
@@ -113,6 +116,8 @@ class ChatController extends Controller
         ]);
 
         $conversation->update(['last_message_at' => now()]);
+
+        NotificationService::messageReceived($conversation, $request->message);
 
         return response()->json([
             'message' => [

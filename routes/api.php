@@ -86,6 +86,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/claims', [ClaimController::class, 'store']);
     Route::get('/claims/mine', [ClaimController::class, 'myClaims']);
 
+    // Account Management
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
+    Route::post('/delete-account', [AuthController::class, 'deleteAccount']);
+
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
@@ -100,6 +104,19 @@ Route::middleware('auth:sanctum')->group(function () {
     // Owner Dashboard
     Route::get('/owner/dashboard', [OwnerDashboardController::class, 'dashboard']);
     Route::get('/owner/businesses', [OwnerDashboardController::class, 'businesses']);
+    Route::get('/owner/businesses/{id}', [OwnerDashboardController::class, 'showBusiness']);
+    Route::put('/owner/businesses/{id}', [OwnerDashboardController::class, 'updateBusiness']);
+    Route::post('/owner/businesses/{id}/photos', [OwnerDashboardController::class, 'updatePhotos']);
+    Route::delete('/owner/businesses/{id}/photos', [OwnerDashboardController::class, 'deletePhoto']);
+    Route::get('/owner/businesses/{id}/analytics', [OwnerDashboardController::class, 'businessAnalytics']);
+
+    // Owner Products
+    Route::post('/owner/businesses/{businessId}/products', [OwnerDashboardController::class, 'storeProduct']);
+    Route::put('/owner/businesses/{businessId}/products/{productId}', [OwnerDashboardController::class, 'updateProduct']);
+    Route::delete('/owner/businesses/{businessId}/products/{productId}', [OwnerDashboardController::class, 'destroyProduct']);
+
+    // Owner Reviews
+    Route::post('/owner/reviews/{reviewId}/respond', [OwnerDashboardController::class, 'respondToReview']);
 });
 
 // ─── Admin Routes ───
