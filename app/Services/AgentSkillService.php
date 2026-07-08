@@ -460,35 +460,115 @@ EOT;
     private function autoCategorize(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
+        $api = $this->getApiConfig($agent);
         $batchId = $input['batch_id'] ?? null;
-        $maxResults = $input['max_results'] ?? 50;
+        $maxResults = $input['max_results'] ?? 30;
 
-        if (!$batchId) {
-            throw new \Exception('batch_id is required.');
+        if (!$api['api_key']) {
+            throw new \Exception('API key not configured for AI categorization.');
         }
 
-        $items = ImportItem::where('batch_id', $batchId)
-            ->whereNull('business_id')
-            ->limit($maxResults)
-            ->get();
+        $query = ImportItem::where('status', 'pending')->whereNull('data->category');
+        if ($batchId) $query->where('batch_id', $batchId);
+        $items = $query->limit($maxResults)->get();
 
-        $categories = Category::all()->keyBy('name');
-        $matched = 0;
+        if ($items->isEmpty()) {
+            return ['count' => 0, 'imported' => 0, 'cost' => 0];
+        }
 
+        $existingCategories = Category::pluck('name')->toArray();
+        $catList = !empty($existingCategories) ? implode("\n- ", $existingCategories) : 'No categories exist yet. Create new ones.';
+
+        $businessList = [];
         foreach ($items as $item) {
-            $data = $item->data;
-            $categoryName = $data['category'] ?? null;
+            $d = $item->data;
+            $types = $d['types'] ?? [];
+            $businessList[] = [
+                'id' => $item->id,
+                'name' => $d['name'] ?? '',
+                'address' => $d['address'] ?? '',
+                'types' => $types,
+                'description' => substr($d['description'] ?? '', 0, 100),
+            ];
+        }
 
-            if ($categoryName && $categories->has($categoryName)) {
-                $item->update(['confidence' => min($item->confidence + 0.2, 1.0)]);
-                $matched++;
+        $prompt = <<<EOT
+You are a business categorization expert. For each business below, pick the BEST matching category.
+
+EXISTING CATEGORIES:
+- {$catList}
+
+If NO existing category fits, suggest a NEW category name (make it concise, e.g., "Tuition Center", "Hardware Store").
+
+Return ONLY a JSON array with: id, category (the category name), is_new (true if you created a new category).
+
+Businesses:
+{$json = json_encode($businessList, JSON_PRETTY_PRINT)}
+EOT;
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $api['api_key'],
+            'Content-Type' => 'application/json',
+        ])->timeout(60)->post($api['endpoint'], [
+            'model' => $api['model'],
+            'messages' => [
+                ['role' => 'system', 'content' => 'You are a business categorization AI. Return only valid JSON array. Be precise.'],
+                ['role' => 'user', 'content' => $prompt],
+            ],
+            'temperature' => 0.2,
+            'max_tokens' => 2000,
+        ]);
+
+        if ($response->failed()) {
+            throw new \Exception('AI categorization failed: ' . $response->body());
+        }
+
+        $result = $response->json();
+        $content = $result['choices'][0]['message']['content'] ?? '';
+        $mappings = $this->parseJsonFromResponse($content);
+
+        if (!is_array($mappings)) {
+            throw new \Exception('AI categorization returned invalid JSON');
+        }
+
+        $categorized = 0;
+        $created = [];
+
+        foreach ($mappings as $map) {
+            $itemId = $map['id'] ?? null;
+            $catName = $map['category'] ?? null;
+            $isNew = $map['is_new'] ?? false;
+
+            if (!$itemId || !$catName) continue;
+
+            // Create category if new
+            if ($isNew && !in_array($catName, $existingCategories) && !in_array($catName, $created)) {
+                Category::create([
+                    'name' => $catName,
+                    'slug' => Str::slug($catName),
+                    'icon' => '📂',
+                    'is_active' => true,
+                ]);
+                $created[] = $catName;
+                $existingCategories[] = $catName;
+            }
+
+            $item = $items->firstWhere('id', $itemId);
+            if ($item) {
+                $data = $item->data;
+                $data['category'] = $catName;
+                $item->update([
+                    'data' => $data,
+                    'confidence' => min(($item->confidence ?? 0.5) + 0.15, 1.0),
+                ]);
+                $categorized++;
             }
         }
 
         return [
             'count' => $items->count(),
-            'imported' => $matched,
-            'cost' => 0,
+            'imported' => $categorized,
+            'cost' => round(($result['usage']['total_tokens'] ?? 0) * 0.00000014, 4),
         ];
     }
 

@@ -138,11 +138,11 @@
                         </div>
 
                         <div class="field-group hidden" data-skill="auto_categorize">
-                            <label class="block text-sm text-slate-400 mb-1">Batch ID</label>
-                            <input type="number" name="batch_id" class="input-dark" placeholder="Required — enter batch ID">
+                            <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
+                            <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
                             <div class="mt-2">
                                 <label class="block text-xs text-slate-500 mb-1">Max Items</label>
-                                <input type="number" name="max_results" class="input-dark" value="50" min="1" max="200">
+                                <input type="number" name="max_results" class="input-dark" value="30" min="1" max="100">
                             </div>
                         </div>
 
