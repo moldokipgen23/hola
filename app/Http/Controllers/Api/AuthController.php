@@ -40,6 +40,8 @@ class AuthController extends Controller
             ]
         );
 
+        $user->recordLogin();
+
         return response()->json([
             'token' => $user->createToken('hola')->plainTextToken,
             'user' => $user,
@@ -80,6 +82,8 @@ class AuthController extends Controller
         }
 
         $user->update(['otp' => null, 'otp_expires_at' => null, 'phone_verified_at' => now()]);
+
+        $user->recordLogin();
 
         return response()->json([
             'token' => $user->createToken('hola')->plainTextToken,

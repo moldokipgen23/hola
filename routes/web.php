@@ -93,6 +93,8 @@ Route::post('/admin/login', function (Request $request) {
     Auth::login($user);
     $request->session()->regenerate();
 
+    $user->recordLogin();
+
     return redirect()->route('admin.dashboard');
 })->name('admin.login.post');
 
