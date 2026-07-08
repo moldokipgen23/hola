@@ -179,7 +179,7 @@ class AgentSkillService
                 try {
                     $details = Http::get('https://maps.googleapis.com/maps/api/place/details/json', [
                         'place_id' => $placeId,
-                        'fields' => 'formatted_phone_number,website,opening_hours,photos',
+                        'fields' => 'formatted_phone_number,website,opening_hours,photos,reviews',
                         'key' => $apiKey,
                     ]);
                     if ($details->successful()) {
@@ -191,6 +191,18 @@ class AgentSkillService
                                 if (!empty($photo['photo_reference'])) {
                                     $photoUrls[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
                                 }
+                            }
+                        }
+                        // Capture reviews
+                        $googleReviews = [];
+                        if (!empty($detailData['reviews'])) {
+                            foreach (array_slice($detailData['reviews'], 0, 5) as $rev) {
+                                $googleReviews[] = [
+                                    'author' => $rev['author_name'] ?? 'Anonymous',
+                                    'rating' => $rev['rating'] ?? 0,
+                                    'text' => $rev['text'] ?? '',
+                                    'time' => $rev['time'] ?? null,
+                                ];
                             }
                         }
                     }
@@ -211,6 +223,7 @@ class AgentSkillService
                 'types' => $place['types'] ?? [],
                 'google_place_id' => $placeId,
                 'photos' => $photoUrls,
+                'google_reviews' => $googleReviews ?? [],
                 'photo_references' => array_map(fn($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
             ];
 
