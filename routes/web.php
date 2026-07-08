@@ -1293,7 +1293,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     Route::get('/staff/create', function () {
         if (Auth::user()->role !== 'super_admin') abort(403);
-        return view('admin.staff.form');
+        return view('admin.staff.form', ['staff' => null]);
     })->name('staff.create');
 
     Route::post('/staff', function (Request $request) {

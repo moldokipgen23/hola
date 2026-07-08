@@ -395,7 +395,8 @@ EOT;
             'pending' => $imported,
         ]);
 
-        $cost = $result['usage']['total_tokens'] ? ($result['usage']['total_tokens'] * 0.00000014) : 0;
+        $tokens = $result['usage']['total_tokens'] ?? 0;
+        $cost = $tokens * 0.00000014;
 
         return [
             'count' => count($businesses),
