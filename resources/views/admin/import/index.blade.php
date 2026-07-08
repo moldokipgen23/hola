@@ -74,9 +74,6 @@
             </div>
         </div>
     </details>
-            <input type="number" id="google-max" class="input-dark" value="20" min="1" max="60">
-        </div>
-    </div>
     <button onclick="runGoogleImport()" class="btn-primary">Search & Import</button>
 </div>
 
