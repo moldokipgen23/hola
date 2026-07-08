@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('import_batches', function (Blueprint $table) {
-            $table->integer('pending')->default(0)->after('skipped');
-        });
+        if (!Schema::hasColumn('import_batches', 'pending')) {
+            Schema::table('import_batches', function (Blueprint $table) {
+                $table->integer('pending')->default(0)->after('skipped');
+            });
+        }
     }
 
     public function down(): void
