@@ -95,7 +95,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('businesses.store');
 
     Route::get('/businesses/{id}', function ($id) {
-        $business = Business::with(['category', 'subcategory', 'products', 'reviews.user'])->findOrFail($id);
+        $business = Business::with(['category', 'subcategory', 'products', 'reviews.user', 'user', 'createdBy'])->findOrFail($id);
         return view('admin.businesses.show', compact('business'));
     })->name('businesses.show');
 
