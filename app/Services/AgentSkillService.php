@@ -255,6 +255,9 @@ class AgentSkillService
 
             // Auto-match category
             $matchedCategory = $this->matchCategory($place['types'] ?? [], array_keys($categories));
+            if ($matchedCategory) {
+                $placeData['category'] = $matchedCategory;
+            }
 
             // Calculate confidence based on data quality
             $rating = $place['rating'] ?? null;
@@ -674,21 +677,27 @@ EOT;
     private function matchCategory(array $placeTypes, array $categoryNames): ?string
     {
         $typeMap = [
-            'restaurant' => ['restaurant', 'food', 'meal_takeaway'],
-            'school' => ['school', 'university'],
-            'hospital' => ['hospital', 'doctor', 'health'],
-            'shop' => ['store', 'shop', 'clothing_store'],
-            'hotel' => ['hotel', 'lodging'],
-            'bank' => ['bank', 'atm', 'finance'],
-            'pharmacy' => ['pharmacy', 'drugstore'],
-            'gym' => ['gym', 'fitness_center'],
-            'church' => ['church', 'place_of_worship'],
+            'Restaurant' => ['restaurant', 'food', 'meal_takeaway', 'meal_delivery', 'cafe', 'bakery', 'bar'],
+            'School' => ['school', 'primary_school', 'secondary_school', 'university', 'college'],
+            'Hospital' => ['hospital', 'doctor', 'health', 'dentist', 'pharmacy', 'drugstore', 'physiotherapist'],
+            'Hotel' => ['hotel', 'lodging', 'guest_house', 'motel', 'resort'],
+            'Bank' => ['bank', 'atm', 'finance', 'insurance_agency'],
+            'Shop' => ['store', 'shopping_mall', 'supermarket', 'grocery_or_supermarket', 'clothing_store', 'electronics_store', 'hardware_store', 'furniture_store', 'jewelry_store', 'shoe_store', 'book_store', 'department_store', 'home_goods_store'],
+            'Gym' => ['gym', 'fitness_center', 'stadium'],
+            'Church' => ['church', 'place_of_worship', 'hindu_temple', 'mosque'],
+            'Gas Station' => ['gas_station', 'petrol_station'],
+            'Beauty' => ['beauty_salon', 'hair_care', 'spa', 'nail_salon'],
+            'Auto Repair' => ['car_repair', 'car_dealer', 'car_wash', 'auto_parts_store'],
+            'Park' => ['park', 'tourist_attraction', 'museum', 'art_gallery', 'zoo'],
+            'Real Estate' => ['real_estate_agency', 'travel_agency'],
+            'Government' => ['local_government_office', 'police', 'fire_station', 'post_office', 'courthouse'],
+            'Education' => ['school', 'primary_school', 'secondary_school', 'university', 'college', 'library'],
         ];
 
         foreach ($placeTypes as $type) {
             foreach ($typeMap as $category => $types) {
                 if (in_array($type, $types)) {
-                    $match = collect($categoryNames)->first(fn($cn) => Str::contains(Str::lower($cn), $category));
+                    $match = collect($categoryNames)->first(fn($cn) => Str::contains(Str::lower($cn), Str::lower($category)));
                     if ($match) return $match;
                 }
             }
