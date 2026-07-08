@@ -51,6 +51,7 @@
                     </td>
                     <td class="text-sm">{{ $business->views_count }}</td>
                     <td class="text-sm space-x-2">
+                        <a href="{{ route('admin.businesses.show', $business->id) }}" class="text-emerald-400 hover:text-emerald-300">View</a>
                         <a href="{{ route('admin.businesses.edit', $business->id) }}" class="text-blue-400 hover:text-blue-300">Edit</a>
                         <form method="POST" action="{{ route('admin.businesses.destroy', $business->id) }}" data-confirm="Delete this business?" class="inline">
                             @csrf @method('DELETE')

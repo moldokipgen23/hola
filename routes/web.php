@@ -94,6 +94,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return redirect()->route('admin.businesses')->with('success', 'Business created.');
     })->name('businesses.store');
 
+    Route::get('/businesses/{id}', function ($id) {
+        $business = Business::with(['category', 'subcategory', 'products', 'reviews.user'])->findOrFail($id);
+        return view('admin.businesses.show', compact('business'));
+    })->name('businesses.show');
+
     Route::get('/businesses/{id}/edit', function ($id) {
         $business = Business::findOrFail($id);
         $categories = Category::orderBy('name')->get();
