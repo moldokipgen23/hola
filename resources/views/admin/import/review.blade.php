@@ -211,12 +211,12 @@
 
 <script>
 document.querySelectorAll('.agent-select').forEach(select => {
-    select.addEventListener('change', function() {
-        const form = this.closest('form');
-        form.action = this.dataset.baseUrl + this.value;
-    });
     const form = select.closest('form');
-    form.action = select.dataset.baseUrl + select.value;
+    const updateAction = () => {
+        form.action = '/admin/agents/' + select.value + '/run';
+    };
+    select.addEventListener('change', updateAction);
+    updateAction();
 });
 
 function updateBulk() {
