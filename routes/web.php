@@ -56,6 +56,9 @@ Route::get('/business/{slug}', function ($slug) {
     return view('public.business', compact('business'));
 })->name('public.business');
 
+// Login redirect (for auth middleware)
+Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
+
 // robots.txt
 Route::get('/robots.txt', function () {
     return response(file_get_contents(public_path('robots.txt')), 200, ['Content-Type' => 'text/plain']);

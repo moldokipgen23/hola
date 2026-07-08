@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
 @section('title', $business->name . ' | ' . config('app.name', 'Hola'))
-@section('description', Str::limit($business->description ?? "Find {$business->name} at {$business->address}. Call {$business->phone ?? 'now'}.", 160))
+@section('description', \Illuminate\Support\Str::limit($business->description ?? "Find {$business->name} at {$business->address}. Call {$business->phone ?? 'now'}.", 160))
 @section('og_title', $business->name)
 @section('og_description', $business->description ?? "Find {$business->name} at {$business->address}")
 @if($business->photos && count($business->photos) > 0)
@@ -174,7 +174,7 @@
             <div class="glass-card p-6 rounded-xl">
                 <h2 class="text-lg font-semibold text-white mb-4">Products ({{ $business->products->count() }})</h2>
                 <div class="space-y-2">
-                    @foreach($business->products->limit(5) as $product)
+                    @foreach($business->products->take(5) as $product)
                         <div class="p-3 rounded-lg bg-white/5">
                             <p class="text-white text-sm font-medium">{{ $product->name }}</p>
                             @if($product->price)
