@@ -125,8 +125,11 @@ class AgentSkillService
                 $lat = $location['lat'];
                 $lng = $location['lng'];
             } else {
-                $lat = $lat ?? 24.4871;
-                $lng = $lng ?? 93.6998;
+                $geoError = $geo['status'] ?? 'UNKNOWN';
+                if ($geoError === 'REQUEST_DENIED') {
+                    throw new \Exception("Geocoding failed: Enable 'Geocoding API' in Google Cloud Console for this API key. Status: {$geoError}");
+                }
+                throw new \Exception("Could not find coordinates for '{$geoAddress}'. Try a more specific area name or enter coordinates manually. Status: {$geoError}");
             }
         }
 
