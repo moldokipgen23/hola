@@ -153,7 +153,7 @@ class AgentSkillService
         foreach ($places as $place) {
             $placeId = $place['place_id'] ?? null;
             $name = $place['name'] ?? '';
-            $address = $place['vicinity'] ?? '';
+            $address = $place['formatted_address'] ?? $place['vicinity'] ?? '';
 
             // DUPLICATE CHECK 1: Skip if google_place_id already exists
             if ($placeId && in_array($placeId, $existingPlaceIds)) {
