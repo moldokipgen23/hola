@@ -27,7 +27,13 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         @foreach(\App\Models\Category::withCount('businesses')->orderBy('name')->limit(8)->get() as $category)
             <a href="/category/{{ $category->slug }}" class="glass-card p-4 text-center hover:border-blue-500/30 transition">
-                <div class="text-3xl mb-2">📂</div>
+                <div class="text-3xl mb-2">
+                    @if($category->image)
+                        <img src="{{ asset($category->image) }}" alt="{{ $category->name }}" class="w-8 h-8 mx-auto object-contain">
+                    @else
+                        {{ $category->icon ?? '📂' }}
+                    @endif
+                </div>
                 <p class="text-white font-medium">{{ $category->name }}</p>
                 <p class="text-slate-500 text-sm">{{ $category->businesses_count }} businesses</p>
             </a>
