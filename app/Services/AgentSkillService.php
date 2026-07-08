@@ -106,40 +106,17 @@ class AgentSkillService
         }
 
         $query = $input['query'] ?? '';
-        $maxResults = min($input['max_results'] ?? 20, 60);
-
-        // Geocode area or zipcode to coordinates
         $area = $input['area'] ?? '';
         $zipcode = $input['zipcode'] ?? '';
-        $geoAddress = $area ?: ($zipcode ?: 'Churachandpur, Manipur, India');
-        $lat = $input['latitude'] ?? null;
-        $lng = $input['longitude'] ?? null;
+        $maxResults = min($input['max_results'] ?? 20, 60);
 
-        if (!$lat || !$lng) {
-            $geo = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
-                'address' => $geoAddress,
-                'key' => $apiKey,
-            ]);
-            if ($geo->successful() && ($geo['status'] ?? '') === 'OK') {
-                $location = $geo['results'][0]['geometry']['location'];
-                $lat = $location['lat'];
-                $lng = $location['lng'];
-            } else {
-                $geoError = $geo['status'] ?? 'UNKNOWN';
-                if ($geoError === 'REQUEST_DENIED') {
-                    throw new \Exception("Geocoding failed: Enable 'Geocoding API' in Google Cloud Console for this API key. Status: {$geoError}");
-                }
-                throw new \Exception("Could not find coordinates for '{$geoAddress}'. Try a more specific area name or enter coordinates manually. Status: {$geoError}");
-            }
-        }
+        // Build search query from area + zipcode + query
+        $location = implode(' ', array_filter([$area, $zipcode]));
+        $searchQuery = $query . ($location ? ' in ' . $location : '');
 
-        $radius = $input['radius'] ?? 10000;
-
-        // Nearby search
-        $response = Http::get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', [
-            'location' => "{$lat},{$lng}",
-            'radius' => $radius,
-            'keyword' => $query,
+        // Text Search - no geocoding needed
+        $response = Http::get('https://maps.googleapis.com/maps/api/place/textsearch/json', [
+            'query' => $searchQuery,
             'key' => $apiKey,
         ]);
 
@@ -160,7 +137,7 @@ class AgentSkillService
         $batch = ImportBatch::create([
             'agent_id' => $agent->id,
             'source' => 'google_places',
-            'name' => "Google: {$query} ({$lat},{$lng})",
+            'name' => "Google: {$searchQuery}",
             'total' => count($places),
             'status' => 'processing',
         ]);
