@@ -108,14 +108,16 @@ class AgentSkillService
         $query = $input['query'] ?? '';
         $maxResults = min($input['max_results'] ?? 20, 60);
 
-        // Geocode area/zipcode to coordinates
-        $area = $input['area'] ?? $input['zipcode'] ?? 'Churachandpur, Manipur, India';
+        // Geocode area or zipcode to coordinates
+        $area = $input['area'] ?? '';
+        $zipcode = $input['zipcode'] ?? '';
+        $geoAddress = $area ?: ($zipcode ?: 'Churachandpur, Manipur, India');
         $lat = $input['latitude'] ?? null;
         $lng = $input['longitude'] ?? null;
 
         if (!$lat || !$lng) {
             $geo = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
-                'address' => $area,
+                'address' => $geoAddress,
                 'key' => $apiKey,
             ]);
             if ($geo->successful() && ($geo['status'] ?? '') === 'OK') {
@@ -492,6 +494,8 @@ EOT;
             ];
         }
 
+        $json = json_encode($businessList, JSON_PRETTY_PRINT);
+
         $prompt = <<<EOT
 You are a business categorization expert. For each business below, pick the BEST matching category.
 
@@ -503,7 +507,7 @@ If NO existing category fits, suggest a NEW category name (make it concise, e.g.
 Return ONLY a JSON array with: id, category (the category name), is_new (true if you created a new category).
 
 Businesses:
-{$json = json_encode($businessList, JSON_PRETTY_PRINT)}
+{$json}
 EOT;
 
         $response = Http::withHeaders([

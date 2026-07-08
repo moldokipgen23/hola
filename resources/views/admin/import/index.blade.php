@@ -46,10 +46,16 @@
             </select>
         </div>
     </div>
-    <div class="mb-4">
-        <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
-        <input type="text" id="google-zipcode" class="input-dark" value="Churachandpur, Manipur" placeholder="e.g., 795128 or Lamka, Churachandpur">
-        <p class="text-slate-500 text-xs mt-1">We'll automatically find the coordinates for this location</p>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Area / City</label>
+            <input type="text" id="google-area" class="input-dark" value="Churachandpur, Manipur" placeholder="e.g., Lamka, Churachandpur">
+        </div>
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Zipcode</label>
+            <input type="text" id="google-zipcode" class="input-dark" placeholder="e.g., 795128">
+            <p class="text-slate-500 text-xs mt-1">Coordinates auto-detected from area or zipcode</p>
+        </div>
     </div>
     <div class="grid grid-cols-3 gap-4 mb-4">
         <div>
@@ -210,7 +216,8 @@ function runGoogleImport() {
         @csrf
         <input type="hidden" name="skill" value="google_places_import">
         <input type="hidden" name="query" value="${document.getElementById('google-query').value}">
-        <input type="hidden" name="area" value="${document.getElementById('google-zipcode').value}">
+        <input type="hidden" name="area" value="${document.getElementById('google-area').value}">
+        <input type="hidden" name="zipcode" value="${document.getElementById('google-zipcode').value}">
         <input type="hidden" name="radius" value="${document.getElementById('google-radius').value}">
         <input type="hidden" name="max_results" value="${document.getElementById('google-max').value}">
         ${lat ? `<input type="hidden" name="latitude" value="${lat}">` : ''}
