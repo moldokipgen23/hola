@@ -832,12 +832,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         // Check by external_id
         if (!empty($item->external_id)) {
-            $existingBusiness = \App\Models\Business::where('external_id', $item->external_id)->first();
+            $existingBusiness = \App\Models\Business::withTrashed()->where('external_id', $item->external_id)->first();
         }
 
         // Check by name + address
         if (!$existingBusiness && !empty($data['name'])) {
-            $existingBusiness = \App\Models\Business::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->first();
+            $existingBusiness = \App\Models\Business::withTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
             if ($existingBusiness && !empty($data['address'])) {
                 similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
                 if ($percent < 50) {
@@ -849,7 +849,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         // Check by phone
         if (!$existingBusiness && !empty($data['phone'])) {
             $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-            $existingBusiness = \App\Models\Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+            $existingBusiness = \App\Models\Business::withTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
         }
 
         if ($existingBusiness) {
@@ -877,8 +877,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
         }
 
-        $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
-        $existing = \App\Models\Business::where('slug', $slug)->first();
+        $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
+        $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
         if ($existing) {
             $slug .= '-' . \Illuminate\Support\Str::random(5);
         }
@@ -954,12 +954,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 // Check by external_id
                 if (!empty($item->external_id)) {
-                    $existingBusiness = \App\Models\Business::where('external_id', $item->external_id)->first();
+                    $existingBusiness = \App\Models\Business::withTrashed()->where('external_id', $item->external_id)->first();
                 }
 
                 // Check by name + address
                 if (!$existingBusiness && !empty($data['name'])) {
-                    $existingBusiness = \App\Models\Business::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->first();
+                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
                     if ($existingBusiness && !empty($data['address'])) {
                         similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
                         if ($percent < 50) {
@@ -971,7 +971,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 // Check by phone
                 if (!$existingBusiness && !empty($data['phone'])) {
                     $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-                    $existingBusiness = \App\Models\Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
                 }
 
                 if ($existingBusiness) {
@@ -996,8 +996,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     }
                 }
 
-                $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
-                $existing = \App\Models\Business::where('slug', $slug)->first();
+                $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
+                $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
                 if ($existing) $slug .= '-' . \Illuminate\Support\Str::random(5);
 
                 $photos = [];
@@ -1076,12 +1076,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 // Check by external_id
                 if (!empty($item->external_id)) {
-                    $existingBusiness = \App\Models\Business::where('external_id', $item->external_id)->first();
+                    $existingBusiness = \App\Models\Business::withTrashed()->where('external_id', $item->external_id)->first();
                 }
 
                 // Check by name + address
                 if (!$existingBusiness && !empty($data['name'])) {
-                    $existingBusiness = \App\Models\Business::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->first();
+                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
                     if ($existingBusiness && !empty($data['address'])) {
                         similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
                         if ($percent < 50) {
@@ -1093,7 +1093,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 // Check by phone
                 if (!$existingBusiness && !empty($data['phone'])) {
                     $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-                    $existingBusiness = \App\Models\Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
                 }
 
                 if ($existingBusiness) {
@@ -1118,8 +1118,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     }
                 }
 
-                $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
-                $existing = \App\Models\Business::where('slug', $slug)->first();
+                $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
+                $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
                 if ($existing) {
                     $slug .= '-' . \Illuminate\Support\Str::random(5);
                 }
