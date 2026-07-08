@@ -129,6 +129,8 @@ class AuthController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8|confirmed',
             'business_name' => 'required|string|max:255',
+            'business_address' => 'nullable|string|max:255',
+            'business_category_id' => 'nullable|exists:categories,id',
         ]);
 
         $user = User::create([
@@ -139,13 +141,29 @@ class AuthController extends Controller
             'role' => 'owner',
         ]);
 
+        $slug = \Illuminate\Support\Str::slug($request->business_name);
+        if (\App\Models\Business::withTrashed()->where('slug', $slug)->exists()) {
+            $slug .= '-' . \Illuminate\Support\Str::random(5);
+        }
+
+        $business = \App\Models\Business::create([
+            'name' => $request->business_name,
+            'slug' => $slug,
+            'address' => $request->business_address ?? '',
+            'category_id' => $request->business_category_id,
+            'created_by' => $user->id,
+            'claim_status' => 'claimed',
+            'is_active' => true,
+        ]);
+
         $user->sendEmailVerificationNotification();
-        ActivityLogService::log('owner_registered', $user, ['business_name' => $request->business_name]);
+        ActivityLogService::log('owner_registered', $user, ['business_name' => $request->business_name, 'business_id' => $business->id]);
 
         return response()->json([
             'token' => $user->createToken('hola')->plainTextToken,
             'user' => $user,
-            'message' => 'Owner account created. Add your business details next.',
+            'business' => $business,
+            'message' => 'Owner account and business created successfully.',
         ]);
     }
 

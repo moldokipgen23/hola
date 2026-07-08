@@ -21,9 +21,6 @@
                 <option value="">All Roles</option>
                 <option value="customer" {{ request('role') == 'customer' ? 'selected' : '' }}>Customer</option>
                 <option value="owner" {{ request('role') == 'owner' ? 'selected' : '' }}>Owner</option>
-                <option value="admin" {{ request('role') == 'admin' ? 'selected' : '' }}>Admin</option>
-                <option value="moderator" {{ request('role') == 'moderator' ? 'selected' : '' }}>Moderator</option>
-                <option value="super_admin" {{ request('role') == 'super_admin' ? 'selected' : '' }}>Super Admin</option>
             </select>
         </div>
         <div>

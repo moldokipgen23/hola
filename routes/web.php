@@ -133,7 +133,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Users Management
     Route::get('/users', function () {
-        $query = User::withCount('ownedBusinesses');
+        $query = User::whereNotIn('role', ['super_admin', 'admin', 'moderator'])->withCount('ownedBusinesses');
 
         if ($search = request('search')) {
             $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
@@ -182,7 +182,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'email' => 'nullable|email|unique:users,email',
             'phone' => 'nullable|string|unique:users,phone',
             'password' => 'required|string|min:6',
-            'role' => 'required|in:customer,owner,moderator,admin,super_admin',
+            'role' => 'required|in:customer,owner',
             'is_active' => 'boolean',
         ]);
 
@@ -218,7 +218,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|unique:users,phone,' . $user->id,
-            'role' => 'required|in:customer,owner,moderator,admin,super_admin',
+            'role' => 'required|in:customer,owner',
             'is_active' => 'boolean',
         ]);
 
@@ -360,6 +360,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_featured'] = $request->boolean('is_featured');
         $validated['district'] = 'Churachandpur';
+        $validated['created_by'] = Auth::id();
 
         Business::create($validated);
         \App\Services\ActivityLogService::log('business_created', null, ['name' => $validated['name']]);
@@ -598,7 +599,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Claims
     Route::get('/claims', function () {
-        $claims = ClaimRequest::with(['user', 'business'])->latest()->paginate(20);
+        $query = ClaimRequest::with(['user', 'business']);
+
+        if ($status = request('status')) {
+            $query->where('status', $status);
+        }
+
+        $claims = $query->latest()->paginate(20)->withQueryString();
         return view('admin.claims.index', compact('claims'));
     })->name('claims');
 
@@ -606,7 +613,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
         $claim->update(['status' => 'approved']);
         $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
-        $claim->user->update(['role' => 'owner']);
+        if ($claim->user->role === 'customer') {
+            $claim->user->update(['role' => 'owner']);
+        }
         \App\Services\NotificationService::claimApproved($claim);
         \App\Services\ActivityLogService::log('claim_approved', $claim, ['business_id' => $claim->business_id, 'user_id' => $claim->user_id]);
         return redirect()->route('admin.claims')->with('success', 'Claim approved. User upgraded to owner.');
@@ -626,10 +635,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if (empty($ids)) return back()->with('error', 'No items selected.');
 
         foreach ($ids as $id) {
-            $claim = ClaimRequest::with('user')->findOrFail($id);
+            $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
             $claim->update(['status' => 'approved']);
             $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
-            $claim->user->update(['role' => 'owner']);
+            if ($claim->user->role === 'customer') {
+                $claim->user->update(['role' => 'owner']);
+            }
+            \App\Services\NotificationService::claimApproved($claim);
             \App\Services\ActivityLogService::log('claim_approved', $claim, ['business_id' => $claim->business_id, 'user_id' => $claim->user_id]);
         }
         return back()->with('success', count($ids) . ' claims approved. Users upgraded to owner.');
@@ -640,8 +652,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if (empty($ids)) return back()->with('error', 'No items selected.');
 
         foreach ($ids as $id) {
-            $claim = ClaimRequest::findOrFail($id);
+            $claim = ClaimRequest::with('business')->findOrFail($id);
             $claim->update(['status' => 'rejected']);
+            \App\Services\NotificationService::claimRejected($claim);
             \App\Services\ActivityLogService::log('claim_rejected', $claim, ['business_id' => $claim->business_id]);
         }
         return back()->with('success', count($ids) . ' claims rejected.');

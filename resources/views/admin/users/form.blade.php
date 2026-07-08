@@ -40,9 +40,6 @@
                 <select name="role" class="input-dark w-full" required>
                     <option value="customer" {{ old('role', $user->role ?? '') === 'customer' ? 'selected' : '' }}>Customer</option>
                     <option value="owner" {{ old('role', $user->role ?? '') === 'owner' ? 'selected' : '' }}>Owner</option>
-                    <option value="moderator" {{ old('role', $user->role ?? '') === 'moderator' ? 'selected' : '' }}>Moderator</option>
-                    <option value="admin" {{ old('role', $user->role ?? '') === 'admin' ? 'selected' : '' }}>Admin</option>
-                    <option value="super_admin" {{ old('role', $user->role ?? '') === 'super_admin' ? 'selected' : '' }}>Super Admin</option>
                 </select>
             </div>
             <div>

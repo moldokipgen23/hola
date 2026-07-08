@@ -74,7 +74,9 @@ class ClaimController extends Controller
                 'claim_status' => 'claimed',
                 'created_by' => $claim->user_id,
             ]);
-            $claim->user->update(['role' => 'owner']);
+            if ($claim->user->role === 'customer') {
+                $claim->user->update(['role' => 'owner']);
+            }
             NotificationService::claimApproved($claim);
             ActivityLogService::log('claim_approved', $claim, ['business_id' => $claim->business_id, 'user_id' => $claim->user_id]);
         } else {
