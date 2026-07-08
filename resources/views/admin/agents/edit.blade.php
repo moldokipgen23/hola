@@ -82,6 +82,7 @@
             @php
                 $allSkills = [
                     'google_places_import' => 'Google Places Import',
+                    'serpapi_business_search' => 'SerpAPI Business Search',
                     'ai_business_scraper' => 'AI Business Scraper',
                     'auto_categorize' => 'Auto Categorize',
                     'duplicate_detector' => 'Duplicate Detector',

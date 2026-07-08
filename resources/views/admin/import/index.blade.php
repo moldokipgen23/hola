@@ -13,6 +13,9 @@
     <button onclick="showTab('google')" id="tab-google" class="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm font-medium transition-all">
         Google Maps
     </button>
+    <button onclick="showTab('serpapi')" id="tab-serpapi" class="px-4 py-2 rounded-lg bg-slate-700/50 text-slate-400 text-sm font-medium transition-all">
+        SerpAPI
+    </button>
     <button onclick="showTab('ai')" id="tab-ai" class="px-4 py-2 rounded-lg bg-slate-700/50 text-slate-400 text-sm font-medium transition-all">
         AI Scraper
     </button>
@@ -66,6 +69,38 @@
         </div>
     </div>
     <button onclick="runGoogleImport()" class="btn-primary">Search & Import</button>
+</div>
+
+<!-- SerpAPI -->
+<div id="panel-serpapi" class="glass-card p-6 rounded-xl hidden">
+    <h3 class="font-semibold text-white mb-3">Search via SerpAPI</h3>
+    <p class="text-sm text-slate-400 mb-4">Scrape real Google search results for businesses. More reliable than AI, broader than Google Maps.</p>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Search Query</label>
+            <input type="text" id="serpapi-query" class="input-dark" placeholder="e.g., restaurants, hotels, shops">
+        </div>
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
+            <input type="text" id="serpapi-area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
+        </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Agent</label>
+            <select id="serpapi-agent" class="input-dark">
+                @foreach(\App\Models\AiAgent::whereJsonContains('skills', 'serpapi_business_search')->get() as $agent)
+                    <option value="{{ $agent->id }}">{{ $agent->avatar }} {{ $agent->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Max Results</label>
+            <input type="number" id="serpapi-max" class="input-dark" value="20" min="1" max="50">
+        </div>
+    </div>
+    <button onclick="runSerpapiImport()" class="btn-primary">Search via SerpAPI</button>
 </div>
 
 <!-- AI Scraper -->
@@ -189,6 +224,24 @@ function runAiScrape() {
         <input type="hidden" name="area" value="${document.getElementById('ai-area').value}">
         <input type="hidden" name="category" value="${document.getElementById('ai-category').value}">
         <input type="hidden" name="max_results" value="${document.getElementById('ai-max').value}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function runSerpapiImport() {
+    const agentId = document.getElementById('serpapi-agent').value;
+    if (!agentId) { alert('Select an agent first'); return; }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/admin/agents/${agentId}/run`;
+    form.innerHTML = `
+        @csrf
+        <input type="hidden" name="skill" value="serpapi_business_search">
+        <input type="hidden" name="query" value="${document.getElementById('serpapi-query').value}">
+        <input type="hidden" name="area" value="${document.getElementById('serpapi-area').value}">
+        <input type="hidden" name="max_results" value="${document.getElementById('serpapi-max').value}">
     `;
     document.body.appendChild(form);
     form.submit();

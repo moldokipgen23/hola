@@ -22,6 +22,7 @@ class AgentSkillService
             $result = match ($task->type) {
                 'google_places_import' => $this->googlePlacesImport($agent, $task),
                 'ai_business_scraper' => $this->aiBusinessScraper($agent, $task),
+                'serpapi_business_search' => $this->serpapiBusinessSearch($agent, $task),
                 'auto_categorize' => $this->autoCategorize($agent, $task),
                 'duplicate_detector' => $this->duplicateDetector($agent, $task),
                 'description_writer' => $this->descriptionWriter($agent, $task),
@@ -654,5 +655,115 @@ EOT;
         }
 
         return null;
+    }
+
+    private function serpapiBusinessSearch(AiAgent $agent, AiAgentTask $task): array
+    {
+        $input = $task->input;
+        $apiKey = $agent->getApiKeyDecrypted()
+            ?? \App\Models\Setting::get('api_key_serpapi')
+            ?? config('services.serpapi.api_key');
+
+        if (!$apiKey) {
+            throw new \Exception('SerpAPI key not configured. Add it in Settings → API Keys or on this agent.');
+        }
+
+        $query = $input['query'] ?? 'businesses';
+        $area = $input['area'] ?? $input['zipcode'] ?? 'Lamka, Churachandpur, Manipur';
+        $maxResults = min($input['max_results'] ?? 20, 50);
+
+        $searchQuery = "{$query} in {$area}";
+
+        $response = Http::get('https://serpapi.com/search', [
+            'engine' => 'google_maps',
+            'q' => $searchQuery,
+            'api_key' => $apiKey,
+            'hl' => 'en',
+            'num' => min($maxResults, 20),
+        ]);
+
+        if ($response->failed()) {
+            throw new \Exception('SerpAPI request failed: ' . $response->body());
+        }
+
+        $data = $response->json();
+        $places = $data['local_results'] ?? $data['results'] ?? [];
+
+        if (empty($places)) {
+            $places = $data['organic_results'] ?? [];
+        }
+
+        $batch = ImportBatch::create([
+            'agent_id' => $agent->id,
+            'source' => 'serpapi',
+            'name' => "SerpAPI: {$query} in {$area}",
+            'total' => count($places),
+            'status' => 'processing',
+        ]);
+
+        $imported = 0;
+        $skipped = 0;
+        $existingNames = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+
+        foreach (array_slice($places, 0, $maxResults) as $place) {
+            $name = $place['title'] ?? $place['name'] ?? '';
+            $address = $place['address'] ?? $place['snippet'] ?? '';
+            $phone = $place['phone'] ?? null;
+            $website = $place['website'] ?? $place['link'] ?? null;
+            $rating = $place['rating'] ?? null;
+            $reviews = $place['reviews'] ?? null;
+
+            if (empty($name)) {
+                $skipped++;
+                continue;
+            }
+
+            $normalizedName = Str::lower(trim($name));
+            if (in_array($normalizedName, $existingNames)) {
+                $skipped++;
+                continue;
+            }
+
+            $placeData = [
+                'name' => $name,
+                'address' => $address,
+                'phone' => $phone,
+                'website' => $website,
+                'rating' => $rating,
+                'total_ratings' => $reviews,
+                'latitude' => $place['gps_coordinates']['latitude'] ?? $place['latitude'] ?? null,
+                'longitude' => $place['gps_coordinates']['longitude'] ?? $place['longitude'] ?? null,
+                'types' => $place['type'] ? [$place['type']] : [],
+            ];
+
+            $confidence = 0.5;
+            if ($phone) $confidence += 0.15;
+            if ($website) $confidence += 0.1;
+            if ($address) $confidence += 0.15;
+            if ($rating) $confidence += 0.1;
+            $confidence = min($confidence, 1.0);
+
+            ImportItem::create([
+                'batch_id' => $batch->id,
+                'data' => $placeData,
+                'confidence' => $confidence,
+            ]);
+
+            $existingNames[] = $normalizedName;
+            $imported++;
+        }
+
+        $batch->update([
+            'status' => 'completed',
+            'pending' => $imported,
+        ]);
+
+        return [
+            'count' => count($places),
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'batch_id' => $batch->id,
+            'cost' => round(count($places) * 0.005, 4),
+        ];
     }
 }
