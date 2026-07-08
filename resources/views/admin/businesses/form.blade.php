@@ -90,12 +90,12 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Latitude</label>
-                    <input type="number" step="any" name="lat" value="{{ old('lat', $business->latitude ?? '') }}"
+                    <input type="number" step="any" name="latitude" value="{{ old('latitude', $business->latitude ?? '') }}"
                         class="input-dark">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Longitude</label>
-                    <input type="number" step="any" name="lng" value="{{ old('lng', $business->longitude ?? '') }}"
+                    <input type="number" step="any" name="longitude" value="{{ old('longitude', $business->longitude ?? '') }}"
                         class="input-dark">
                 </div>
             </div>

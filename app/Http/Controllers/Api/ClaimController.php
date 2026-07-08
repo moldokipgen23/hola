@@ -67,6 +67,7 @@ class ClaimController extends Controller
         if ($request->status === 'approved') {
             $claim->business->update([
                 'claim_status' => 'claimed',
+                'created_by' => $claim->user_id,
             ]);
         }
 

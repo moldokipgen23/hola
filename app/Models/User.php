@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -22,6 +23,12 @@ class User extends Authenticatable
         'google_id',
         'avatar',
         'role',
+        'is_active',
+        'banned_at',
+        'ban_reason',
+        'last_login_at',
+        'login_count',
+        'created_by_admin',
     ];
 
     protected $hidden = [
@@ -34,8 +41,16 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'banned_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    public function ownedBusinesses(): HasMany
+    {
+        return $this->hasMany(Business::class, 'created_by');
     }
 
     public function savedListings(): HasMany
@@ -73,6 +88,11 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\Conversation::class, 'business_owner_id');
     }
 
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_admin');
+    }
+
     public function isAdmin(): bool
     {
         return in_array($this->role, ['super_admin', 'admin', 'moderator']);
@@ -86,5 +106,46 @@ class User extends Authenticatable
     public function isModerator(): bool
     {
         return $this->role === 'moderator';
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->role === 'owner';
+    }
+
+    public function isBanned(): bool
+    {
+        return $this->banned_at !== null;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->is_active && !$this->isBanned();
+    }
+
+    public function ban(string $reason = null): void
+    {
+        $this->update([
+            'banned_at' => now(),
+            'ban_reason' => $reason,
+            'is_active' => false,
+        ]);
+    }
+
+    public function unban(): void
+    {
+        $this->update([
+            'banned_at' => null,
+            'ban_reason' => null,
+            'is_active' => true,
+        ]);
+    }
+
+    public function recordLogin(): void
+    {
+        $this->update([
+            'last_login_at' => now(),
+            'login_count' => $this->login_count + 1,
+        ]);
     }
 }

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Artisan;
 use App\Models\User;
 use App\Models\Business;
 use App\Models\Category;
@@ -53,6 +54,170 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         return view('admin.dashboard', compact('stats', 'recentBusinesses', 'pendingClaims'));
     })->name('dashboard');
+
+    // Users Management
+    Route::get('/users', function () {
+        $query = User::withCount('ownedBusinesses');
+
+        if ($search = request('search')) {
+            $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
+            $query->where(function ($q) use ($safe) {
+                $q->where('name', 'like', $safe)
+                  ->orWhere('email', 'like', $safe)
+                  ->orWhere('phone', 'like', $safe);
+            });
+        }
+
+        if ($role = request('role')) {
+            $query->where('role', $role);
+        }
+
+        if ($status = request('status')) {
+            if ($status === 'banned') {
+                $query->whereNotNull('banned_at');
+            } elseif ($status === 'active') {
+                $query->where('is_active', true)->whereNull('banned_at');
+            } elseif ($status === 'inactive') {
+                $query->where('is_active', false);
+            }
+        }
+
+        if (request()->has('verified') && request('verified') !== '') {
+            if (request('verified') === '1') {
+                $query->where(function ($q) {
+                    $q->whereNotNull('email_verified_at')->orWhereNotNull('phone_verified_at');
+                });
+            } else {
+                $query->whereNull('email_verified_at')->whereNull('phone_verified_at');
+            }
+        }
+
+        $users = $query->latest()->paginate(20)->withQueryString();
+        return view('admin.users.index', compact('users'));
+    })->name('users');
+
+    Route::get('/users/create', function () {
+        return view('admin.users.form');
+    })->name('users.create');
+
+    Route::post('/users', function (Request $request) {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|unique:users,email',
+            'phone' => 'nullable|string|unique:users,phone',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:customer,owner,moderator,admin,super_admin',
+            'is_active' => 'boolean',
+        ]);
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => $request->password,
+            'role' => $request->role,
+            'is_active' => $request->boolean('is_active', true),
+            'created_by_admin' => Auth::id(),
+        ]);
+
+        return redirect()->route('admin.users.show', $user->id)->with('success', 'User created.');
+    })->name('users.store');
+
+    Route::get('/users/{id}', function ($id) {
+        $user = User::with(['ownedBusinesses', 'reviews', 'savedListings', 'reports', 'claimRequests', 'conversations'])->findOrFail($id);
+        return view('admin.users.show', compact('user'));
+    })->name('users.show');
+
+    Route::get('/users/{id}/edit', function ($id) {
+        $user = User::findOrFail($id);
+        return view('admin.users.form', compact('user'));
+    })->name('users.edit');
+
+    Route::put('/users/{id}', function (Request $request, $id) {
+        $user = User::findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|unique:users,phone,' . $user->id,
+            'role' => 'required|in:customer,owner,moderator,admin,super_admin',
+            'is_active' => 'boolean',
+        ]);
+
+        $updateData = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'role' => $request->role,
+            'is_active' => $request->boolean('is_active', true),
+        ];
+
+        if ($request->filled('password')) {
+            $updateData['password'] = $request->password;
+        }
+
+        $user->update($updateData);
+
+        return redirect()->route('admin.users.show', $user->id)->with('success', 'User updated.');
+    })->name('users.update');
+
+    Route::delete('/users/{id}', function ($id) {
+        $user = User::findOrFail($id);
+
+        if ($user->isSuperAdmin()) {
+            return back()->with('error', 'Cannot delete super admin.');
+        }
+
+        $user->delete();
+        return redirect()->route('admin.users')->with('success', 'User deleted.');
+    })->name('users.destroy');
+
+    Route::post('/users/{id}/ban', function (Request $request, $id) {
+        $user = User::findOrFail($id);
+        $user->ban($request->input('reason'));
+        return back()->with('success', 'User banned.');
+    })->name('users.ban');
+
+    Route::post('/users/{id}/unban', function ($id) {
+        $user = User::findOrFail($id);
+        $user->unban();
+        return back()->with('success', 'User unbanned.');
+    })->name('users.unban');
+
+    Route::post('/users/bulk', function (Request $request) {
+        $action = $request->input('action');
+        $ids = json_decode($request->input('ids', '[]'), true);
+
+        if (empty($ids)) return back()->with('error', 'No users selected.');
+
+        $users = User::whereIn('id', $ids)->get();
+        $count = 0;
+
+        foreach ($users as $user) {
+            if ($user->isSuperAdmin()) continue;
+
+            switch ($action) {
+                case 'activate':
+                    $user->update(['is_active' => true]);
+                    $count++;
+                    break;
+                case 'deactivate':
+                    $user->update(['is_active' => false]);
+                    $count++;
+                    break;
+                case 'ban':
+                    $user->ban('Bulk ban');
+                    $count++;
+                    break;
+                case 'unban':
+                    $user->unban();
+                    $count++;
+                    break;
+            }
+        }
+
+        return back()->with('success', "Updated {$count} users.");
+    })->name('users.bulk');
 
     // Businesses
     Route::get('/businesses', function () {
@@ -779,10 +944,47 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::post('/import/approve-all', function () {
         $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->get();
         $approved = 0;
+        $skipped = 0;
 
         foreach ($items as $item) {
             try {
                 $data = $item->data;
+
+                // DUPLICATE CHECK
+                $existingBusiness = null;
+
+                // Check by external_id
+                if (!empty($item->external_id)) {
+                    $existingBusiness = \App\Models\Business::where('external_id', $item->external_id)->first();
+                }
+
+                // Check by name + address
+                if (!$existingBusiness && !empty($data['name'])) {
+                    $existingBusiness = \App\Models\Business::whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->first();
+                    if ($existingBusiness && !empty($data['address'])) {
+                        similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
+                        if ($percent < 50) {
+                            $existingBusiness = null;
+                        }
+                    }
+                }
+
+                // Check by phone
+                if (!$existingBusiness && !empty($data['phone'])) {
+                    $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
+                    $existingBusiness = \App\Models\Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+                }
+
+                if ($existingBusiness) {
+                    $item->update(['status' => 'rejected', 'notes' => "Duplicate: {$existingBusiness->name}"]);
+                    if ($item->batch) {
+                        $item->batch->increment('rejected');
+                        $item->batch->decrement('pending');
+                    }
+                    $skipped++;
+                    continue;
+                }
+
                 $categories = \App\Models\Category::pluck('id', 'name')->toArray();
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = null;
@@ -793,9 +995,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                             break;
                         }
                     }
-                }
-                if (!$categoryId) {
-                    $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
                 }
 
                 $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
@@ -834,17 +1033,25 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'district' => 'Churachandpur',
                     'is_active' => true,
                     'source' => 'import',
+                    'external_id' => $item->external_id,
                     'import_batch_id' => $item->batch_id,
+                    'confidence' => $item->confidence,
                     'photos' => count($photos) > 0 ? $photos : null,
                 ]);
 
                 $item->update(['status' => 'approved']);
+                if ($item->batch) {
+                    $item->batch->increment('approved');
+                    $item->batch->decrement('pending');
+                }
                 $approved++;
             } catch (\Exception $e) {
                 continue;
             }
         }
 
-        return back()->with('success', "Approved {$approved} items.");
+        $message = "Approved {$approved} items.";
+        if ($skipped > 0) $message .= " Skipped {$skipped} duplicates.";
+        return back()->with('success', $message);
     })->name('import.approve-all');
 });
