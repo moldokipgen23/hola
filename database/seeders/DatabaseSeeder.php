@@ -243,5 +243,21 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
         }
+
+        // Default SMTP settings (user configures via admin panel)
+        $smtpDefaults = [
+            'smtp_driver' => 'log',
+            'smtp_host' => '',
+            'smtp_port' => '587',
+            'smtp_encryption' => 'tls',
+            'smtp_username' => '',
+            'smtp_password' => '',
+            'smtp_from_address' => 'noreply@hola.app',
+            'smtp_from_name' => 'Hola',
+        ];
+
+        foreach ($smtpDefaults as $key => $value) {
+            \App\Models\Setting::set($key, $value, 'smtp');
+        }
     }
 }

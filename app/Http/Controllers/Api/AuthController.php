@@ -7,184 +7,147 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function adminLogin(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
-            ]);
-        }
-
-        if ($user->role !== 'admin') {
-            throw ValidationException::withMessages([
-                'email' => ['Unauthorized. Admin access only.'],
-            ]);
-        }
-
-        $token = $user->createToken('hola-admin')->plainTextToken;
-
-        return response()->json([
-            'user' => $user,
-            'token' => $token,
-        ]);
-    }
-
+    // ─── Google OAuth ───
     public function googleLogin(Request $request)
     {
         $request->validate([
-            'token' => 'required|string',
+            'google_token' => 'required|string',
         ]);
 
-        $response = Http::get('https://www.googleapis.com/oauth2/v3/userinfo', [
-            'access_token' => $request->token,
+        $response = Http::get('https://www.googleapis.com/oauth2/v3/tokeninfo', [
+            'id_token' => $request->google_token,
         ]);
 
-        if ($response->failed()) {
-            throw ValidationException::withMessages([
-                'token' => ['Invalid Google token.'],
-            ]);
+        if (!$response->successful() || !$response->json('sub')) {
+            return response()->json(['message' => 'Invalid Google token'], 401);
         }
 
-        $googleUser = $response->json();
+        $payload = $response->json();
 
         $user = User::updateOrCreate(
-            ['google_id' => $googleUser['sub']],
+            ['google_id' => $payload['sub']],
             [
-                'name' => $googleUser['name'],
-                'email' => $googleUser['email'],
-                'avatar' => $googleUser['picture'] ?? null,
+                'name' => $payload['name'] ?? $payload['email'],
+                'email' => $payload['email'],
+                'avatar' => $payload['picture'] ?? null,
                 'email_verified_at' => now(),
             ]
         );
 
-        $token = $user->createToken('hola-app')->plainTextToken;
-
         return response()->json([
+            'token' => $user->createToken('hola')->plainTextToken,
             'user' => $user,
-            'token' => $token,
         ]);
     }
 
+    // ─── OTP ───
     public function sendOtp(Request $request)
     {
-        $request->validate([
-            'phone' => 'required|string|max:15',
-        ]);
+        $request->validate(['phone' => 'required|string']);
 
-        $otp = (string) random_int(100000, 999999);
+        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        $user = User::updateOrCreate(
+        $user = User::firstOrCreate(
             ['phone' => $request->phone],
-            [
-                'name' => 'User ' . substr($request->phone, -4),
-                'password' => Hash::make($otp),
-            ]
+            ['name' => 'User', 'password' => Hash::make(Str::random(16))]
         );
 
-        $user->otp = $otp;
-        $user->otp_expires_at = now()->addMinutes(10);
-        $user->save();
+        $user->update(['otp' => $otp, 'otp_expires_at' => now()->addMinutes(10)]);
 
-        return response()->json([
-            'message' => 'OTP sent successfully.',
-            'phone' => $request->phone,
-        ]);
+        // TODO: Integrate actual SMS provider
+        \Log::info("OTP for {$request->phone}: {$otp}");
+
+        return response()->json(['message' => 'OTP sent successfully.']);
     }
 
     public function verifyOtp(Request $request)
     {
         $request->validate([
-            'phone' => 'required|string|max:15',
+            'phone' => 'required|string',
             'otp' => 'required|string|size:6',
         ]);
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (!$user) {
-            throw ValidationException::withMessages([
-                'phone' => ['User not found.'],
-            ]);
+        if (!$user || $user->otp !== $request->otp || now()->greaterThan($user->otp_expires_at)) {
+            return response()->json(['message' => 'Invalid or expired OTP'], 401);
         }
 
-        if ($user->otp !== $request->otp) {
-            throw ValidationException::withMessages([
-                'otp' => ['Invalid OTP.'],
-            ]);
-        }
-
-        if ($user->otp_expires_at && $user->otp_expires_at->isPast()) {
-            throw ValidationException::withMessages([
-                'otp' => ['OTP has expired.'],
-            ]);
-        }
-
-        $user->phone_verified_at = now();
-        $user->otp = null;
-        $user->otp_expires_at = null;
-        $user->save();
-
-        $token = $user->createToken('hola-app')->plainTextToken;
+        $user->update(['otp' => null, 'otp_expires_at' => null, 'phone_verified_at' => now()]);
 
         return response()->json([
+            'token' => $user->createToken('hola')->plainTextToken,
             'user' => $user,
-            'token' => $token,
         ]);
     }
 
+    // ─── Email/Password Auth ───
     public function register(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:6|confirmed',
+            'email' => 'required|string|email|max:255|unique:users',
+            'phone' => 'nullable|string|max:20',
+            'password' => 'required|string|min:8|confirmed',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'phone' => $request->phone,
             'password' => Hash::make($request->password),
         ]);
 
-        $token = $user->createToken('hola-app')->plainTextToken;
+        $user->sendEmailVerificationNotification();
 
         return response()->json([
+            'token' => $user->createToken('hola')->plainTextToken,
             'user' => $user,
-            'token' => $token,
+            'message' => 'Account created. Please verify your email.',
         ]);
     }
 
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'email' => 'required|string|email',
             'password' => 'required|string',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
-            ]);
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $token = $user->createToken('hola-app')->plainTextToken;
+        return response()->json([
+            'token' => $user->createToken('hola')->plainTextToken,
+            'user' => $user,
+        ]);
+    }
+
+    public function adminLogin(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|string|email',
+            'password' => 'required|string',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !$user->isAdmin() || !Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
+        }
 
         return response()->json([
+            'token' => $user->createToken('hola-admin')->plainTextToken,
             'user' => $user,
-            'token' => $token,
         ]);
     }
 
@@ -192,30 +155,81 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'message' => 'Logged out successfully.',
-        ]);
+        return response()->json(['message' => 'Logged out.']);
     }
 
+    // ─── Profile ───
     public function profile(Request $request)
     {
         return response()->json([
-            'user' => $request->user(),
+            'user' => $request->user()->load('reviews', 'claimRequests'),
         ]);
     }
 
     public function updateProfile(Request $request)
     {
         $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'avatar' => 'sometimes|string|max:255',
+            'name' => 'string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'avatar' => 'nullable|string',
         ]);
 
-        $user = $request->user();
-        $user->update($request->only(['name', 'avatar']));
+        $request->user()->update($request->only('name', 'phone', 'avatar'));
 
         return response()->json([
-            'user' => $user,
+            'user' => $request->user(),
+            'message' => 'Profile updated.',
         ]);
+    }
+
+    // ─── Email Verification ───
+    public function sendVerificationEmail(Request $request)
+    {
+        $request->user()->sendEmailVerificationNotification();
+
+        return response()->json(['message' => 'Verification email sent.']);
+    }
+
+    public function verifyEmail(Request $request)
+    {
+        $request->user()->markEmailAsVerified();
+
+        return response()->json(['message' => 'Email verified.']);
+    }
+
+    // ─── Password Reset ───
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $status = Password::sendResetLink($request->only('email'));
+
+        return $status === Password::RESET_LINK_SENT
+            ? response()->json(['message' => __($status)])
+            : response()->json(['message' => __($status)], 400);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->setRememberToken(Str::random(60));
+                $user->save();
+                event(new PasswordReset($user));
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET
+            ? response()->json(['message' => __($status)])
+            : response()->json(['message' => __($status)], 400);
     }
 }

@@ -18,8 +18,8 @@ return new class extends Migration
             $table->string('api_key')->nullable()->comment('Per-agent API key, falls back to global');
             $table->string('model')->default('deepseek/deepseek-chat')->comment('AI model to use');
             $table->text('system_prompt')->nullable()->comment('Custom instructions for the agent');
-            $table->json('skills')->default('[]')->comment('List of skill names');
-            $table->json('config')->default('{}')->comment('Skill-specific configuration');
+            $table->json('skills')->comment('List of skill names');
+            $table->json('config')->comment('Skill-specific configuration');
             $table->enum('status', ['active', 'paused', 'error'])->default('active');
             $table->integer('tasks_completed')->default(0);
             $table->integer('tasks_failed')->default(0);

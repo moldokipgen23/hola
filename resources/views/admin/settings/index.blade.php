@@ -117,5 +117,166 @@
     <div class="mt-6 flex gap-3">
         <button type="submit" class="btn-primary">Save Settings</button>
     </div>
+
+    <!-- SMTP / Email Configuration -->
+    <div class="grid grid-cols-1 mt-8">
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-orange-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">SMTP / Email Configuration</h3>
+                    <p class="text-slate-500 text-xs">Configure email sending for verification, password reset, and notifications</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Driver -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Mail Driver</label>
+                    <select name="settings[smtp_driver]" class="input-dark">
+                        <option value="smtp" {{ ($settings['smtp_driver'] ?? 'log') === 'smtp' ? 'selected' : '' }}>SMTP</option>
+                        <option value="log" {{ ($settings['smtp_driver'] ?? '') === 'log' ? 'selected' : '' }}>Log (Debug Only)</option>
+                    </select>
+                </div>
+
+                <!-- From Address -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">From Email Address</label>
+                    <input type="email" name="settings[smtp_from_address]" value="{{ $settings['smtp_from_address'] ?? '' }}"
+                        class="input-dark" placeholder="noreply@hola.app">
+                </div>
+
+                <!-- From Name -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">From Name</label>
+                    <input type="text" name="settings[smtp_from_name]" value="{{ $settings['smtp_from_name'] ?? 'Hola' }}"
+                        class="input-dark" placeholder="Hola">
+                </div>
+
+                <!-- SMTP Host -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">SMTP Host</label>
+                    <input type="text" name="settings[smtp_host]" value="{{ $settings['smtp_host'] ?? '' }}"
+                        class="input-dark" placeholder="smtp.brevo.com">
+                </div>
+
+                <!-- SMTP Port -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">SMTP Port</label>
+                    <input type="number" name="settings[smtp_port]" value="{{ $settings['smtp_port'] ?? '587' }}"
+                        class="input-dark" placeholder="587">
+                </div>
+
+                <!-- Encryption -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Encryption</label>
+                    <select name="settings[smtp_encryption]" class="input-dark">
+                        <option value="tls" {{ ($settings['smtp_encryption'] ?? 'tls') === 'tls' ? 'selected' : '' }}>TLS</option>
+                        <option value="ssl" {{ ($settings['smtp_encryption'] ?? '') === 'ssl' ? 'selected' : '' }}>SSL</option>
+                    </select>
+                </div>
+
+                <!-- Username -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">SMTP Username</label>
+                    <input type="text" name="settings[smtp_username]" value="{{ $settings['smtp_username'] ?? '' }}"
+                        class="input-dark" placeholder="Your SMTP login">
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">SMTP Password</label>
+                    <input type="password" name="settings[smtp_password]" value="{{ $settings['smtp_password'] ?? '' }}"
+                        class="input-dark" placeholder="Your SMTP password">
+                </div>
+            </div>
+
+            <!-- Presets -->
+            <div class="mt-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                <p class="text-xs text-slate-400 mb-3 uppercase tracking-wider font-semibold">Quick Presets</p>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="fillBrevo()" class="px-3 py-1.5 text-xs rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition">Brevo</button>
+                    <button type="button" onclick="fillGmail()" class="px-3 py-1.5 text-xs rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition">Gmail</button>
+                    <button type="button" onclick="fillSendgrid()" class="px-3 py-1.5 text-xs rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition">SendGrid</button>
+                    <button type="button" onclick="fillResend()" class="px-3 py-1.5 text-xs rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition">Resend</button>
+                </div>
+            </div>
+
+            <!-- Test Email -->
+            <div class="mt-4 flex gap-3">
+                <input type="email" id="testEmail" placeholder="test@example.com" class="input-dark flex-1">
+                <button type="button" onclick="sendTestEmail()" class="btn-primary px-6">Send Test Email</button>
+            </div>
+        </div>
+    </div>
 </form>
+
+<script>
+function fill(field, value) {
+    const el = document.querySelector(`[name="settings[${field}]"]`);
+    if (el) el.value = value;
+}
+
+function fillBrevo() {
+    fill('smtp_driver', 'smtp');
+    fill('smtp_host', 'smtp-relay.brevo.com');
+    fill('smtp_port', '587');
+    fill('smtp_encryption', 'tls');
+}
+
+function fillGmail() {
+    fill('smtp_driver', 'smtp');
+    fill('smtp_host', 'smtp.gmail.com');
+    fill('smtp_port', '587');
+    fill('smtp_encryption', 'tls');
+}
+
+function fillSendgrid() {
+    fill('smtp_driver', 'smtp');
+    fill('smtp_host', 'smtp.sendgrid.net');
+    fill('smtp_port', '587');
+    fill('smtp_encryption', 'tls');
+}
+
+function fillResend() {
+    fill('smtp_driver', 'smtp');
+    fill('smtp_host', 'smtp.resend.com');
+    fill('smtp_port', '587');
+    fill('smtp_encryption', 'tls');
+}
+
+async function sendTestEmail() {
+    const email = document.getElementById('testEmail').value;
+    if (!email) {
+        alert('Please enter a test email address');
+        return;
+    }
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+        const resp = await fetch('{{ route("admin.settings.test-email") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ email }),
+        });
+
+        const data = await resp.json();
+        alert(data.message || (resp.ok ? 'Test email sent!' : 'Failed to send'));
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Test Email';
+    }
+}
+</script>
 @endsection

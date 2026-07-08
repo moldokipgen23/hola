@@ -39,6 +39,8 @@ class Business extends Model
         'is_active',
         'views_count',
         'saves_count',
+        'average_rating',
+        'review_count',
         'call_count',
         'whatsapp_count',
         'directions_count',
@@ -59,6 +61,8 @@ class Business extends Model
         'whatsapp_count' => 'integer',
         'directions_count' => 'integer',
         'share_count' => 'integer',
+        'average_rating' => 'float',
+        'review_count' => 'integer',
     ];
 
     protected $appends = ['quality_score'];
@@ -76,6 +80,13 @@ class Business extends Model
         if ($this->email) $score += 5;
         if ($this->whatsapp) $score += 5;
         return min($score, 100);
+    }
+
+    public function updateRatingStats(): void
+    {
+        $this->average_rating = round($this->reviews()->avg('rating'), 1);
+        $this->review_count = $this->reviews()->count();
+        $this->saveQuietly();
     }
 
     public function category(): BelongsTo
@@ -106,6 +117,11 @@ class Business extends Model
     public function claimRequests(): HasMany
     {
         return $this->hasMany(ClaimRequest::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
     }
 
     public function createdBy(): BelongsTo

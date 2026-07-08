@@ -20,7 +20,7 @@ Route::get('/admin/login', fn () => view('auth.login'))->name('admin.login');
 Route::post('/admin/login', function (Request $request) {
     $request->validate(['email' => 'required|email', 'password' => 'required']);
 
-    $user = User::where('email', $request->email)->where('role', 'admin')->first();
+    $user = User::where('email', $request->email)->whereIn('role', ['admin', 'super_admin', 'moderator'])->first();
 
     if (!$user || !Hash::check($request->password, $user->password)) {
         return back()->withErrors(['email' => 'Invalid credentials.']);
@@ -80,8 +80,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'phone' => 'nullable|max:20',
             'email' => 'nullable|email',
             'locality' => 'nullable|max:100',
-            'lat' => 'nullable|numeric',
-            'lng' => 'nullable|numeric',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         $validated['slug'] = $request->slug ?: \Illuminate\Support\Str::slug($request->name);
@@ -112,8 +112,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'phone' => 'nullable|max:20',
             'email' => 'nullable|email',
             'locality' => 'nullable|max:100',
-            'lat' => 'nullable|numeric',
-            'lng' => 'nullable|numeric',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         $validated['slug'] = $request->slug ?: \Illuminate\Support\Str::slug($request->name);
@@ -319,17 +319,36 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Settings
     Route::get('/settings', function () {
-        $settings = \App\Models\Setting::getAll();
-        return view('admin.settings.index', compact('settings'));
+        $all = \App\Models\Setting::orderBy('key')->get()->pluck('value', 'key')->toArray();
+        return view('admin.settings.index', ['settings' => $all]);
     })->name('settings');
 
     Route::put('/settings', function (Request $request) {
         $settings = $request->input('settings', []);
         foreach ($settings as $key => $value) {
-            \App\Models\Setting::set($key, $value);
+            \App\Models\Setting::set($key, $value, str_starts_with($key, 'smtp') ? 'smtp' : 'general');
         }
         return redirect()->route('admin.settings')->with('success', 'Settings saved.');
     })->name('settings.update');
+
+    Route::post('/settings/test-email', function (Request $request) {
+        $request->validate(['email' => 'required|email']);
+
+        try {
+            \Illuminate\Support\Facades\Mail::raw(
+                "Hola SMTP Test\n\nThis is a test email from your Hola app.\n\nIf you received this, your SMTP configuration is working correctly!\n\nSent at: " . now()->format('Y-m-d H:i:s'),
+                function ($message) use ($request) {
+                    $message->to($request->email)
+                            ->subject('Hola - SMTP Test Email')
+                            ->from(config('mail.from.address', 'noreply@hola.app'), config('mail.from.name', 'Hola'));
+                }
+            );
+
+            return response()->json(['message' => 'Test email sent successfully! Check your inbox.']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to send: ' . $e->getMessage()], 500);
+        }
+    })->name('settings.test-email');
 
     // Analytics
     Route::get('/analytics', function () {

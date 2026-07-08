@@ -8,7 +8,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdminMiddleware
 {
-    public function handle(Request $request, Closure $next): Response
+    private const ROLES = ['super_admin', 'admin', 'moderator'];
+
+    public function handle(Request $request, Closure $next, ?string $level = null): Response
     {
         $user = $request->user();
 
@@ -16,8 +18,12 @@ class AdminMiddleware
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        if ($user->role !== 'admin') {
+        if (!in_array($user->role, self::ROLES)) {
             return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
+        if ($level === 'super_admin' && $user->role !== 'super_admin') {
+            return response()->json(['message' => 'Unauthorized. Super admin access required.'], 403);
         }
 
         return $next($request);

@@ -4,10 +4,16 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\OwnerDashboardController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SavedListingController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\ClaimController;
 use Illuminate\Support\Facades\Route;
 
 // ─── Public Auth (rate limited) ───
@@ -18,6 +24,8 @@ Route::middleware('throttle:10,1')->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
     Route::post('/auth/admin/login', [AuthController::class, 'adminLogin']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 });
 
 // ─── Public Data ───
@@ -38,9 +46,11 @@ Route::post('/businesses/{slug}/track', [BusinessController::class, 'trackAction
     ->middleware('throttle:30,1');
 Route::get('/businesses/{slug}/related', [BusinessController::class, 'related']);
 
+Route::get('/businesses/{business}/reviews', [ReviewController::class, 'index']);
+
 // Public Settings & SEO
-Route::get('/settings', [\App\Http\Controllers\Api\SettingController::class, 'publicSettings']);
-Route::get('/sitemap', [\App\Http\Controllers\Api\SettingController::class, 'sitemap']);
+Route::get('/settings', [SettingController::class, 'publicSettings']);
+Route::get('/sitemap', [SettingController::class, 'sitemap']);
 
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/popular', [ProductController::class, 'popular']);
@@ -55,52 +65,74 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/profile', [AuthController::class, 'profile']);
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
 
+    // Email verification
+    Route::post('/auth/verify-email/send', [AuthController::class, 'sendVerificationEmail']);
+    Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
+
+    // Saved
     Route::get('/saved', [SavedListingController::class, 'index']);
     Route::post('/saved/toggle', [SavedListingController::class, 'toggle']);
     Route::get('/saved/check', [SavedListingController::class, 'check']);
 
+    // Reports
     Route::post('/reports', [ReportController::class, 'store']);
 
-    Route::post('/claims', [\App\Http\Controllers\Api\ClaimController::class, 'store']);
-    Route::get('/claims/mine', [\App\Http\Controllers\Api\ClaimController::class, 'myClaims']);
+    // Reviews
+    Route::post('/businesses/{business}/reviews', [ReviewController::class, 'store']);
+    Route::put('/reviews/{review}', [ReviewController::class, 'update']);
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
+
+    // Claims
+    Route::post('/claims', [ClaimController::class, 'store']);
+    Route::get('/claims/mine', [ClaimController::class, 'myClaims']);
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+
+    // Chat
+    Route::get('/chat/conversations', [ChatController::class, 'conversations']);
+    Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show']);
+    Route::post('/chat/businesses/{business}', [ChatController::class, 'store']);
+    Route::post('/chat/conversations/{conversation}/reply', [ChatController::class, 'reply']);
+
+    // Owner Dashboard
+    Route::get('/owner/dashboard', [OwnerDashboardController::class, 'dashboard']);
+    Route::get('/owner/businesses', [OwnerDashboardController::class, 'businesses']);
 });
 
 // ─── Admin Routes ───
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
-    // Businesses
     Route::post('/businesses', [AdminController::class, 'storeBusiness']);
     Route::put('/businesses/{id}', [AdminController::class, 'updateBusiness']);
     Route::delete('/businesses/{id}', [AdminController::class, 'destroyBusiness']);
     Route::patch('/businesses/{id}/toggle', [AdminController::class, 'toggleBusiness']);
     Route::patch('/businesses/{id}/verify', [AdminController::class, 'verifyBusiness']);
 
-    // Categories
     Route::post('/categories', [AdminController::class, 'storeCategory']);
     Route::put('/categories/{id}', [AdminController::class, 'updateCategory']);
     Route::delete('/categories/{id}', [AdminController::class, 'destroyCategory']);
 
-    // Subcategories
     Route::post('/subcategories', [AdminController::class, 'storeSubcategory']);
     Route::put('/subcategories/{id}', [AdminController::class, 'updateSubcategory']);
     Route::delete('/subcategories/{id}', [AdminController::class, 'destroySubcategory']);
 
-    // Products
     Route::post('/products', [AdminController::class, 'storeProduct']);
     Route::put('/products/{id}', [AdminController::class, 'updateProduct']);
     Route::delete('/products/{id}', [AdminController::class, 'destroyProduct']);
 
-    // Reports
     Route::get('/reports', [AdminController::class, 'indexReports']);
     Route::put('/reports/{id}', [AdminController::class, 'updateReport']);
 
-    // Claims
-    Route::get('/claims', [\App\Http\Controllers\Api\ClaimController::class, 'index']);
-    Route::put('/claims/{id}', [\App\Http\Controllers\Api\ClaimController::class, 'update']);
+    Route::get('/claims', [ClaimController::class, 'index']);
+    Route::put('/claims/{id}', [ClaimController::class, 'update']);
 
-    // Settings
-    Route::get('/settings', [\App\Http\Controllers\Api\SettingController::class, 'index']);
-    Route::put('/settings', [\App\Http\Controllers\Api\SettingController::class, 'update']);
+    Route::get('/settings', [SettingController::class, 'index']);
+    Route::put('/settings', [SettingController::class, 'update']);
 
-    // Analytics
     Route::get('/analytics', [AdminController::class, 'analytics']);
+
+    // Admin reviews management
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 });

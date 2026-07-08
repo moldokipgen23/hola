@@ -53,8 +53,38 @@ class User extends Authenticatable
         return $this->hasMany(ClaimRequest::class);
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(\App\Models\Notification::class);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(\App\Models\Conversation::class, 'user_id');
+    }
+
+    public function ownedConversations(): HasMany
+    {
+        return $this->hasMany(\App\Models\Conversation::class, 'business_owner_id');
+    }
+
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return in_array($this->role, ['super_admin', 'admin', 'moderator']);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function isModerator(): bool
+    {
+        return $this->role === 'moderator';
     }
 }
