@@ -246,24 +246,32 @@
                     <h4 class="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">AI Providers</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">DeepSeek API Key</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">DeepSeek API Key
+                                <a href="https://platform.deepseek.com/api_keys" target="_blank" class="text-blue-400 hover:underline font-normal text-xs ml-1">Get Key →</a>
+                            </label>
                             <input type="password" name="settings[api_key_deepseek]" value="{{ $settings['api_key_deepseek'] ?? '' }}" class="input-dark" placeholder="sk-...">
-                            <p class="text-slate-600 text-xs mt-1">Used by agents with DeepSeek provider</p>
+                            <p class="text-slate-600 text-xs mt-1">platform.deepseek.com — $0.27/M tokens</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">OpenAI API Key</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">OpenAI API Key
+                                <a href="https://platform.openai.com/api-keys" target="_blank" class="text-blue-400 hover:underline font-normal text-xs ml-1">Get Key →</a>
+                            </label>
                             <input type="password" name="settings[api_key_openai]" value="{{ $settings['api_key_openai'] ?? '' }}" class="input-dark" placeholder="sk-...">
-                            <p class="text-slate-600 text-xs mt-1">Used by agents with OpenAI provider</p>
+                            <p class="text-slate-600 text-xs mt-1">platform.openai.com — $2.50-$15/M tokens</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">OpenRouter API Key</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">OpenRouter API Key
+                                <a href="https://openrouter.ai/keys" target="_blank" class="text-blue-400 hover:underline font-normal text-xs ml-1">Get Key →</a>
+                            </label>
                             <input type="password" name="settings[api_key_openrouter]" value="{{ $settings['api_key_openrouter'] ?? '' }}" class="input-dark" placeholder="sk-or-...">
-                            <p class="text-slate-600 text-xs mt-1">Used by agents with OpenRouter provider</p>
+                            <p class="text-slate-600 text-xs mt-1">openrouter.ai — multi-provider, pay per use</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Anthropic API Key</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">Anthropic API Key
+                                <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-blue-400 hover:underline font-normal text-xs ml-1">Get Key →</a>
+                            </label>
                             <input type="password" name="settings[api_key_anthropic]" value="{{ $settings['api_key_anthropic'] ?? '' }}" class="input-dark" placeholder="sk-ant-...">
-                            <p class="text-slate-600 text-xs mt-1">Used by agents with Anthropic provider</p>
+                            <p class="text-slate-600 text-xs mt-1">console.anthropic.com — $3-$15/M tokens</p>
                         </div>
                     </div>
                 </div>
@@ -272,14 +280,18 @@
                     <h4 class="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Maps & Search</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Google Maps / Places API Key</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">Google Maps / Places API Key
+                                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="text-blue-400 hover:underline font-normal text-xs ml-1">Get Key →</a>
+                            </label>
                             <input type="password" name="settings[api_key_google_places]" value="{{ $settings['api_key_google_places'] ?? '' }}" class="input-dark" placeholder="AIza...">
-                            <p class="text-slate-600 text-xs mt-1">Places API, Maps JS, Geocoding</p>
+                            <p class="text-slate-600 text-xs mt-1">console.cloud.google.com — enable Places API, Maps JS</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">SerpAPI Key</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">SerpAPI Key
+                                <a href="https://serpapi.com/manage-api-key" target="_blank" class="text-blue-400 hover:underline font-normal text-xs ml-1">Get Key →</a>
+                            </label>
                             <input type="password" name="settings[api_key_serpapi]" value="{{ $settings['api_key_serpapi'] ?? '' }}" class="input-dark" placeholder="...">
-                            <p class="text-slate-600 text-xs mt-1">Google search results API</p>
+                            <p class="text-slate-600 text-xs mt-1">serpapi.com — $50/mo (100 searches/mo free)</p>
                         </div>
                     </div>
                 </div>
