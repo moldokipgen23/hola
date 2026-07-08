@@ -262,6 +262,7 @@ EOT;
     {
         $input = $task->input;
         $batchId = $input['batch_id'] ?? null;
+        $maxResults = $input['max_results'] ?? 50;
 
         if (!$batchId) {
             throw new \Exception('batch_id is required.');
@@ -269,6 +270,7 @@ EOT;
 
         $items = ImportItem::where('batch_id', $batchId)
             ->whereNull('business_id')
+            ->limit($maxResults)
             ->get();
 
         $categories = Category::all()->keyBy('name');
@@ -295,12 +297,13 @@ EOT;
     {
         $input = $task->input;
         $batchId = $input['batch_id'] ?? null;
+        $maxResults = $input['max_results'] ?? 50;
 
         $query = ImportItem::where('status', 'pending');
         if ($batchId) {
             $query->where('batch_id', $batchId);
         }
-        $items = $query->get();
+        $items = $query->limit($maxResults)->get();
 
         $existing = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
         $duplicates = 0;
@@ -324,6 +327,7 @@ EOT;
     {
         $input = $task->input;
         $apiKey = $agent->getApiKeyDecrypted();
+        $maxResults = $input['max_results'] ?? 10;
 
         if (!$apiKey) {
             throw new \Exception('API key not configured.');
@@ -333,11 +337,12 @@ EOT;
         $items = ImportItem::where('status', 'pending')
             ->when($batchId, fn($q) => $q->where('batch_id', $batchId))
             ->whereNull('data->description')
+            ->limit($maxResults)
             ->get();
 
         $updated = 0;
 
-        foreach ($items->take(10) as $item) {
+        foreach ($items as $item) {
             $name = $item->data['name'] ?? '';
             $address = $item->data['address'] ?? '';
 
@@ -372,12 +377,13 @@ EOT;
     {
         $input = $task->input;
         $batchId = $input['batch_id'] ?? null;
+        $maxResults = $input['max_results'] ?? 50;
 
         $query = ImportItem::where('status', 'pending');
         if ($batchId) {
             $query->where('batch_id', $batchId);
         }
-        $items = $query->get();
+        $items = $query->limit($maxResults)->get();
 
         $checked = 0;
 
