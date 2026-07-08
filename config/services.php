@@ -39,6 +39,18 @@ return [
         'api_key' => env('OPENROUTER_API_KEY'),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+    ],
+
+    'deepseek' => [
+        'api_key' => env('DEEPSEEK_API_KEY'),
+    ],
+
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+    ],
+
     'google' => [
         'places_api_key' => env('GOOGLE_PLACES_API_KEY'),
     ],

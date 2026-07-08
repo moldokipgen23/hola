@@ -63,6 +63,37 @@ class AgentSkillService
         }
     }
 
+    private function getApiConfig(AiAgent $agent): array
+    {
+        $provider = $agent->provider ?? 'openrouter';
+        $agentKey = $agent->getApiKeyDecrypted();
+
+        $configs = [
+            'openrouter' => [
+                'endpoint' => 'https://openrouter.ai/api/v1/chat/completions',
+                'api_key' => $agentKey ?: config('services.openrouter.api_key'),
+                'model' => $agent->model ?? 'deepseek/deepseek-chat',
+            ],
+            'deepseek' => [
+                'endpoint' => 'https://api.deepseek.com/v1/chat/completions',
+                'api_key' => $agentKey ?: config('services.deepseek.api_key'),
+                'model' => $agent->model ?? 'deepseek-chat',
+            ],
+            'openai' => [
+                'endpoint' => 'https://api.openai.com/v1/chat/completions',
+                'api_key' => $agentKey ?: config('services.openai.api_key'),
+                'model' => $agent->model ?? 'gpt-4o',
+            ],
+            'anthropic' => [
+                'endpoint' => 'https://api.anthropic.com/v1/messages',
+                'api_key' => $agentKey ?: config('services.anthropic.api_key'),
+                'model' => $agent->model ?? 'claude-3-5-sonnet-20241022',
+            ],
+        ];
+
+        return $configs[$provider] ?? $configs['openrouter'];
+    }
+
     private function googlePlacesImport(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
@@ -217,10 +248,10 @@ class AgentSkillService
     private function aiBusinessScraper(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
-        $apiKey = $agent->getApiKeyDecrypted() ?? config('services.openrouter.api_key');
+        $api = $this->getApiConfig($agent);
 
-        if (!$apiKey) {
-            throw new \Exception('API key not configured for this agent.');
+        if (!$api['api_key']) {
+            throw new \Exception("API key not configured. Set the API key for this agent or add it to your .env for provider: {$agent->provider}.");
         }
 
         $area = $input['area'] ?? 'Lamka, Churachandpur';
@@ -250,10 +281,10 @@ Rules:
 EOT;
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $apiKey,
+            'Authorization' => 'Bearer ' . $api['api_key'],
             'Content-Type' => 'application/json',
-        ])->timeout(60)->post('https://openrouter.ai/api/v1/chat/completions', [
-            'model' => $agent->model ?? 'deepseek/deepseek-chat',
+        ])->timeout(60)->post($api['endpoint'], [
+            'model' => $api['model'],
             'messages' => [
                 ['role' => 'system', 'content' => $agent->system_prompt ?? 'You are a business research assistant. Return only valid JSON.'],
                 ['role' => 'user', 'content' => $prompt],
@@ -266,7 +297,7 @@ EOT;
             $error = $response->json();
             $message = $error['error']['message'] ?? $response->body();
             if ($response->status() === 401) {
-                $message = 'Invalid or missing OpenRouter API key. Set OPENROUTER_API_KEY in your .env or add an API key to this agent.';
+                $message = "Invalid or missing API key for {$agent->provider}. Add the key to this agent or set it in your .env.";
             }
             throw new \Exception('AI API request failed: ' . $message);
         }
@@ -441,10 +472,10 @@ EOT;
     private function descriptionWriter(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
-        $apiKey = $agent->getApiKeyDecrypted();
+        $api = $this->getApiConfig($agent);
         $maxResults = $input['max_results'] ?? 10;
 
-        if (!$apiKey) {
+        if (!$api['api_key']) {
             throw new \Exception('API key not configured.');
         }
 
@@ -462,9 +493,9 @@ EOT;
             $address = $item->data['address'] ?? '';
 
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-            ])->timeout(30)->post('https://openrouter.ai/api/v1/chat/completions', [
-                'model' => $agent->model ?? 'deepseek/deepseek-chat',
+                'Authorization' => 'Bearer ' . $api['api_key'],
+            ])->timeout(30)->post($api['endpoint'], [
+                'model' => $api['model'],
                 'messages' => [
                     ['role' => 'user', 'content' => "Write a 2-sentence description for: {$name}, located at {$address}. Return ONLY the description text."],
                 ],

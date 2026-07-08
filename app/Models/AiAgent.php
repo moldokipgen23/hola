@@ -49,10 +49,16 @@ class AiAgent extends Model
 
     public function getApiKeyDecrypted(): ?string
     {
-        if (!$this->api_key) {
-            return config('services.openrouter.api_key');
+        if ($this->api_key) {
+            return $this->api_key;
         }
-        return $this->api_key;
+
+        return match ($this->provider) {
+            'openai' => config('services.openai.api_key'),
+            'deepseek' => config('services.deepseek.api_key'),
+            'anthropic' => config('services.anthropic.api_key'),
+            default => config('services.openrouter.api_key'),
+        };
     }
 
     public function scopeActive($query)
