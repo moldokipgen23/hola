@@ -1245,4 +1245,158 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if ($skipped > 0) $message .= " Skipped {$skipped} duplicates/invalid.";
         return back()->with('success', $message);
     })->name('import.csv');
+
+    // ─── Vendors (Owner Management) ─── admin + super_admin only
+    Route::get('/vendors', function () {
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
+
+        $query = User::where('role', 'owner')->withCount('ownedBusinesses');
+
+        if ($search = request('search')) {
+            $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
+            $query->where(function ($q) use ($safe) {
+                $q->where('name', 'like', $safe)
+                  ->orWhere('email', 'like', $safe)
+                  ->orWhere('phone', 'like', $safe);
+            });
+        }
+
+        if ($status = request('status')) {
+            if ($status === 'banned') {
+                $query->whereNotNull('banned_at');
+            } elseif ($status === 'active') {
+                $query->where('is_active', true)->whereNull('banned_at');
+            }
+        }
+
+        $vendors = $query->latest()->paginate(20)->withQueryString();
+        return view('admin.vendors.index', compact('vendors'));
+    })->name('vendors');
+
+    Route::get('/vendors/{id}', function ($id) {
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
+
+        $vendor = User::where('role', 'owner')->findOrFail($id);
+        $businesses = Business::where('created_by', $vendor->id)->with('category')->get();
+        $recentActivity = \App\Models\ActivityLog::where('user_id', $vendor->id)->latest()->take(10)->get();
+
+        return view('admin.vendors.show', compact('vendor', 'businesses', 'recentActivity'));
+    })->name('vendors.show');
+
+    // ─── Staff Management ─── super_admin only
+    Route::get('/staff', function () {
+        if (Auth::user()->role !== 'super_admin') abort(403);
+
+        $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->latest()->paginate(20);
+        return view('admin.staff.index', compact('staff'));
+    })->name('staff');
+
+    Route::get('/staff/create', function () {
+        if (Auth::user()->role !== 'super_admin') abort(403);
+        return view('admin.staff.form');
+    })->name('staff.create');
+
+    Route::post('/staff', function (Request $request) {
+        if (Auth::user()->role !== 'super_admin') abort(403);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:moderator,admin,super_admin',
+            'is_active' => 'boolean',
+        ]);
+
+        $staff = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => $request->password,
+            'role' => $request->role,
+            'is_active' => $request->boolean('is_active', true),
+            'created_by_admin' => Auth::id(),
+        ]);
+
+        \App\Services\ActivityLogService::log('staff_created', $staff, ['role' => $staff->role]);
+
+        return redirect()->route('admin.staff')->with('success', 'Staff member created.');
+    })->name('staff.store');
+
+    Route::get('/staff/{id}', function ($id) {
+        if (Auth::user()->role !== 'super_admin') abort(403);
+
+        $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
+        return view('admin.staff.show', compact('staff'));
+    })->name('staff.show');
+
+    Route::get('/staff/{id}/edit', function ($id) {
+        if (Auth::user()->role !== 'super_admin') abort(403);
+
+        $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
+        return view('admin.staff.form', compact('staff'));
+    })->name('staff.edit');
+
+    Route::put('/staff/{id}', function (Request $request, $id) {
+        if (Auth::user()->role !== 'super_admin') abort(403);
+
+        $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $staff->id,
+            'role' => 'required|in:moderator,admin,super_admin',
+            'is_active' => 'boolean',
+        ]);
+
+        $updateData = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'role' => $request->role,
+            'is_active' => $request->boolean('is_active', true),
+        ];
+
+        if ($request->filled('password')) {
+            $updateData['password'] = $request->password;
+        }
+
+        $staff->update($updateData);
+        \App\Services\ActivityLogService::log('staff_updated', $staff);
+
+        return redirect()->route('admin.staff')->with('success', 'Staff member updated.');
+    })->name('staff.update');
+
+    Route::delete('/staff/{id}', function ($id) {
+        if (Auth::user()->role !== 'super_admin') abort(403);
+
+        $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
+
+        if ($staff->id === Auth::id()) {
+            return back()->with('error', 'Cannot delete your own account.');
+        }
+
+        \App\Services\ActivityLogService::log('staff_deleted', $staff, ['name' => $staff->name]);
+        $staff->delete();
+
+        return redirect()->route('admin.staff')->with('success', 'Staff member deleted.');
+    })->name('staff.destroy');
+
+    // ─── Activity Logs ─── admin + super_admin
+    Route::get('/activity-logs', function () {
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
+
+        $query = \App\Models\ActivityLog::with('user')->latest();
+
+        if ($action = request('action')) {
+            $query->where('action', $action);
+        }
+
+        if ($userId = request('user_id')) {
+            $query->where('user_id', $userId);
+        }
+
+        $logs = $query->paginate(50)->withQueryString();
+        $actions = \App\Models\ActivityLog::distinct()->pluck('action');
+        $users = User::whereIn('id', \App\Models\ActivityLog::distinct()->pluck('user_id'))->get(['id', 'name']);
+
+        return view('admin.activity-logs', compact('logs', 'actions', 'users'));
+    })->name('activity-logs');
 });
