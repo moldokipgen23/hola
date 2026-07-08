@@ -8,6 +8,8 @@ use App\Models\Category;
 use App\Models\ImportBatch;
 use App\Models\ImportItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ImportController extends Controller
@@ -70,6 +72,25 @@ class ImportController extends Controller
             $slug .= '-' . Str::random(5);
         }
 
+        // Download photos if available
+        $photos = [];
+        if (!empty($data['photos']) && is_array($data['photos'])) {
+            foreach ($data['photos'] as $photoUrl) {
+                try {
+                    $response = Http::timeout(10)->get($photoUrl);
+                    if ($response->successful()) {
+                        $ext = 'jpg';
+                        $filename = 'businesses/' . $slug . '_' . Str::random(6) . '.' . $ext;
+                        Storage::disk('public')->put($filename, $response->body());
+                        $photos[] = 'storage/' . $filename;
+                    }
+                } catch (\Exception $e) {
+                    // Skip failed photo downloads
+                    continue;
+                }
+            }
+        }
+
         $business = Business::create([
             'name' => $data['name'] ?? '',
             'slug' => $slug,
@@ -85,6 +106,7 @@ class ImportController extends Controller
             'external_id' => $item->external_id,
             'import_batch_id' => $item->batch_id,
             'confidence' => $item->confidence,
+            'photos' => count($photos) > 0 ? $photos : null,
             'is_active' => true,
         ]);
 

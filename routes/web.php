@@ -461,9 +461,32 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
         }
 
+        $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
+        $existing = \App\Models\Business::where('slug', $slug)->first();
+        if ($existing) {
+            $slug .= '-' . \Illuminate\Support\Str::random(5);
+        }
+
+        // Download photos if available
+        $photos = [];
+        if (!empty($data['photos']) && is_array($data['photos'])) {
+            foreach ($data['photos'] as $photoUrl) {
+                try {
+                    $response = \Illuminate\Support\Facades\Http::timeout(10)->get($photoUrl);
+                    if ($response->successful()) {
+                        $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.jpg';
+                        \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
+                        $photos[] = 'storage/' . $filename;
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+        }
+
         \App\Models\Business::create([
             'name' => $data['name'] ?? 'Unknown Business',
-            'slug' => \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business'),
+            'slug' => $slug,
             'category_id' => $categoryId,
             'description' => $data['description'] ?? null,
             'address' => $data['address'] ?? $data['location'] ?? '',
@@ -476,6 +499,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'is_active' => true,
             'source' => 'import',
             'import_batch_id' => $item->batch_id,
+            'photos' => count($photos) > 0 ? $photos : null,
         ]);
 
         $item->update(['status' => 'approved']);
@@ -502,41 +526,68 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $approved = 0;
 
         foreach ($items as $item) {
-            $data = $item->data;
-            $categories = \App\Models\Category::pluck('id', 'name')->toArray();
-            $categoryName = $data['category'] ?? $data['type'] ?? null;
-            $categoryId = null;
-            if ($categoryName) {
-                foreach ($categories as $id => $name) {
-                    if (strtolower($name) === strtolower($categoryName)) {
-                        $categoryId = $id;
-                        break;
+            try {
+                $data = $item->data;
+                $categories = \App\Models\Category::pluck('id', 'name')->toArray();
+                $categoryName = $data['category'] ?? $data['type'] ?? null;
+                $categoryId = null;
+                if ($categoryName) {
+                    foreach ($categories as $id => $name) {
+                        if (strtolower($name) === strtolower($categoryName)) {
+                            $categoryId = $id;
+                            break;
+                        }
                     }
                 }
-            }
-            if (!$categoryId) {
-                $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
-            }
+                if (!$categoryId) {
+                    $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
+                }
 
-            \App\Models\Business::create([
-                'name' => $data['name'] ?? 'Unknown Business',
-                'slug' => \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business'),
-                'category_id' => $categoryId,
-                'description' => $data['description'] ?? null,
-                'address' => $data['address'] ?? $data['location'] ?? '',
-                'phone' => $data['phone'] ?? null,
-                'email' => $data['email'] ?? null,
-                'website' => $data['website'] ?? null,
-                'latitude' => $data['latitude'] ?? $data['lat'] ?? null,
-                'longitude' => $data['longitude'] ?? $data['lng'] ?? null,
-                'district' => 'Churachandpur',
-                'is_active' => true,
-                'source' => 'import',
-                'import_batch_id' => $item->batch_id,
-            ]);
+                $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
+                $existing = \App\Models\Business::where('slug', $slug)->first();
+                if ($existing) {
+                    $slug .= '-' . \Illuminate\Support\Str::random(5);
+                }
 
-            $item->update(['status' => 'approved']);
-            $approved++;
+                $photos = [];
+                if (!empty($data['photos']) && is_array($data['photos'])) {
+                    foreach ($data['photos'] as $photoUrl) {
+                        try {
+                            $response = \Illuminate\Support\Facades\Http::timeout(10)->get($photoUrl);
+                            if ($response->successful()) {
+                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.jpg';
+                                \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
+                                $photos[] = 'storage/' . $filename;
+                            }
+                        } catch (\Exception $e) {
+                            continue;
+                        }
+                    }
+                }
+
+                \App\Models\Business::create([
+                    'name' => $data['name'] ?? 'Unknown Business',
+                    'slug' => $slug,
+                    'category_id' => $categoryId,
+                    'description' => $data['description'] ?? null,
+                    'address' => $data['address'] ?? $data['location'] ?? '',
+                    'phone' => $data['phone'] ?? null,
+                    'email' => $data['email'] ?? null,
+                    'website' => $data['website'] ?? null,
+                    'latitude' => $data['latitude'] ?? $data['lat'] ?? null,
+                    'longitude' => $data['longitude'] ?? $data['lng'] ?? null,
+                    'district' => 'Churachandpur',
+                    'is_active' => true,
+                    'source' => 'import',
+                    'import_batch_id' => $item->batch_id,
+                    'photos' => count($photos) > 0 ? $photos : null,
+                ]);
+
+                $item->update(['status' => 'approved']);
+                $approved++;
+            } catch (\Exception $e) {
+                continue;
+            }
         }
 
         return back()->with('success', "Approved {$approved} items.");

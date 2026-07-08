@@ -103,6 +103,16 @@ class AgentSkillService
         $categories = Category::pluck('id', 'name')->toArray();
 
         foreach ($places as $place) {
+            // Capture photo references
+            $photos = [];
+            if (!empty($place['photos'])) {
+                foreach (array_slice($place['photos'], 0, 5) as $photo) {
+                    if (!empty($photo['photo_reference'])) {
+                        $photos[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
+                    }
+                }
+            }
+
             $placeData = [
                 'name' => $place['name'],
                 'address' => $place['vicinity'] ?? '',
@@ -115,6 +125,8 @@ class AgentSkillService
                 'types' => $place['types'] ?? [],
                 'is_open' => $place['opening_hours']['open_now'] ?? null,
                 'google_place_id' => $place['place_id'] ?? null,
+                'photos' => $photos,
+                'photo_references' => array_map(fn($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
             ];
 
             // Auto-match category
