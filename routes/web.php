@@ -42,6 +42,15 @@ Route::get('/categories', function () {
     return view('public.categories');
 })->name('public.categories');
 
+Route::get('/map', function () {
+    $businesses = \App\Models\Business::where('is_active', true)
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->with('category')
+        ->get();
+    return view('public.map', compact('businesses'));
+})->name('public.map');
+
 Route::get('/category/{slug}', function ($slug) {
     $category = \App\Models\Category::where('slug', $slug)->firstOrFail();
     $businesses = $category->businesses()->where('is_active', true)->latest()->paginate(12);
@@ -94,11 +103,13 @@ Route::post('/admin/login', function (Request $request) {
     $request->session()->regenerate();
 
     $user->recordLogin();
+    \App\Services\ActivityLogService::log('admin_login', $user);
 
     return redirect()->route('admin.dashboard');
 })->name('admin.login.post');
 
 Route::post('/admin/logout', function () {
+    \App\Services\ActivityLogService::log('admin_logout');
     Auth::logout();
     return redirect()->route('admin.login');
 })->name('admin.logout');
@@ -185,6 +196,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'created_by_admin' => Auth::id(),
         ]);
 
+        \App\Services\ActivityLogService::log('user_created', $user, ['role' => $user->role]);
+
         return redirect()->route('admin.users.show', $user->id)->with('success', 'User created.');
     })->name('users.store');
 
@@ -222,6 +235,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         }
 
         $user->update($updateData);
+        \App\Services\ActivityLogService::log('user_updated', $user);
 
         return redirect()->route('admin.users.show', $user->id)->with('success', 'User updated.');
     })->name('users.update');
@@ -234,18 +248,21 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         }
 
         $user->delete();
+        \App\Services\ActivityLogService::log('user_deleted', $user, ['name' => $user->name]);
         return redirect()->route('admin.users')->with('success', 'User deleted.');
     })->name('users.destroy');
 
     Route::post('/users/{id}/ban', function (Request $request, $id) {
         $user = User::findOrFail($id);
         $user->ban($request->input('reason'));
+        \App\Services\ActivityLogService::log('user_banned', $user, ['reason' => $request->input('reason')]);
         return back()->with('success', 'User banned.');
     })->name('users.ban');
 
     Route::post('/users/{id}/unban', function ($id) {
         $user = User::findOrFail($id);
         $user->unban();
+        \App\Services\ActivityLogService::log('user_unbanned', $user);
         return back()->with('success', 'User unbanned.');
     })->name('users.unban');
 
@@ -345,6 +362,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['district'] = 'Churachandpur';
 
         Business::create($validated);
+        \App\Services\ActivityLogService::log('business_created', null, ['name' => $validated['name']]);
 
         return redirect()->route('admin.businesses')->with('success', 'Business created.');
     })->name('businesses.store');
@@ -381,12 +399,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['is_featured'] = $request->boolean('is_featured');
 
         $business->update($validated);
+        \App\Services\ActivityLogService::log('business_updated', $business);
 
         return redirect()->route('admin.businesses')->with('success', 'Business updated.');
     })->name('businesses.update');
 
     Route::delete('/businesses/{id}', function ($id) {
         Business::findOrFail($id)->delete();
+        \App\Services\ActivityLogService::log('business_deleted', null, ['id' => $id]);
         return redirect()->route('admin.businesses')->with('success', 'Business deleted.');
     })->name('businesses.destroy');
 
@@ -586,14 +606,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
         $claim->update(['status' => 'approved']);
         $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
+        $claim->user->update(['role' => 'owner']);
         \App\Services\NotificationService::claimApproved($claim);
-        return redirect()->route('admin.claims')->with('success', 'Claim approved.');
+        \App\Services\ActivityLogService::log('claim_approved', $claim, ['business_id' => $claim->business_id, 'user_id' => $claim->user_id]);
+        return redirect()->route('admin.claims')->with('success', 'Claim approved. User upgraded to owner.');
     })->name('claims.approve');
 
     Route::patch('/claims/{id}/reject', function ($id) {
         $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
         $claim->update(['status' => 'rejected']);
         \App\Services\NotificationService::claimRejected($claim);
+        \App\Services\ActivityLogService::log('claim_rejected', $claim, ['business_id' => $claim->business_id]);
         return redirect()->route('admin.claims')->with('success', 'Claim rejected.');
     })->name('claims.reject');
 
@@ -603,18 +626,24 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if (empty($ids)) return back()->with('error', 'No items selected.');
 
         foreach ($ids as $id) {
-            $claim = ClaimRequest::findOrFail($id);
+            $claim = ClaimRequest::with('user')->findOrFail($id);
             $claim->update(['status' => 'approved']);
             $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
+            $claim->user->update(['role' => 'owner']);
+            \App\Services\ActivityLogService::log('claim_approved', $claim, ['business_id' => $claim->business_id, 'user_id' => $claim->user_id]);
         }
-        return back()->with('success', count($ids) . ' claims approved.');
+        return back()->with('success', count($ids) . ' claims approved. Users upgraded to owner.');
     })->name('claims.bulk-approve');
 
     Route::post('/claims/bulk-reject', function (\Illuminate\Http\Request $request) {
         $ids = json_decode($request->input('ids', '[]'), true);
         if (empty($ids)) return back()->with('error', 'No items selected.');
 
-        ClaimRequest::whereIn('id', $ids)->update(['status' => 'rejected']);
+        foreach ($ids as $id) {
+            $claim = ClaimRequest::findOrFail($id);
+            $claim->update(['status' => 'rejected']);
+            \App\Services\ActivityLogService::log('claim_rejected', $claim, ['business_id' => $claim->business_id]);
+        }
         return back()->with('success', count($ids) . ' claims rejected.');
     })->name('claims.bulk-reject');
 

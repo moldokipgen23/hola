@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\Review;
+use App\Services\ActivityLogService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
@@ -54,6 +55,7 @@ class ReviewController extends Controller
         $review->load('user');
 
         NotificationService::reviewCreated($review);
+        ActivityLogService::log('review_created', $review, ['business_id' => $business->id, 'rating' => $review->rating]);
 
         return response()->json([
             'review' => $review,

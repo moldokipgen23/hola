@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -41,6 +42,7 @@ class AuthController extends Controller
         );
 
         $user->recordLogin();
+        ActivityLogService::log('login', $user);
 
         return response()->json([
             'token' => $user->createToken('hola')->plainTextToken,
@@ -84,6 +86,7 @@ class AuthController extends Controller
         $user->update(['otp' => null, 'otp_expires_at' => null, 'phone_verified_at' => now()]);
 
         $user->recordLogin();
+        ActivityLogService::log('login', $user);
 
         return response()->json([
             'token' => $user->createToken('hola')->plainTextToken,
@@ -109,11 +112,40 @@ class AuthController extends Controller
         ]);
 
         $user->sendEmailVerificationNotification();
+        ActivityLogService::log('user_registered', $user);
 
         return response()->json([
             'token' => $user->createToken('hola')->plainTextToken,
             'user' => $user,
             'message' => 'Account created. Please verify your email.',
+        ]);
+    }
+
+    public function registerOwner(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'phone' => 'nullable|string|max:20',
+            'password' => 'required|string|min:8|confirmed',
+            'business_name' => 'required|string|max:255',
+        ]);
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => Hash::make($request->password),
+            'role' => 'owner',
+        ]);
+
+        $user->sendEmailVerificationNotification();
+        ActivityLogService::log('owner_registered', $user, ['business_name' => $request->business_name]);
+
+        return response()->json([
+            'token' => $user->createToken('hola')->plainTextToken,
+            'user' => $user,
+            'message' => 'Owner account created. Add your business details next.',
         ]);
     }
 
@@ -139,6 +171,7 @@ class AuthController extends Controller
         }
 
         $user->recordLogin();
+        ActivityLogService::log('login', $user);
 
         return response()->json([
             'token' => $user->createToken('hola')->plainTextToken,
@@ -168,6 +201,7 @@ class AuthController extends Controller
         }
 
         $user->recordLogin();
+        ActivityLogService::log('admin_login', $user);
 
         return response()->json([
             'token' => $user->createToken('hola-admin')->plainTextToken,
@@ -177,6 +211,7 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        ActivityLogService::log('logout', $request->user());
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out.']);

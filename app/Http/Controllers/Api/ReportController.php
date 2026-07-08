@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Report;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -22,6 +23,8 @@ class ReportController extends Controller
             'type' => $request->type,
             'message' => $request->message,
         ]);
+
+        ActivityLogService::log('report_submitted', $report, ['business_id' => $request->business_id, 'type' => $request->type]);
 
         return response()->json([
             'report' => $report,

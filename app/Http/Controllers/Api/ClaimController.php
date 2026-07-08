@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClaimRequest;
 use App\Models\Business;
+use App\Services\ActivityLogService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -50,6 +51,7 @@ class ClaimController extends Controller
         $claim = ClaimRequest::create($data);
 
         NotificationService::claimSubmitted($claim);
+        ActivityLogService::log('claim_submitted', $claim, ['business_id' => $claim->business_id]);
 
         return response()->json(['claim' => $claim, 'message' => 'Claim request submitted.'], 201);
     }
@@ -72,9 +74,12 @@ class ClaimController extends Controller
                 'claim_status' => 'claimed',
                 'created_by' => $claim->user_id,
             ]);
+            $claim->user->update(['role' => 'owner']);
             NotificationService::claimApproved($claim);
+            ActivityLogService::log('claim_approved', $claim, ['business_id' => $claim->business_id, 'user_id' => $claim->user_id]);
         } else {
             NotificationService::claimRejected($claim);
+            ActivityLogService::log('claim_rejected', $claim, ['business_id' => $claim->business_id]);
         }
 
         return response()->json(['claim' => $claim]);

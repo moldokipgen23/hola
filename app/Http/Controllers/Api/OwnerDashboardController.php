@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\Category;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -23,6 +24,8 @@ class OwnerDashboardController extends Controller
         $totalCalls = $businesses->sum('call_count');
         $totalWhatsApps = $businesses->sum('whatsapp_count');
         $totalDirections = $businesses->sum('directions_count');
+        $totalSaves = $businesses->sum('saves_count');
+        $totalShares = $businesses->sum('share_count');
 
         $recentConversations = \App\Models\Conversation::whereIn('business_id', $businesses->pluck('id'))
             ->with(['user:id,name', 'business:id,name'])
@@ -38,7 +41,7 @@ class OwnerDashboardController extends Controller
 
         return response()->json([
             'businesses' => $businesses,
-            'stats' => compact('totalViews', 'totalCalls', 'totalWhatsApps', 'totalDirections'),
+            'stats' => compact('totalViews', 'totalCalls', 'totalWhatsApps', 'totalDirections', 'totalSaves', 'totalShares'),
             'recentConversations' => $recentConversations,
             'recentReviews' => $recentReviews,
         ]);

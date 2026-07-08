@@ -57,6 +57,7 @@
                 <a href="/" class="hover:text-white transition">Home</a>
                 <a href="/businesses" class="hover:text-white transition">Businesses</a>
                 <a href="/categories" class="hover:text-white transition">Categories</a>
+                <a href="/map" class="hover:text-white transition">Map</a>
             </nav>
         </div>
     </header>

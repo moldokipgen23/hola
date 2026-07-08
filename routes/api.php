@@ -22,6 +22,7 @@ Route::middleware('throttle:10,1')->group(function () {
     Route::post('/auth/otp/send', [AuthController::class, 'sendOtp']);
     Route::post('/auth/otp/verify', [AuthController::class, 'verifyOtp']);
     Route::post('/auth/register', [AuthController::class, 'register']);
+    Route::post('/auth/register-owner', [AuthController::class, 'registerOwner']);
     Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
     Route::post('/auth/admin/login', [AuthController::class, 'adminLogin']);
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
