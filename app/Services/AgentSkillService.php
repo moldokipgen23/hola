@@ -98,8 +98,7 @@ class AgentSkillService
     private function googlePlacesImport(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
-        $apiKey = $agent->getApiKeyDecrypted()
-            ?? \App\Models\Setting::get('api_key_google_places')
+        $apiKey = \App\Models\Setting::get('api_key_google_places')
             ?? config('services.google.places_api_key');
 
         if (!$apiKey) {
@@ -680,8 +679,7 @@ EOT;
     private function serpapiBusinessSearch(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
-        $apiKey = $agent->getApiKeyDecrypted()
-            ?? \App\Models\Setting::get('api_key_serpapi')
+        $apiKey = \App\Models\Setting::get('api_key_serpapi')
             ?? config('services.serpapi.api_key');
 
         if (!$apiKey) {
