@@ -68,7 +68,7 @@
 <!-- SerpAPI -->
 <div id="panel-serpapi" class="glass-card p-6 rounded-xl hidden">
     <h3 class="font-semibold text-white mb-3">Search via SerpAPI</h3>
-    <p class="text-sm text-slate-400 mb-4">Scrapes real Google search results for businesses in your area.</p>
+    <p class="text-sm text-slate-400 mb-4">Finds real businesses from Google Maps via SerpAPI.</p>
 
     <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
@@ -86,9 +86,15 @@
     </div>
     <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
-            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
-            <input type="text" id="serpapi-area" class="input-dark" value="Churachandpur, Manipur" placeholder="e.g., 795128 or Lamka, Churachandpur">
+            <label class="block text-sm text-slate-400 mb-1">City / Area</label>
+            <input type="text" id="serpapi-area" class="input-dark" placeholder="e.g., Delhi, Lamka">
         </div>
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Zipcode</label>
+            <input type="text" id="serpapi-zipcode" class="input-dark" placeholder="e.g., 110014">
+        </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
             <label class="block text-sm text-slate-400 mb-1">Max Results</label>
             <input type="number" id="serpapi-max" class="input-dark" value="20" min="1" max="50">
@@ -233,6 +239,7 @@ function runSerpapiImport() {
         <input type="hidden" name="skill" value="serpapi_business_search">
         <input type="hidden" name="query" value="${document.getElementById('serpapi-query').value}">
         <input type="hidden" name="area" value="${document.getElementById('serpapi-area').value}">
+        <input type="hidden" name="zipcode" value="${document.getElementById('serpapi-zipcode').value}">
         <input type="hidden" name="max_results" value="${document.getElementById('serpapi-max').value}">
     `;
     document.body.appendChild(form);

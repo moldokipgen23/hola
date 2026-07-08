@@ -123,8 +123,16 @@
                         <div class="field-group hidden" data-skill="serpapi_business_search">
                             <label class="block text-sm text-slate-400 mb-1">Search Query</label>
                             <input type="text" name="query" class="input-dark" placeholder="e.g., restaurants, hotels, shops">
-                            <label class="block text-sm text-slate-400 mb-1 mt-2">Area / Zipcode</label>
-                            <input type="text" name="area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">City / Area</label>
+                                    <input type="text" name="area" class="input-dark" placeholder="e.g., Delhi, Lamka">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Zipcode</label>
+                                    <input type="text" name="zipcode" class="input-dark" placeholder="e.g., 110014">
+                                </div>
+                            </div>
                             <div class="mt-2">
                                 <label class="block text-xs text-slate-500 mb-1">Max Results</label>
                                 <input type="number" name="max_results" class="input-dark" value="20" min="1" max="50">

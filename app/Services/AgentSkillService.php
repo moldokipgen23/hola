@@ -781,17 +781,18 @@ EOT;
         }
 
         $query = $input['query'] ?? 'businesses';
-        $area = $input['area'] ?? $input['zipcode'] ?? 'Lamka, Churachandpur, Manipur';
+        $area = $input['area'] ?? '';
+        $zipcode = $input['zipcode'] ?? '';
         $maxResults = min($input['max_results'] ?? 20, 50);
 
-        $searchQuery = "{$query} in {$area} contact phone address";
+        $location = implode(' ', array_filter([$area, $zipcode]));
+        $searchQuery = $query . ($location ? ' in ' . $location : '');
 
         $response = Http::get('https://serpapi.com/search', [
-            'engine' => 'google',
+            'engine' => 'google_maps',
             'q' => $searchQuery,
             'api_key' => $apiKey,
             'hl' => 'en',
-            'gl' => 'in',
             'num' => min($maxResults, 20),
         ]);
 
@@ -800,16 +801,16 @@ EOT;
         }
 
         $data = $response->json();
-        $places = $data['organic_results'] ?? [];
+        $places = $data['local_results'] ?? [];
 
-        if (empty($places) && !empty($data['local_results'])) {
-            $places = $data['local_results'];
+        if (empty($places)) {
+            return ['count' => 0, 'imported' => 0, 'skipped' => 0, 'batch_id' => null, 'cost' => 0];
         }
 
         $batch = ImportBatch::create([
             'agent_id' => $agent->id,
             'source' => 'serpapi',
-            'name' => "SerpAPI: {$query} in {$area}",
+            'name' => "SerpAPI: {$searchQuery}",
             'total' => count($places),
             'status' => 'processing',
         ]);
@@ -819,45 +820,45 @@ EOT;
         $existingNames = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
 
         foreach (array_slice($places, 0, $maxResults) as $place) {
-            $name = $place['title'] ?? $place['name'] ?? '';
-            $snippet = $place['snippet'] ?? $place['address'] ?? '';
-            $link = $place['link'] ?? $place['website'] ?? null;
-
-            // Extract phone from snippet if present
+            $name = $place['title'] ?? '';
+            $address = $place['address'] ?? '';
             $phone = $place['phone'] ?? null;
-            if (!$phone && $snippet) {
-                preg_match('/(\+91[\s-]?\d{5}[\s-]?\d{5}|\d{5}[\s-]?\d{5}|\d{3}[\s-]?\d{3}[\s-]?\d{4})/', $snippet, $m);
-                $phone = $m[1] ?? null;
-            }
+            $website = $place['website'] ?? $place['link'] ?? null;
+            $rating = $place['rating'] ?? null;
+            $reviews = $place['reviews'] ?? null;
+            $type = $place['type'] ?? null;
 
             if (empty($name) || strlen($name) < 3) {
                 $skipped++;
                 continue;
             }
 
-            $normalizedName = Str::lower(trim($name));
+            // Clean name - remove rating numbers at start like "4.5"
+            $cleanName = preg_replace('/^[\d.]+\s*/', '', $name);
+
+            $normalizedName = Str::lower(trim($cleanName));
             if (in_array($normalizedName, $existingNames)) {
                 $skipped++;
                 continue;
             }
 
             $placeData = [
-                'name' => $name,
-                'address' => $place['address'] ?? $snippet,
+                'name' => $cleanName,
+                'address' => $address,
                 'phone' => $phone,
-                'website' => $link,
-                'description' => $snippet,
-                'rating' => $place['rating'] ?? null,
-                'total_ratings' => $place['reviews'] ?? null,
-                'latitude' => $place['gps_coordinates']['latitude'] ?? $place['latitude'] ?? null,
-                'longitude' => $place['gps_coordinates']['longitude'] ?? $place['longitude'] ?? null,
+                'website' => $website,
+                'rating' => $rating,
+                'total_ratings' => $reviews,
+                'category' => is_array($type) ? ($type[0] ?? null) : $type,
+                'latitude' => $place['gps_coordinates']['latitude'] ?? null,
+                'longitude' => $place['gps_coordinates']['longitude'] ?? null,
             ];
 
             $confidence = 0.5;
             if ($phone) $confidence += 0.15;
-            if ($link) $confidence += 0.1;
-            if ($placeData['address']) $confidence += 0.15;
-            if ($placeData['rating']) $confidence += 0.1;
+            if ($website) $confidence += 0.1;
+            if ($address) $confidence += 0.15;
+            if ($rating) $confidence += 0.1;
             $confidence = min($confidence, 1.0);
 
             ImportItem::create([
