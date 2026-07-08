@@ -1298,19 +1298,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Staff Management ─── super_admin only
     Route::get('/staff', function () {
-        if (Auth::user()->role !== 'super_admin') abort(403);
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->latest()->paginate(20)->withQueryString();
         return view('admin.staff.index', compact('staff'));
     })->name('staff');
 
     Route::get('/staff/create', function () {
-        if (Auth::user()->role !== 'super_admin') abort(403);
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
         return view('admin.staff.form', ['staff' => null]);
     })->name('staff.create');
 
     Route::post('/staff', function (Request $request) {
-        if (Auth::user()->role !== 'super_admin') abort(403);
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -1335,21 +1335,21 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.store');
 
     Route::get('/staff/{id}', function ($id) {
-        if (Auth::user()->role !== 'super_admin') abort(403);
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
         return view('admin.staff.show', compact('staff'));
     })->name('staff.show');
 
     Route::get('/staff/{id}/edit', function ($id) {
-        if (Auth::user()->role !== 'super_admin') abort(403);
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
         return view('admin.staff.form', compact('staff'));
     })->name('staff.edit');
 
     Route::put('/staff/{id}', function (Request $request, $id) {
-        if (Auth::user()->role !== 'super_admin') abort(403);
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
 
@@ -1378,7 +1378,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.update');
 
     Route::delete('/staff/{id}', function ($id) {
-        if (Auth::user()->role !== 'super_admin') abort(403);
+        if (!in_array(Auth::user()->role, ['super_admin', 'admin'])) abort(403);
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
 
