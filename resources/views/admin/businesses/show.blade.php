@@ -110,6 +110,12 @@
                         <p class="text-white font-medium text-xs">{{ $business->external_id }}</p>
                     </div>
                 @endif
+                @if($business->last_synced_at)
+                    <div class="bg-white/5 rounded-xl p-3">
+                        <p class="text-xs text-slate-500 mb-1">Last Synced</p>
+                        <p class="text-white font-medium">{{ $business->last_synced_at->diffForHumans() }}</p>
+                    </div>
+                @endif
             </div>
         </div>
 

@@ -101,9 +101,54 @@ class AgentSkillService
         ]);
 
         $imported = 0;
+        $skipped = 0;
         $categories = Category::pluck('id', 'name')->toArray();
 
+        // Pre-load existing businesses for duplicate detection
+        $existingPlaceIds = Business::whereNotNull('external_id')->pluck('external_id')->toArray();
+        $existingNames = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+
         foreach ($places as $place) {
+            $placeId = $place['place_id'] ?? null;
+            $name = $place['name'] ?? '';
+            $address = $place['vicinity'] ?? '';
+
+            // DUPLICATE CHECK 1: Skip if google_place_id already exists
+            if ($placeId && in_array($placeId, $existingPlaceIds)) {
+                $skipped++;
+                continue;
+            }
+
+            // DUPLICATE CHECK 2: Skip if name+address combination already exists
+            $normalizedName = Str::lower(trim($name));
+            $normalizedAddress = Str::lower(trim($address));
+            if (in_array($normalizedName, $existingNames)) {
+                // Double-check with address to allow same name in different locations
+                $existingWithSameName = Business::whereRaw('LOWER(name) = ?', [$normalizedName])->first();
+                if ($existingWithSameName && Str::contains(Str::lower($existingWithSameName->address), substr($normalizedAddress, 0, 10))) {
+                    $skipped++;
+                    continue;
+                }
+            }
+
+            // QUALITY CHECK: Skip businesses without useful data
+            $phone = $place['phone_number'] ?? null;
+            $website = $place['website'] ?? null;
+            $rating = $place['rating'] ?? null;
+            $totalRatings = $place['user_ratings_total'] ?? 0;
+
+            // Must have at least a phone or website or decent rating
+            if (!$phone && !$website && ($rating === null || $totalRatings < 3)) {
+                $skipped++;
+                continue;
+            }
+
+            // Must have a valid address
+            if (strlen($address) < 5) {
+                $skipped++;
+                continue;
+            }
+
             // Capture photo references
             $photos = [];
             if (!empty($place['photos'])) {
@@ -115,17 +160,17 @@ class AgentSkillService
             }
 
             $placeData = [
-                'name' => $place['name'],
-                'address' => $place['vicinity'] ?? '',
+                'name' => $name,
+                'address' => $address,
                 'latitude' => $place['geometry']['location']['lat'] ?? null,
                 'longitude' => $place['geometry']['location']['lng'] ?? null,
-                'phone' => $place['phone_number'] ?? null,
-                'website' => $place['website'] ?? null,
-                'rating' => $place['rating'] ?? null,
-                'total_ratings' => $place['user_ratings_total'] ?? 0,
+                'phone' => $phone,
+                'website' => $website,
+                'rating' => $rating,
+                'total_ratings' => $totalRatings,
                 'types' => $place['types'] ?? [],
                 'is_open' => $place['opening_hours']['open_now'] ?? null,
-                'google_place_id' => $place['place_id'] ?? null,
+                'google_place_id' => $placeId,
                 'photos' => $photos,
                 'photo_references' => array_map(fn($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
             ];
@@ -133,21 +178,37 @@ class AgentSkillService
             // Auto-match category
             $matchedCategory = $this->matchCategory($place['types'] ?? [], array_keys($categories));
 
+            // Calculate confidence based on data quality
+            $confidence = 0.5;
+            if ($phone) $confidence += 0.1;
+            if ($website) $confidence += 0.1;
+            if ($rating && $rating >= 4.0) $confidence += 0.1;
+            if ($totalRatings >= 10) $confidence += 0.1;
+            if (count($photos) > 0) $confidence += 0.1;
+            $confidence = min($confidence, 1.0);
+
             ImportItem::create([
                 'batch_id' => $batch->id,
                 'data' => $placeData,
-                'external_id' => $place['place_id'] ?? null,
-                'confidence' => $matchedCategory ? 0.8 : 0.4,
+                'external_id' => $placeId,
+                'confidence' => $confidence,
             ]);
 
+            // Track for future duplicate detection
+            if ($placeId) $existingPlaceIds[] = $placeId;
+            $existingNames[] = $normalizedName;
             $imported++;
         }
 
-        $batch->update(['status' => 'completed']);
+        $batch->update([
+            'status' => 'completed',
+            'pending' => $imported,
+        ]);
 
         return [
             'count' => count($places),
             'imported' => $imported,
+            'skipped' => $skipped,
             'batch_id' => $batch->id,
             'cost' => 0.0,
         ];
@@ -224,35 +285,84 @@ EOT;
         ]);
 
         $imported = 0;
+        $skipped = 0;
+
+        // Pre-load existing businesses for duplicate detection
+        $existingNames = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+        $existingPhones = Business::whereNotNull('phone')->pluck('phone')->map(fn($p) => Str::replace([' ', '-', '(', ')'], '', $p))->toArray();
 
         foreach ($businesses as $biz) {
+            $name = $biz['name'] ?? null;
+            $phone = $biz['phone'] ?? null;
+            $address = $biz['address'] ?? null;
+
+            if (empty($name)) {
+                $skipped++;
+                continue;
+            }
+
+            // DUPLICATE CHECK 1: Skip if name already exists
+            $normalizedName = Str::lower(trim($name));
+            if (in_array($normalizedName, $existingNames)) {
+                $skipped++;
+                continue;
+            }
+
+            // DUPLICATE CHECK 2: Skip if phone number already exists (normalized)
+            if ($phone) {
+                $normalizedPhone = Str::replace([' ', '-', '(', ')'], '', $phone);
+                if (in_array($normalizedPhone, $existingPhones)) {
+                    $skipped++;
+                    continue;
+                }
+            }
+
+            // QUALITY CHECK: Must have at least a phone or address
+            if (!$phone && !$address) {
+                $skipped++;
+                continue;
+            }
+
             $itemData = [
-                'name' => $biz['name'] ?? null,
-                'address' => $biz['address'] ?? null,
-                'phone' => $biz['phone'] ?? null,
+                'name' => $name,
+                'address' => $address,
+                'phone' => $phone,
                 'description' => $biz['description'] ?? null,
                 'website' => $biz['website'] ?? null,
                 'category' => $biz['category'] ?? null,
             ];
 
-            if (empty($itemData['name'])) continue;
+            // Calculate confidence based on data quality
+            $confidence = 0.5;
+            if ($phone) $confidence += 0.15;
+            if ($address) $confidence += 0.1;
+            if (!empty($itemData['website'])) $confidence += 0.1;
+            if (!empty($itemData['description'])) $confidence += 0.1;
+            $confidence = min($confidence, 1.0);
 
             ImportItem::create([
                 'batch_id' => $batch->id,
                 'data' => $itemData,
-                'confidence' => 0.6,
+                'confidence' => $confidence,
             ]);
 
+            // Track for future duplicate detection
+            $existingNames[] = $normalizedName;
+            if ($phone) $existingPhones[] = Str::replace([' ', '-', '(', ')'], '', $phone);
             $imported++;
         }
 
-        $batch->update(['status' => 'completed']);
+        $batch->update([
+            'status' => 'completed',
+            'pending' => $imported,
+        ]);
 
         $cost = $result['usage']['total_tokens'] ? ($result['usage']['total_tokens'] * 0.00000014) : 0;
 
         return [
             'count' => count($businesses),
             'imported' => $imported,
+            'skipped' => $skipped,
             'batch_id' => $batch->id,
             'cost' => round($cost, 4),
         ];

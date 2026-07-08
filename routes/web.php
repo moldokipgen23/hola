@@ -83,6 +83,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return view('admin.businesses.index', compact('businesses'));
     })->name('businesses');
 
+    // Detect business changes
+    Route::post('/businesses/detect-changes', function () {
+        Artisan::call('app:detect-business-changes', ['--limit' => request('limit', 50)]);
+        $output = Artisan::output();
+        return response()->json(['message' => 'Change detection completed', 'output' => $output]);
+    })->name('businesses.detect-changes');
+
     Route::get('/businesses/create', function () {
         $categories = Category::orderBy('name')->get();
         $subcategories = Subcategory::orderBy('name')->get();

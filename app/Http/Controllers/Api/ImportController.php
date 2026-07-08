@@ -45,8 +45,49 @@ class ImportController extends Controller
     public function approve($id)
     {
         $item = ImportItem::with('batch')->findOrFail($id);
-
         $data = $item->data;
+
+        // DUPLICATE CHECK: Skip if business already exists
+        $existingBusiness = null;
+
+        // Check by google_place_id (external_id)
+        if (!empty($item->external_id)) {
+            $existingBusiness = Business::where('external_id', $item->external_id)->first();
+        }
+
+        // Check by name + similar address
+        if (!$existingBusiness && !empty($data['name'])) {
+            $existingBusiness = Business::whereRaw('LOWER(name) = ?', [Str::lower($data['name'])])->first();
+            if ($existingBusiness && !empty($data['address'])) {
+                // Verify address is also similar (at least 60% match)
+                $similarity = similar_text(Str::lower($existingBusiness->address), Str::lower($data['address']));
+                if ($similarity < strlen($data['address']) * 0.6) {
+                    $existingBusiness = null; // Different address, allow import
+                }
+            }
+        }
+
+        // Check by phone number
+        if (!$existingBusiness && !empty($data['phone'])) {
+            $normalizedPhone = Str::replace([' ', '-', '(', ')', '+'], '', $data['phone']);
+            $existingBusiness = Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+        }
+
+        if ($existingBusiness) {
+            $item->update([
+                'status' => 'rejected',
+                'notes' => "Duplicate of existing business: {$existingBusiness->name} (ID: {$existingBusiness->id})",
+            ]);
+            $item->batch->increment('rejected');
+            $item->batch->decrement('pending');
+
+            return response()->json([
+                'message' => "Skipped: Business already exists ({$existingBusiness->name})",
+                'duplicate_of' => $existingBusiness->id,
+                'skipped' => true,
+            ]);
+        }
+
         $categories = Category::pluck('id', 'name')->toArray();
 
         // Auto-match category
@@ -55,7 +96,6 @@ class ImportController extends Controller
             $categoryId = $categories[$data['category']] ?? null;
         }
         if (!$categoryId && !empty($data['types'])) {
-            // Try to match from Google types
             foreach ($data['types'] as $type) {
                 foreach ($categories as $name => $id) {
                     if (Str::contains(Str::lower($name), $type)) {
@@ -85,7 +125,6 @@ class ImportController extends Controller
                         $photos[] = 'storage/' . $filename;
                     }
                 } catch (\Exception $e) {
-                    // Skip failed photo downloads
                     continue;
                 }
             }
@@ -115,7 +154,6 @@ class ImportController extends Controller
             'business_id' => $business->id,
         ]);
 
-        // Update batch counts
         $item->batch->increment('approved');
         $item->batch->decrement('pending');
 

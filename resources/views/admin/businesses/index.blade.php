@@ -6,7 +6,10 @@
 @section('content')
 <div class="flex justify-between items-center mb-6">
     <h3 class="text-white font-semibold text-lg">All Businesses</h3>
-    <a href="{{ route('admin.businesses.create') }}" class="btn-primary">+ Add Business</a>
+    <div class="flex gap-2">
+        <button onclick="detectChanges()" class="px-4 py-2 text-sm rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition">Detect Changes</button>
+        <a href="{{ route('admin.businesses.create') }}" class="btn-primary">+ Add Business</a>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -152,6 +155,34 @@ function bulkDelete() {
     document.getElementById('bulk-action-input').value = 'delete';
     document.getElementById('bulk-ids-input').value = JSON.stringify(ids);
     document.getElementById('bulk-form').submit();
+}
+
+async function detectChanges() {
+    if (!confirm('Check all imported businesses for updates from Google? This may take a minute.')) return;
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Checking...';
+    
+    try {
+        const response = await fetch('{{ route("admin.businesses.detect-changes") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Content-Type': 'application/json',
+            },
+        });
+        
+        const data = await response.json();
+        alert(data.message || 'Change detection completed');
+        if (data.output) console.log(data.output);
+        location.reload();
+    } catch (error) {
+        alert('Error: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Detect Changes';
+    }
 }
 </script>
 @endsection
