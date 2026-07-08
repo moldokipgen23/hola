@@ -94,27 +94,25 @@
                             <label class="block text-sm text-slate-400 mb-1">Search Query</label>
                             <input type="text" name="query" class="input-dark" placeholder="e.g., restaurants, schools">
                             <label class="block text-sm text-slate-400 mb-1 mt-2">Area / Zipcode</label>
-                            <input type="text" name="zipcode" class="input-dark" placeholder="e.g., 795128 or Lamka, Churachandpur">
-                            <div class="grid grid-cols-2 gap-2 mt-2">
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Latitude</label>
-                                    <input type="text" name="latitude" class="input-dark" value="24.4871">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Longitude</label>
-                                    <input type="text" name="longitude" class="input-dark" value="93.6998">
-                                </div>
-                            </div>
+                            <input type="text" name="area" class="input-dark" value="Churachandpur, Manipur" placeholder="e.g., 795128 or Lamka, Churachandpur">
+                            <p class="text-slate-500 text-xs mt-1">Coordinates will be auto-detected from this area name</p>
                             <div class="grid grid-cols-2 gap-2 mt-2">
                                 <div>
                                     <label class="block text-xs text-slate-500 mb-1">Radius (meters)</label>
-                                    <input type="number" name="radius" class="input-dark" value="5000">
+                                    <input type="number" name="radius" class="input-dark" value="10000">
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-500 mb-1">Max Results</label>
                                     <input type="number" name="max_results" class="input-dark" value="20" min="1" max="60">
                                 </div>
                             </div>
+                            <details class="mt-2">
+                                <summary class="text-xs text-slate-500 cursor-pointer">Advanced: Manual coordinates</summary>
+                                <div class="grid grid-cols-2 gap-2 mt-1">
+                                    <input type="text" name="latitude" class="input-dark" placeholder="Latitude (optional)">
+                                    <input type="text" name="longitude" class="input-dark" placeholder="Longitude (optional)">
+                                </div>
+                            </details>
                         </div>
 
                         <div class="field-group hidden" data-skill="ai_business_scraper">

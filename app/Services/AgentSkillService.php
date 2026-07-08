@@ -106,14 +106,34 @@ class AgentSkillService
         }
 
         $query = $input['query'] ?? '';
-        $lat = $input['latitude'] ?? 24.4871;
-        $lng = $input['longitude'] ?? 93.6998;
         $maxResults = min($input['max_results'] ?? 20, 60);
+
+        // Geocode area/zipcode to coordinates
+        $area = $input['area'] ?? $input['zipcode'] ?? 'Churachandpur, Manipur, India';
+        $lat = $input['latitude'] ?? null;
+        $lng = $input['longitude'] ?? null;
+
+        if (!$lat || !$lng) {
+            $geo = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
+                'address' => $area,
+                'key' => $apiKey,
+            ]);
+            if ($geo->successful() && ($geo['status'] ?? '') === 'OK') {
+                $location = $geo['results'][0]['geometry']['location'];
+                $lat = $location['lat'];
+                $lng = $location['lng'];
+            } else {
+                $lat = $lat ?? 24.4871;
+                $lng = $lng ?? 93.6998;
+            }
+        }
+
+        $radius = $input['radius'] ?? 10000;
 
         // Nearby search
         $response = Http::get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', [
             'location' => "{$lat},{$lng}",
-            'radius' => $input['radius'] ?? 5000,
+            'radius' => $radius,
             'keyword' => $query,
             'key' => $apiKey,
         ]);

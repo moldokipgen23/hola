@@ -30,7 +30,7 @@
 <!-- Google Places -->
 <div id="panel-google" class="glass-card p-6 rounded-xl">
     <h3 class="font-semibold text-white mb-3">Import from Google Maps</h3>
-    <p class="text-sm text-slate-400 mb-4">Search for businesses near a location and import them.</p>
+    <p class="text-sm text-slate-400 mb-4">Enter an area name or zipcode — we'll find businesses near that location.</p>
 
     <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
@@ -48,23 +48,32 @@
     </div>
     <div class="mb-4">
         <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
-        <input type="text" id="google-zipcode" class="input-dark" placeholder="e.g., 795128 or Lamka, Churachandpur">
+        <input type="text" id="google-zipcode" class="input-dark" value="Churachandpur, Manipur" placeholder="e.g., 795128 or Lamka, Churachandpur">
+        <p class="text-slate-500 text-xs mt-1">We'll automatically find the coordinates for this location</p>
     </div>
-    <div class="grid grid-cols-4 gap-4 mb-4">
+    <div class="grid grid-cols-3 gap-4 mb-4">
         <div>
-            <label class="block text-xs text-slate-500 mb-1">Latitude</label>
-            <input type="text" id="google-lat" class="input-dark" value="24.4871">
-        </div>
-        <div>
-            <label class="block text-xs text-slate-500 mb-1">Longitude</label>
-            <input type="text" id="google-lng" class="input-dark" value="93.6998">
-        </div>
-        <div>
-            <label class="block text-xs text-slate-500 mb-1">Radius (m)</label>
-            <input type="number" id="google-radius" class="input-dark" value="5000">
+            <label class="block text-xs text-slate-500 mb-1">Radius (meters)</label>
+            <input type="number" id="google-radius" class="input-dark" value="10000">
         </div>
         <div>
             <label class="block text-xs text-slate-500 mb-1">Max Results</label>
+            <input type="number" id="google-max" class="input-dark" value="20" min="1" max="60">
+        </div>
+    </div>
+    <details class="mb-4">
+        <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-400">Advanced: Manual coordinates</summary>
+        <div class="grid grid-cols-2 gap-4 mt-2">
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Latitude</label>
+                <input type="text" id="google-lat" class="input-dark">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Longitude</label>
+                <input type="text" id="google-lng" class="input-dark">
+            </div>
+        </div>
+    </details>
             <input type="number" id="google-max" class="input-dark" value="20" min="1" max="60">
         </div>
     </div>
@@ -194,6 +203,9 @@ function runGoogleImport() {
     const agentId = document.getElementById('google-agent').value;
     if (!agentId) { alert('Select an agent first'); return; }
 
+    const lat = document.getElementById('google-lat').value;
+    const lng = document.getElementById('google-lng').value;
+
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `/admin/agents/${agentId}/run`;
@@ -201,11 +213,11 @@ function runGoogleImport() {
         @csrf
         <input type="hidden" name="skill" value="google_places_import">
         <input type="hidden" name="query" value="${document.getElementById('google-query').value}">
-        <input type="hidden" name="zipcode" value="${document.getElementById('google-zipcode').value}">
-        <input type="hidden" name="latitude" value="${document.getElementById('google-lat').value}">
-        <input type="hidden" name="longitude" value="${document.getElementById('google-lng').value}">
+        <input type="hidden" name="area" value="${document.getElementById('google-zipcode').value}">
         <input type="hidden" name="radius" value="${document.getElementById('google-radius').value}">
         <input type="hidden" name="max_results" value="${document.getElementById('google-max').value}">
+        ${lat ? `<input type="hidden" name="latitude" value="${lat}">` : ''}
+        ${lng ? `<input type="hidden" name="longitude" value="${lng}">` : ''}
     `;
     document.body.appendChild(form);
     form.submit();
