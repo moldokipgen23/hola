@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -29,6 +30,10 @@ class User extends Authenticatable
         'last_login_at',
         'login_count',
         'created_by_admin',
+        'email_verified_at',
+        'phone_verified_at',
+        'otp',
+        'otp_expires_at',
     ];
 
     protected $hidden = [

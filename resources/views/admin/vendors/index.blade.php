@@ -86,6 +86,6 @@
 </div>
 
 <div class="mt-4">
-    {{ $vendors->withQueryString()->links() }}
+    {{ $vendors->links() }}
 </div>
 @endsection

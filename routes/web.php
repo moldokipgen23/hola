@@ -1287,7 +1287,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/staff', function () {
         if (Auth::user()->role !== 'super_admin') abort(403);
 
-        $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->latest()->paginate(20);
+        $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->latest()->paginate(20)->withQueryString();
         return view('admin.staff.index', compact('staff'));
     })->name('staff');
 

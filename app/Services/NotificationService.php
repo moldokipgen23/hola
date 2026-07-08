@@ -129,9 +129,9 @@ class NotificationService
 
     public static function reportResolved(\App\Models\Report $report): void
     {
-        if ($report->user_id) {
+        if ($report->user_id && $user = User::find($report->user_id)) {
             self::create(
-                User::find($report->user_id),
+                $user,
                 'report_resolved',
                 'Report Resolved',
                 "Your report for \"{$report->business->name}\" has been reviewed.",
