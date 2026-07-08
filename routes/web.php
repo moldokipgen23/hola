@@ -61,7 +61,22 @@ Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
 
 // robots.txt
 Route::get('/robots.txt', function () {
-    return response(file_get_contents(public_path('robots.txt')), 200, ['Content-Type' => 'text/plain']);
+    $siteUrl = config('app.url', 'http://localhost');
+    return response()
+        ->view('public.robots', compact('siteUrl'))
+        ->header('Content-Type', 'text/plain');
+});
+
+// Sitemap
+Route::get('/sitemap.xml', function () {
+    $businesses = \App\Models\Business::where('is_active', true)->get();
+    $categories = \App\Models\Category::all();
+
+    return response()->view('public.sitemap', [
+        'businesses' => $businesses,
+        'categories' => $categories,
+        'settings' => \App\Models\Setting::pluck('value', 'key')->toArray(),
+    ], 200, ['Content-Type' => 'application/xml']);
 });
 
 // Admin Login
@@ -675,11 +690,36 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'total_directions' => Business::sum('directions_count'),
             'total_shares' => Business::sum('share_count'),
             'total_products' => Product::count(),
+            'total_businesses' => Business::count(),
+            'total_users' => User::count(),
+            'total_reviews' => \App\Models\Review::count(),
+            'total_claims' => \App\Models\ClaimRequest::count(),
+            'pending_claims' => \App\Models\ClaimRequest::where('status', 'pending')->count(),
             'pending_reports' => Report::where('status', 'pending')->count(),
+            'pending_imports' => \App\Models\ImportItem::where('status', 'pending')->count(),
+            'active_businesses' => Business::where('is_active', true)->count(),
+            'featured_businesses' => Business::where('is_featured', true)->count(),
             'top_businesses' => Business::orderByDesc('views_count')->limit(10)->get(),
             'recent_reports' => Report::with('business')->orderByDesc('created_at')->limit(10)->get(),
+            // Category distribution
+            'category_distribution' => Category::withCount('businesses')->orderByDesc('businesses_count')->get(),
+            // User growth (last 30 days)
+            'user_growth' => User::selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->where('created_at', '>=', now()->subDays(30))
+                ->groupBy('date')
+                ->orderBy('date')
+                ->pluck('count', 'date'),
+            // Business growth (last 30 days)
+            'business_growth' => Business::selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->where('created_at', '>=', now()->subDays(30))
+                ->groupBy('date')
+                ->orderBy('date')
+                ->pluck('count', 'date'),
+            'businessesMaxViews' => Business::max('views_count') ?: 1,
         ];
-        return view('admin.analytics.index', compact('analytics'));
+
+        $businessesMaxViews = $analytics['businessesMaxViews'];
+        return view('admin.analytics.index', compact('analytics', 'businessesMaxViews'));
     })->name('analytics');
 
     // Featured Businesses
