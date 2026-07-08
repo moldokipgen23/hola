@@ -19,6 +19,85 @@
     @endif
 </div>
 
+<!-- Post-Processing Tools -->
+@if($items->count() > 0)
+<div class="glass-card p-4 rounded-xl mb-4">
+    <h4 class="text-sm font-semibold text-white mb-3">Batch Processing Tools</h4>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        @php
+            $dupAgents = \App\Models\AiAgent::whereJsonContains('skills', 'duplicate_detector')->get();
+            $qualAgents = \App\Models\AiAgent::whereJsonContains('skills', 'quality_checker')->get();
+            $descAgents = \App\Models\AiAgent::whereJsonContains('skills', 'description_writer')->get();
+        @endphp
+        <!-- Duplicate Detector -->
+        <div class="p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+            <p class="text-xs font-semibold text-red-400 mb-2">🔎 Check for Duplicates</p>
+            @if($dupAgents->isNotEmpty())
+                <form method="POST" action="{{ route('admin.agents.run', $dupAgents->first()->id) }}" class="flex gap-2 process-form">
+                    @csrf
+                    <input type="hidden" name="skill" value="duplicate_detector">
+                    <input type="hidden" name="max_results" value="100">
+                    @if(request('batch_id')) <input type="hidden" name="batch_id" value="{{ request('batch_id') }}"> @endif
+                    <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select"
+                        data-base-url="{{ route('admin.agents.run', '') }}">
+                        @foreach($dupAgents as $a)
+                            <option value="{{ $a->id }}">{{ $a->avatar }} {{ $a->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="px-3 py-1.5 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20">Run</button>
+                </form>
+            @else
+                <p class="text-slate-500 text-xs">No agent with this skill</p>
+            @endif
+        </div>
+
+        <!-- Quality Checker -->
+        <div class="p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
+            <p class="text-xs font-semibold text-yellow-400 mb-2">✅ Check Quality Scores</p>
+            @if($qualAgents->isNotEmpty())
+                <form method="POST" action="{{ route('admin.agents.run', $qualAgents->first()->id) }}" class="flex gap-2 process-form">
+                    @csrf
+                    <input type="hidden" name="skill" value="quality_checker">
+                    <input type="hidden" name="max_results" value="100">
+                    @if(request('batch_id')) <input type="hidden" name="batch_id" value="{{ request('batch_id') }}"> @endif
+                    <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select"
+                        data-base-url="{{ route('admin.agents.run', '') }}">
+                        @foreach($qualAgents as $a)
+                            <option value="{{ $a->id }}">{{ $a->avatar }} {{ $a->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="px-3 py-1.5 text-xs rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20">Run</button>
+                </form>
+            @else
+                <p class="text-slate-500 text-xs">No agent with this skill</p>
+            @endif
+        </div>
+
+        <!-- Description Writer -->
+        <div class="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+            <p class="text-xs font-semibold text-blue-400 mb-2">✍️ Generate Descriptions</p>
+            @if($descAgents->isNotEmpty())
+                <form method="POST" action="{{ route('admin.agents.run', $descAgents->first()->id) }}" class="flex gap-2 process-form">
+                    @csrf
+                    <input type="hidden" name="skill" value="description_writer">
+                    <input type="hidden" name="max_results" value="20">
+                    @if(request('batch_id')) <input type="hidden" name="batch_id" value="{{ request('batch_id') }}"> @endif
+                    <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select"
+                        data-base-url="{{ route('admin.agents.run', '') }}">
+                        @foreach($descAgents as $a)
+                            <option value="{{ $a->id }}">{{ $a->avatar }} {{ $a->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="px-3 py-1.5 text-xs rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20">Run</button>
+                </form>
+            @else
+                <p class="text-slate-500 text-xs">No agent with this skill</p>
+            @endif
+        </div>
+    </div>
+</div>
+@endif
+
 <!-- Bulk Actions -->
 <div id="bulk-actions" class="glass-card p-3 rounded-xl mb-4 flex items-center gap-4" style="display:none">
     <span class="text-white text-sm"><span id="selected-count">0</span> selected</span>
@@ -111,6 +190,18 @@
 @endif
 
 <script>
+document.querySelectorAll('.agent-select').forEach(select => {
+    select.addEventListener('change', function() {
+        const form = this.closest('form');
+        const baseUrl = this.dataset.baseUrl;
+        form.action = baseUrl + this.value;
+    });
+    // trigger once to set initial action
+    const form = select.closest('form');
+    const baseUrl = select.dataset.baseUrl;
+    form.action = baseUrl + select.value;
+});
+
 function updateBulk() {
     const checked = document.querySelectorAll('.row-checkbox:checked');
     document.getElementById('selected-count').textContent = checked.length;
