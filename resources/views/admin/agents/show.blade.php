@@ -125,6 +125,16 @@
                             <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
                             <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
                         </div>
+
+                        <div class="field-group hidden" data-skill="description_writer">
+                            <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
+                            <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
+                        </div>
+
+                        <div class="field-group hidden" data-skill="quality_checker">
+                            <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
+                            <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
+                        </div>
                     </div>
 
                     <button type="submit" class="btn-primary w-full">Run Task</button>
