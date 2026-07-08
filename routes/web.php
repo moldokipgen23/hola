@@ -901,13 +901,20 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if (!empty($data['photos']) && is_array($data['photos'])) {
             foreach ($data['photos'] as $photoUrl) {
                 try {
-                    $response = \Illuminate\Support\Facades\Http::timeout(10)->get($photoUrl);
-                    if ($response->successful()) {
-                        $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.jpg';
+                    $response = \Illuminate\Support\Facades\Http::timeout(15)->get($photoUrl);
+                    if ($response->successful() && strlen($response->body()) > 100) {
+                        $ext = match ($response->header('Content-Type')) {
+                            'image/png' => 'png',
+                            'image/webp' => 'webp',
+                            'image/gif' => 'gif',
+                            default => 'jpg',
+                        };
+                        $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.' . $ext;
                         \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
                         $photos[] = 'storage/' . $filename;
                     }
                 } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning("Photo download failed: {$photoUrl} - " . $e->getMessage());
                     continue;
                 }
             }
@@ -1017,9 +1024,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 if (!empty($data['photos']) && is_array($data['photos'])) {
                     foreach ($data['photos'] as $photoUrl) {
                         try {
-                            $response = \Illuminate\Support\Facades\Http::timeout(10)->get($photoUrl);
-                            if ($response->successful()) {
-                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.jpg';
+                            $response = \Illuminate\Support\Facades\Http::timeout(15)->get($photoUrl);
+                            if ($response->successful() && strlen($response->body()) > 100) {
+                                $ext = match ($response->header('Content-Type')) {
+                                    'image/png' => 'png',
+                                    'image/webp' => 'webp',
+                                    'image/gif' => 'gif',
+                                    default => 'jpg',
+                                };
+                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.' . $ext;
                                 \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
                                 $photos[] = 'storage/' . $filename;
                             }
@@ -1141,9 +1154,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 if (!empty($data['photos']) && is_array($data['photos'])) {
                     foreach ($data['photos'] as $photoUrl) {
                         try {
-                            $response = \Illuminate\Support\Facades\Http::timeout(10)->get($photoUrl);
-                            if ($response->successful()) {
-                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.jpg';
+                            $response = \Illuminate\Support\Facades\Http::timeout(15)->get($photoUrl);
+                            if ($response->successful() && strlen($response->body()) > 100) {
+                                $ext = match ($response->header('Content-Type')) {
+                                    'image/png' => 'png',
+                                    'image/webp' => 'webp',
+                                    'image/gif' => 'gif',
+                                    default => 'jpg',
+                                };
+                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.' . $ext;
                                 \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
                                 $photos[] = 'storage/' . $filename;
                             }
