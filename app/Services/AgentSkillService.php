@@ -295,7 +295,7 @@ class AgentSkillService
         $categoryList = implode(', ', array_slice($categories, 0, 20));
 
         $prompt = <<<EOT
-You are a business directory researcher. List ONLY verified, real businesses that physically exist in {$area}, Churachandpur district, Manipur, India. Category: {$category}.
+You are a business directory researcher. List ONLY verified, real businesses that physically exist in {$area}, India. Category: {$category}.
 
 CRITICAL RULES:
 - ONLY include businesses you are CERTAIN exist at this location
