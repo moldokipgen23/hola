@@ -57,11 +57,29 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     // Businesses
     Route::get('/businesses', function () {
         $query = Business::with('category');
+
         if ($search = request('search')) {
             $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
-            $query->where('name', 'like', $safe);
+            $query->where(function ($q) use ($safe) {
+                $q->where('name', 'like', $safe)
+                  ->orWhere('address', 'like', $safe)
+                  ->orWhere('locality', 'like', $safe);
+            });
         }
-        $businesses = $query->latest()->paginate(20);
+
+        if ($categoryId = request('category')) {
+            $query->where('category_id', $categoryId);
+        }
+
+        if ($status = request('status')) {
+            $query->where('is_active', $status === 'active');
+        }
+
+        if (request()->has('featured') && request('featured') !== '') {
+            $query->where('is_featured', request('featured') === '1');
+        }
+
+        $businesses = $query->latest()->paginate(20)->withQueryString();
         return view('admin.businesses.index', compact('businesses'));
     })->name('businesses');
 
@@ -312,7 +330,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Reports
     Route::get('/reports', function () {
-        $reports = Report::with(['user', 'business'])->latest()->paginate(20);
+        $query = Report::with(['user', 'business']);
+
+        if ($status = request('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($type = request('type')) {
+            $query->where('type', $type);
+        }
+
+        $reports = $query->latest()->paginate(20)->withQueryString();
         return view('admin.reports.index', compact('reports'));
     })->name('reports');
 
