@@ -1,2 +1,6 @@
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: {{ config('app.url', 'http://localhost') }}/sitemap.xml

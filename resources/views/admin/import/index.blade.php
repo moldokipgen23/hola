@@ -105,7 +105,7 @@
     <h3 class="font-semibold text-white mb-3">Bulk Import from CSV</h3>
     <p class="text-sm text-slate-400 mb-4">Upload a CSV file with columns: name, category, address, phone, email, website, description</p>
 
-    <form id="csv-form" enctype="multipart/form-data">
+    <form id="csv-form" action="{{ route('admin.import.csv') }}" method="POST" enctype="multipart/form-data">
         @csrf
         <div class="mb-4">
             <input type="file" name="csv_file" accept=".csv" class="input-dark" required>
@@ -193,12 +193,5 @@ function runAiScrape() {
     document.body.appendChild(form);
     form.submit();
 }
-
-document.getElementById('csv-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    // CSV upload would go through an API endpoint
-    alert('CSV upload will be processed.');
-});
 </script>
 @endsection

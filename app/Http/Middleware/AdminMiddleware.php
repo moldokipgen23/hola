@@ -15,15 +15,24 @@ class AdminMiddleware
         $user = $request->user();
 
         if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+            return redirect()->route('admin.login');
         }
 
         if (!in_array($user->role, self::ROLES)) {
-            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+            }
+            return redirect()->route('admin.login')->with('error', 'Admin access required.');
         }
 
         if ($level === 'super_admin' && $user->role !== 'super_admin') {
-            return response()->json(['message' => 'Unauthorized. Super admin access required.'], 403);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Unauthorized. Super admin access required.'], 403);
+            }
+            return redirect()->route('admin.login')->with('error', 'Super admin access required.');
         }
 
         return $next($request);

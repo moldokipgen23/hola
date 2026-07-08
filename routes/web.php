@@ -13,8 +13,53 @@ use App\Models\ClaimRequest;
 use App\Models\Report;
 use Illuminate\Support\Facades\Hash;
 
-// Home redirect to admin
-Route::get('/', fn () => redirect()->route('admin.dashboard'));
+// Public Routes
+Route::get('/', function () {
+    return view('public.home');
+})->name('home');
+
+Route::get('/businesses', function () {
+    $query = \App\Models\Business::where('is_active', true)->with('category');
+
+    if ($search = request('search')) {
+        $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
+        $query->where(function ($q) use ($safe) {
+            $q->where('name', 'like', $safe)
+              ->orWhere('description', 'like', $safe)
+              ->orWhere('address', 'like', $safe);
+        });
+    }
+
+    if ($category = request('category')) {
+        $query->whereHas('category', fn($q) => $q->where('slug', $category));
+    }
+
+    $businesses = $query->latest()->paginate(12)->withQueryString();
+    return view('public.businesses', compact('businesses'));
+})->name('public.businesses');
+
+Route::get('/categories', function () {
+    return view('public.categories');
+})->name('public.categories');
+
+Route::get('/category/{slug}', function ($slug) {
+    $category = \App\Models\Category::where('slug', $slug)->firstOrFail();
+    $businesses = $category->businesses()->where('is_active', true)->latest()->paginate(12);
+    return view('public.category', compact('category', 'businesses'));
+})->name('public.category');
+
+Route::get('/business/{slug}', function ($slug) {
+    $business = \App\Models\Business::where('slug', $slug)
+        ->where('is_active', true)
+        ->with(['category', 'products', 'reviews' => fn($q) => $q->with('user:id,name')->latest()])
+        ->firstOrFail();
+    return view('public.business', compact('business'));
+})->name('public.business');
+
+// robots.txt
+Route::get('/robots.txt', function () {
+    return response(file_get_contents(public_path('robots.txt')), 200, ['Content-Type' => 'text/plain']);
+});
 
 // Admin Login
 Route::get('/admin/login', fn () => view('auth.login'))->name('admin.login');
@@ -1056,4 +1101,74 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if ($skipped > 0) $message .= " Skipped {$skipped} duplicates.";
         return back()->with('success', $message);
     })->name('import.approve-all');
+
+    // CSV Upload
+    Route::post('/import/csv', function (\Illuminate\Http\Request $request) {
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:10240',
+        ]);
+
+        $file = $request->file('csv_file');
+        $csvData = array_map('str_getcsv', file($file->getRealPath()));
+        $headers = array_shift($csvData);
+
+        $batch = \App\Models\ImportBatch::create([
+            'agent_id' => null,
+            'source' => 'csv',
+            'name' => 'CSV: ' . $file->getClientOriginalName(),
+            'total' => count($csvData),
+            'status' => 'processing',
+            'pending' => count($csvData),
+        ]);
+
+        $imported = 0;
+        $skipped = 0;
+
+        // Pre-load existing for duplicate detection
+        $existingNames = \App\Models\Business::pluck('name')->map(fn($n) => strtolower($n))->toArray();
+
+        foreach ($csvData as $row) {
+            $data = array_combine($headers, $row);
+
+            $name = $data['name'] ?? $data['business_name'] ?? null;
+            if (!$name) {
+                $skipped++;
+                continue;
+            }
+
+            // Duplicate check
+            if (in_array(strtolower(trim($name)), $existingNames)) {
+                $skipped++;
+                continue;
+            }
+
+            \App\Models\ImportItem::create([
+                'batch_id' => $batch->id,
+                'data' => [
+                    'name' => $name,
+                    'address' => $data['address'] ?? $data['location'] ?? '',
+                    'phone' => $data['phone'] ?? null,
+                    'email' => $data['email'] ?? null,
+                    'website' => $data['website'] ?? null,
+                    'description' => $data['description'] ?? null,
+                    'category' => $data['category'] ?? null,
+                    'latitude' => $data['latitude'] ?? $data['lat'] ?? null,
+                    'longitude' => $data['longitude'] ?? $data['lng'] ?? null,
+                ],
+                'confidence' => 0.8,
+            ]);
+
+            $existingNames[] = strtolower(trim($name));
+            $imported++;
+        }
+
+        $batch->update([
+            'status' => 'completed',
+            'pending' => $imported,
+        ]);
+
+        $message = "Imported {$imported} items from CSV.";
+        if ($skipped > 0) $message .= " Skipped {$skipped} duplicates/invalid.";
+        return back()->with('success', $message);
+    })->name('import.csv');
 });
