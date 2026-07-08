@@ -46,7 +46,7 @@
                         @endforeach
                     </select>
                     <div class="flex gap-2">
-                        <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select" data-base-url="{{ route('admin.agents.run', '') }}">
+                        <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select">
                             @foreach($dupAgents as $a)
                                 <option value="{{ $a->id }}">{{ $a->avatar }} {{ $a->name }}</option>
                             @endforeach
@@ -75,7 +75,7 @@
                         @endforeach
                     </select>
                     <div class="flex gap-2">
-                        <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select" data-base-url="{{ route('admin.agents.run', '') }}">
+                        <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select">
                             @foreach($qualAgents as $a)
                                 <option value="{{ $a->id }}">{{ $a->avatar }} {{ $a->name }}</option>
                             @endforeach
@@ -104,7 +104,7 @@
                         @endforeach
                     </select>
                     <div class="flex gap-2">
-                        <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select" data-base-url="{{ route('admin.agents.run', '') }}">
+                        <select name="agent_id_selector" class="input-dark text-xs flex-1 agent-select">
                             @foreach($descAgents as $a)
                                 <option value="{{ $a->id }}">{{ $a->avatar }} {{ $a->name }}</option>
                             @endforeach
