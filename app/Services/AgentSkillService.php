@@ -164,31 +164,37 @@ class AgentSkillService
                 }
             }
 
-            // QUALITY CHECK: Skip businesses without useful data
-            $phone = $place['phone_number'] ?? null;
-            $website = $place['website'] ?? null;
-            $rating = $place['rating'] ?? null;
-            $totalRatings = $place['user_ratings_total'] ?? 0;
-
-            // Must have at least a phone or website or decent rating
-            if (!$phone && !$website && ($rating === null || $totalRatings < 3)) {
-                $skipped++;
-                continue;
-            }
-
-            // Must have a valid address
+            // QUALITY CHECK: Skip places without address
             if (strlen($address) < 5) {
                 $skipped++;
                 continue;
             }
 
-            // Capture photo references
-            $photos = [];
-            if (!empty($place['photos'])) {
-                foreach (array_slice($place['photos'], 0, 5) as $photo) {
-                    if (!empty($photo['photo_reference'])) {
-                        $photos[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
+            // Fetch place details for phone, website, photos
+            $phone = null;
+            $website = null;
+            $photoUrls = [];
+            if ($placeId) {
+                try {
+                    $details = Http::get('https://maps.googleapis.com/maps/api/place/details/json', [
+                        'place_id' => $placeId,
+                        'fields' => 'formatted_phone_number,website,opening_hours,photos',
+                        'key' => $apiKey,
+                    ]);
+                    if ($details->successful()) {
+                        $detailData = $details->json('result', []);
+                        $phone = $detailData['formatted_phone_number'] ?? null;
+                        $website = $detailData['website'] ?? null;
+                        if (!empty($detailData['photos'])) {
+                            foreach (array_slice($detailData['photos'], 0, 3) as $photo) {
+                                if (!empty($photo['photo_reference'])) {
+                                    $photoUrls[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
+                                }
+                            }
+                        }
                     }
+                } catch (\Exception $e) {
+                    // Continue without details
                 }
             }
 
@@ -199,12 +205,11 @@ class AgentSkillService
                 'longitude' => $place['geometry']['location']['lng'] ?? null,
                 'phone' => $phone,
                 'website' => $website,
-                'rating' => $rating,
-                'total_ratings' => $totalRatings,
+                'rating' => $place['rating'] ?? null,
+                'total_ratings' => $place['user_ratings_total'] ?? 0,
                 'types' => $place['types'] ?? [],
-                'is_open' => $place['opening_hours']['open_now'] ?? null,
                 'google_place_id' => $placeId,
-                'photos' => $photos,
+                'photos' => $photoUrls,
                 'photo_references' => array_map(fn($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
             ];
 
@@ -212,12 +217,13 @@ class AgentSkillService
             $matchedCategory = $this->matchCategory($place['types'] ?? [], array_keys($categories));
 
             // Calculate confidence based on data quality
-            $confidence = 0.5;
+            $rating = $place['rating'] ?? null;
+            $confidence = 0.6;
             if ($phone) $confidence += 0.1;
             if ($website) $confidence += 0.1;
             if ($rating && $rating >= 4.0) $confidence += 0.1;
-            if ($totalRatings >= 10) $confidence += 0.1;
-            if (count($photos) > 0) $confidence += 0.1;
+            if (($place['user_ratings_total'] ?? 0) >= 10) $confidence += 0.1;
+            if (count($photoUrls) > 0) $confidence += 0.1;
             $confidence = min($confidence, 1.0);
 
             ImportItem::create([
