@@ -128,64 +128,56 @@
                             </div>
                         </div>
 
+                        <div class="field-group hidden" data-skill="serpapi_business_search">
+                            <label class="block text-sm text-slate-400 mb-1">Search Query</label>
+                            <input type="text" name="query" class="input-dark" placeholder="e.g., restaurants, hotels, shops">
+                            <label class="block text-sm text-slate-400 mb-1 mt-2">Area / Zipcode</label>
+                            <input type="text" name="area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
+                            <div class="mt-2">
+                                <label class="block text-xs text-slate-500 mb-1">Max Results</label>
+                                <input type="number" name="max_results" class="input-dark" value="20" min="1" max="50">
+                            </div>
+                        </div>
+
                         <div class="field-group hidden" data-skill="auto_categorize">
-                            <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
-                            <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
-                            <div class="grid grid-cols-2 gap-2 mt-2">
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Area / Zipcode (filter)</label>
-                                    <input type="text" name="area" class="input-dark" placeholder="e.g., 795128">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Max Items</label>
-                                    <input type="number" name="max_results" class="input-dark" value="50" min="1" max="200">
-                                </div>
+                            <label class="block text-sm text-slate-400 mb-1">Batch ID</label>
+                            <input type="number" name="batch_id" class="input-dark" placeholder="Required — enter batch ID">
+                            <div class="mt-2">
+                                <label class="block text-xs text-slate-500 mb-1">Max Items</label>
+                                <input type="number" name="max_results" class="input-dark" value="50" min="1" max="200">
                             </div>
                         </div>
 
                         <div class="field-group hidden" data-skill="duplicate_detector">
                             <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
                             <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
-                            <div class="grid grid-cols-2 gap-2 mt-2">
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Area / Zipcode (filter)</label>
-                                    <input type="text" name="area" class="input-dark" placeholder="e.g., 795128">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Max Items</label>
-                                    <input type="number" name="max_results" class="input-dark" value="50" min="1" max="200">
-                                </div>
+                            <div class="mt-2">
+                                <label class="block text-xs text-slate-500 mb-1">Max Items</label>
+                                <input type="number" name="max_results" class="input-dark" value="200" min="1" max="500">
                             </div>
                         </div>
 
                         <div class="field-group hidden" data-skill="description_writer">
                             <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
                             <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
-                            <div class="grid grid-cols-2 gap-2 mt-2">
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Area / Zipcode (filter)</label>
-                                    <input type="text" name="area" class="input-dark" placeholder="e.g., 795128">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Max Items</label>
-                                    <input type="number" name="max_results" class="input-dark" value="10" min="1" max="50">
-                                </div>
+                            <div class="mt-2">
+                                <label class="block text-xs text-slate-500 mb-1">Max Items</label>
+                                <input type="number" name="max_results" class="input-dark" value="10" min="1" max="50">
                             </div>
                         </div>
 
                         <div class="field-group hidden" data-skill="quality_checker">
                             <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
                             <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
-                            <div class="grid grid-cols-2 gap-2 mt-2">
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Area / Zipcode (filter)</label>
-                                    <input type="text" name="area" class="input-dark" placeholder="e.g., 795128">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-slate-500 mb-1">Max Items</label>
-                                    <input type="number" name="max_results" class="input-dark" value="50" min="1" max="200">
-                                </div>
+                            <div class="mt-2">
+                                <label class="block text-xs text-slate-500 mb-1">Max Items</label>
+                                <input type="number" name="max_results" class="input-dark" value="200" min="1" max="500">
                             </div>
+                        </div>
+
+                        <div class="field-group hidden" data-skill="csv_importer">
+                            <label class="block text-sm text-slate-400 mb-1">File Path (server-side)</label>
+                            <input type="text" name="file_path" class="input-dark" placeholder="/path/to/file.csv">
                         </div>
                     </div>
 
