@@ -46,10 +46,27 @@
     </div>
 </form>
 
+<!-- Bulk Actions -->
+<div id="bulk-actions" class="glass-card p-3 rounded-xl mb-4 flex items-center gap-4" style="display:none">
+    <span class="text-white text-sm"><span id="selected-count">0</span> selected</span>
+    <button type="button" onclick="bulkAction('activate')" class="px-3 py-1.5 text-xs rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition">Activate</button>
+    <button type="button" onclick="bulkAction('deactivate')" class="px-3 py-1.5 text-xs rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition">Deactivate</button>
+    <button type="button" onclick="bulkAction('feature')" class="px-3 py-1.5 text-xs rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition">Feature</button>
+    <button type="button" onclick="bulkAction('unfeature')" class="px-3 py-1.5 text-xs rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 transition">Unfeature</button>
+    <button type="button" onclick="bulkDelete()" class="px-3 py-1.5 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition">Delete Selected</button>
+</div>
+
+<form id="bulk-form" method="POST" action="{{ route('admin.businesses.bulk') }}">
+    @csrf
+    <input type="hidden" name="action" id="bulk-action-input">
+    <input type="hidden" name="ids" id="bulk-ids-input">
+</form>
+
 <div class="glass-card rounded-lg overflow-hidden">
     <table class="data-table">
         <thead>
             <tr>
+                <th style="width:40px"><input type="checkbox" id="select-all" onchange="toggleAll(this)"></th>
                 <th>Name</th>
                 <th>Category</th>
                 <th>Status</th>
@@ -61,6 +78,7 @@
         <tbody>
             @forelse($businesses ?? [] as $business)
                 <tr>
+                    <td><input type="checkbox" name="ids[]" value="{{ $business->id }}" class="row-checkbox" onchange="updateBulk()"></td>
                     <td class="font-medium">
                         <div>{{ $business->name }}</div>
                         <div class="text-xs text-slate-500">{{ $business->address }}</div>
@@ -91,7 +109,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center text-slate-400">No businesses match your filters.</td></tr>
+                <tr><td colspan="7" class="text-center text-slate-400">No businesses match your filters.</td></tr>
             @endforelse
         </tbody>
     </table>
@@ -102,4 +120,38 @@
         {{ $businesses->links() }}
     </div>
 @endif
+
+<script>
+function toggleAll(el) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = el.checked);
+    updateBulk();
+}
+
+function updateBulk() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    document.getElementById('selected-count').textContent = checked.length;
+    document.getElementById('bulk-actions').style.display = checked.length > 0 ? 'flex' : 'none';
+}
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+}
+
+function bulkAction(action) {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    document.getElementById('bulk-action-input').value = action;
+    document.getElementById('bulk-ids-input').value = JSON.stringify(ids);
+    document.getElementById('bulk-form').submit();
+}
+
+function bulkDelete() {
+    if (!confirm('Delete selected businesses? This cannot be undone.')) return;
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    document.getElementById('bulk-action-input').value = 'delete';
+    document.getElementById('bulk-ids-input').value = JSON.stringify(ids);
+    document.getElementById('bulk-form').submit();
+}
+</script>
 @endsection

@@ -153,6 +153,36 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return redirect()->route('admin.businesses')->with('success', 'Business deleted.');
     })->name('businesses.destroy');
 
+    // Bulk business actions
+    Route::post('/businesses/bulk', function (\Illuminate\Http\Request $request) {
+        $action = $request->input('action');
+        $ids = json_decode($request->input('ids', '[]'), true);
+
+        if (empty($ids)) {
+            return back()->with('error', 'No items selected.');
+        }
+
+        switch ($action) {
+            case 'activate':
+                Business::whereIn('id', $ids)->update(['is_active' => true]);
+                return back()->with('success', count($ids) . ' businesses activated.');
+            case 'deactivate':
+                Business::whereIn('id', $ids)->update(['is_active' => false]);
+                return back()->with('success', count($ids) . ' businesses deactivated.');
+            case 'feature':
+                Business::whereIn('id', $ids)->update(['is_featured' => true]);
+                return back()->with('success', count($ids) . ' businesses featured.');
+            case 'unfeature':
+                Business::whereIn('id', $ids)->update(['is_featured' => false]);
+                return back()->with('success', count($ids) . ' businesses unfeatured.');
+            case 'delete':
+                Business::whereIn('id', $ids)->delete();
+                return back()->with('success', count($ids) . ' businesses deleted.');
+            default:
+                return back()->with('error', 'Unknown action.');
+        }
+    })->name('businesses.bulk');
+
     // Categories
     Route::get('/categories', function () {
         $categories = Category::withCount('businesses')->orderBy('name')->get();
@@ -328,6 +358,27 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return redirect()->route('admin.claims')->with('success', 'Claim rejected.');
     })->name('claims.reject');
 
+    // Bulk claim actions
+    Route::post('/claims/bulk-approve', function (\Illuminate\Http\Request $request) {
+        $ids = json_decode($request->input('ids', '[]'), true);
+        if (empty($ids)) return back()->with('error', 'No items selected.');
+
+        foreach ($ids as $id) {
+            $claim = ClaimRequest::findOrFail($id);
+            $claim->update(['status' => 'approved']);
+            $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
+        }
+        return back()->with('success', count($ids) . ' claims approved.');
+    })->name('claims.bulk-approve');
+
+    Route::post('/claims/bulk-reject', function (\Illuminate\Http\Request $request) {
+        $ids = json_decode($request->input('ids', '[]'), true);
+        if (empty($ids)) return back()->with('error', 'No items selected.');
+
+        ClaimRequest::whereIn('id', $ids)->update(['status' => 'rejected']);
+        return back()->with('success', count($ids) . ' claims rejected.');
+    })->name('claims.bulk-reject');
+
     // Reports
     Route::get('/reports', function () {
         $query = Report::with(['user', 'business']);
@@ -349,6 +400,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $report->update(['status' => 'resolved']);
         return redirect()->route('admin.reports')->with('success', 'Report resolved.');
     })->name('reports.resolve');
+
+    // Bulk report actions
+    Route::post('/reports/bulk-resolve', function (\Illuminate\Http\Request $request) {
+        $ids = json_decode($request->input('ids', '[]'), true);
+        if (empty($ids)) return back()->with('error', 'No items selected.');
+
+        Report::whereIn('id', $ids)->update(['status' => 'resolved']);
+        return back()->with('success', count($ids) . ' reports resolved.');
+    })->name('reports.bulk-resolve');
 
     // Settings
     Route::get('/settings', function () {
@@ -548,6 +608,93 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         }
         return back()->with('success', 'Item rejected.');
     })->name('import.reject');
+
+    // Bulk import actions
+    Route::post('/import/bulk-approve', function (\Illuminate\Http\Request $request) {
+        $ids = json_decode($request->input('ids', '[]'), true);
+        if (empty($ids)) return back()->with('error', 'No items selected.');
+
+        $approved = 0;
+        foreach ($ids as $id) {
+            try {
+                $item = \App\Models\ImportItem::with('batch')->findOrFail($id);
+                $data = $item->data;
+                $categories = \App\Models\Category::pluck('id', 'name')->toArray();
+                $categoryName = $data['category'] ?? $data['type'] ?? null;
+                $categoryId = null;
+                if ($categoryName) {
+                    foreach ($categories as $catId => $name) {
+                        if (strtolower($name) === strtolower($categoryName)) {
+                            $categoryId = $catId;
+                            break;
+                        }
+                    }
+                }
+                if (!$categoryId) {
+                    $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
+                }
+
+                $slug = \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business');
+                $existing = \App\Models\Business::where('slug', $slug)->first();
+                if ($existing) $slug .= '-' . \Illuminate\Support\Str::random(5);
+
+                $photos = [];
+                if (!empty($data['photos']) && is_array($data['photos'])) {
+                    foreach ($data['photos'] as $photoUrl) {
+                        try {
+                            $response = \Illuminate\Support\Facades\Http::timeout(10)->get($photoUrl);
+                            if ($response->successful()) {
+                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.jpg';
+                                \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
+                                $photos[] = 'storage/' . $filename;
+                            }
+                        } catch (\Exception $e) { continue; }
+                    }
+                }
+
+                \App\Models\Business::create([
+                    'name' => $data['name'] ?? 'Unknown Business',
+                    'slug' => $slug,
+                    'category_id' => $categoryId,
+                    'description' => $data['description'] ?? null,
+                    'address' => $data['address'] ?? '',
+                    'phone' => $data['phone'] ?? null,
+                    'email' => $data['email'] ?? null,
+                    'website' => $data['website'] ?? null,
+                    'latitude' => $data['latitude'] ?? null,
+                    'longitude' => $data['longitude'] ?? null,
+                    'district' => 'Churachandpur',
+                    'is_active' => true,
+                    'source' => 'import',
+                    'import_batch_id' => $item->batch_id,
+                    'photos' => count($photos) > 0 ? $photos : null,
+                ]);
+
+                $item->update(['status' => 'approved']);
+                if ($item->batch) {
+                    $item->batch->increment('approved');
+                    $item->batch->decrement('pending');
+                }
+                $approved++;
+            } catch (\Exception $e) { continue; }
+        }
+        return back()->with('success', "Approved {$approved} items.");
+    })->name('import.bulk-approve');
+
+    Route::post('/import/bulk-reject', function (\Illuminate\Http\Request $request) {
+        $ids = json_decode($request->input('ids', '[]'), true);
+        if (empty($ids)) return back()->with('error', 'No items selected.');
+
+        foreach ($ids as $id) {
+            $item = \App\Models\ImportItem::findOrFail($id);
+            $item->update(['status' => 'rejected']);
+            if ($item->batch) {
+                $item->batch->increment('rejected');
+                $item->batch->decrement('pending');
+            }
+        }
+        return back()->with('success', count($ids) . ' items rejected.');
+    })->name('import.bulk-reject');
 
     Route::post('/import/approve-all', function () {
         $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->get();

@@ -33,10 +33,22 @@
     </div>
 </form>
 
+<!-- Bulk Actions -->
+<div id="bulk-actions" class="glass-card p-3 rounded-xl mb-4 flex items-center gap-4" style="display:none">
+    <span class="text-white text-sm"><span id="selected-count">0</span> selected</span>
+    <button type="button" onclick="bulkResolve()" class="px-3 py-1.5 text-xs rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition">Resolve Selected</button>
+</div>
+
+<form id="bulk-form" method="POST">
+    @csrf
+    <input type="hidden" name="ids" id="bulk-ids-input">
+</form>
+
 <div class="glass-card rounded-lg overflow-hidden">
     <table class="data-table">
         <thead>
             <tr>
+                <th style="width:40px"><input type="checkbox" id="select-all" onchange="toggleAll(this)"></th>
                 <th>User</th>
                 <th>Business</th>
                 <th>Type</th>
@@ -49,6 +61,7 @@
         <tbody>
             @forelse($reports ?? [] as $report)
                 <tr>
+                    <td><input type="checkbox" value="{{ $report->id }}" class="row-checkbox" onchange="updateBulk()"></td>
                     <td class="text-sm">{{ $report->user->name ?? '-' }}</td>
                     <td class="text-sm">{{ $report->business->name ?? '-' }}</td>
                     <td class="text-sm">{{ str_replace('_', ' ', ucfirst($report->type)) }}</td>
@@ -73,7 +86,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="text-center text-slate-400">No reports.</td></tr>
+                <tr><td colspan="8" class="text-center text-slate-400">No reports.</td></tr>
             @endforelse
         </tbody>
     </table>
@@ -82,4 +95,30 @@
 @if(isset($reports) && $reports->hasPages())
     <div class="mt-4 text-slate-400">{{ $reports->links() }}</div>
 @endif
+
+<script>
+function toggleAll(el) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = el.checked);
+    updateBulk();
+}
+
+function updateBulk() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    document.getElementById('selected-count').textContent = checked.length;
+    document.getElementById('bulk-actions').style.display = checked.length > 0 ? 'flex' : 'none';
+}
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+}
+
+function bulkResolve() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    if (!confirm('Resolve ' + ids.length + ' reports?')) return;
+    document.getElementById('bulk-ids-input').value = JSON.stringify(ids);
+    document.getElementById('bulk-form').action = '{{ route("admin.reports.bulk-resolve") }}';
+    document.getElementById('bulk-form').submit();
+}
+</script>
 @endsection
