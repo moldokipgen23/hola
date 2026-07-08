@@ -426,11 +426,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('agents.run');
 
     // ─── Import ───
-    $importCtrl = \App\Http\Controllers\Api\ImportController::class;
 
-    Route::get('/import', function () use ($importCtrl) {
-        $response = (new $importCtrl())->index();
-        $batches = json_decode($response->getContent(), true)['batches']['data'] ?? [];
+    Route::get('/import', function () {
+        $batches = \App\Models\ImportBatch::withCount('items')
+            ->with('agent:id,name,avatar')
+            ->latest()
+            ->paginate(20);
         return view('admin.import.index', compact('batches'));
     })->name('import');
 
@@ -438,23 +439,106 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $query = \App\Models\ImportItem::where('status', 'pending')->with('batch:id,name,source');
         if (request('batch_id')) $query->where('batch_id', request('batch_id'));
         $items = $query->latest()->paginate(20);
-
         return view('admin.import.review', compact('items'));
     })->name('import.review');
 
-    Route::post('/import/review/{id}/approve', function ($id) use ($importCtrl) {
-        $response = (new $importCtrl())->approve($id);
-        return back()->with('success', 'Business created.');
+    Route::post('/import/review/{id}/approve', function ($id) {
+        $item = \App\Models\ImportItem::with('batch')->findOrFail($id);
+        $data = $item->data;
+        $categories = \App\Models\Category::pluck('id', 'name')->toArray();
+
+        $categoryName = $data['category'] ?? $data['type'] ?? null;
+        $categoryId = null;
+        if ($categoryName) {
+            foreach ($categories as $id => $name) {
+                if (strtolower($name) === strtolower($categoryName)) {
+                    $categoryId = $id;
+                    break;
+                }
+            }
+        }
+        if (!$categoryId) {
+            $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
+        }
+
+        \App\Models\Business::create([
+            'name' => $data['name'] ?? 'Unknown Business',
+            'slug' => \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business'),
+            'category_id' => $categoryId,
+            'description' => $data['description'] ?? null,
+            'address' => $data['address'] ?? $data['location'] ?? '',
+            'phone' => $data['phone'] ?? null,
+            'email' => $data['email'] ?? null,
+            'website' => $data['website'] ?? null,
+            'latitude' => $data['latitude'] ?? $data['lat'] ?? null,
+            'longitude' => $data['longitude'] ?? $data['lng'] ?? null,
+            'district' => 'Churachandpur',
+            'is_active' => true,
+            'source' => 'import',
+            'import_batch_id' => $item->batch_id,
+        ]);
+
+        $item->update(['status' => 'approved']);
+        if ($item->batch) {
+            $item->batch->increment('approved');
+            $item->batch->decrement('pending');
+        }
+
+        return back()->with('success', 'Business created from import.');
     })->name('import.approve');
 
-    Route::post('/import/review/{id}/reject', function ($id) use ($importCtrl) {
-        $response = (new $importCtrl())->reject($id);
+    Route::post('/import/review/{id}/reject', function ($id) {
+        $item = \App\Models\ImportItem::findOrFail($id);
+        $item->update(['status' => 'rejected']);
+        if ($item->batch) {
+            $item->batch->increment('rejected');
+            $item->batch->decrement('pending');
+        }
         return back()->with('success', 'Item rejected.');
     })->name('import.reject');
 
-    Route::post('/import/approve-all', function () use ($importCtrl) {
-        $response = (new $importCtrl())->approveAll(request());
-        $data = json_decode($response->getContent(), true);
-        return back()->with('success', $data['message']);
+    Route::post('/import/approve-all', function () {
+        $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->get();
+        $approved = 0;
+
+        foreach ($items as $item) {
+            $data = $item->data;
+            $categories = \App\Models\Category::pluck('id', 'name')->toArray();
+            $categoryName = $data['category'] ?? $data['type'] ?? null;
+            $categoryId = null;
+            if ($categoryName) {
+                foreach ($categories as $id => $name) {
+                    if (strtolower($name) === strtolower($categoryName)) {
+                        $categoryId = $id;
+                        break;
+                    }
+                }
+            }
+            if (!$categoryId) {
+                $categoryId = \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
+            }
+
+            \App\Models\Business::create([
+                'name' => $data['name'] ?? 'Unknown Business',
+                'slug' => \Illuminate\Support\Str::slug($data['name'] ?? 'unknown-business'),
+                'category_id' => $categoryId,
+                'description' => $data['description'] ?? null,
+                'address' => $data['address'] ?? $data['location'] ?? '',
+                'phone' => $data['phone'] ?? null,
+                'email' => $data['email'] ?? null,
+                'website' => $data['website'] ?? null,
+                'latitude' => $data['latitude'] ?? $data['lat'] ?? null,
+                'longitude' => $data['longitude'] ?? $data['lng'] ?? null,
+                'district' => 'Churachandpur',
+                'is_active' => true,
+                'source' => 'import',
+                'import_batch_id' => $item->batch_id,
+            ]);
+
+            $item->update(['status' => 'approved']);
+            $approved++;
+        }
+
+        return back()->with('success', "Approved {$approved} items.");
     })->name('import.approve-all');
 });
