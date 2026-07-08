@@ -120,7 +120,14 @@ class AgentSkillService
         ]);
 
         if ($response->failed()) {
-            throw new \Exception('Google Places API request failed.');
+            throw new \Exception('Google Places API request failed: ' . $response->body());
+        }
+
+        $data = $response->json();
+
+        if (($data['status'] ?? '') !== 'OK' && ($data['status'] ?? '') !== 'ZERO_RESULTS') {
+            $errorMsg = $data['error_message'] ?? $data['status'] ?? 'Unknown error';
+            throw new \Exception('Google Places API error: ' . $errorMsg);
         }
 
         $data = $response->json();
