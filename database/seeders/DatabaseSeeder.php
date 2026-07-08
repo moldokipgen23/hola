@@ -45,6 +45,12 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
+        // ─── Default fallback category (used by imports without a category match) ───
+        $catModels['Uncategorized'] = Category::firstOrCreate(
+            ['slug' => 'uncategorized'],
+            ['name' => 'Uncategorized', 'icon' => '📁', 'is_featured' => false, 'order' => 999, 'slug' => 'uncategorized']
+        );
+
         // ─── Subcategories ───
         $subcategories = [
             'Food & Restaurants' => [

@@ -69,6 +69,9 @@ class SettingController extends Controller
 
     private function urlEntry(string $loc, string $lastmod): string
     {
+        $loc = htmlspecialchars($loc, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $lastmod = htmlspecialchars($lastmod, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
         return "  <url>\n    <loc>{$loc}</loc>\n    <lastmod>{$lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n";
     }
 }

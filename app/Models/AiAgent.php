@@ -25,9 +25,14 @@ class AiAgent extends Model
         'last_active_at',
     ];
 
+    protected $hidden = [
+        'api_key',
+    ];
+
     protected $casts = [
         'skills' => 'array',
         'config' => 'array',
+        'api_key' => 'encrypted',
         'total_cost' => 'decimal:4',
         'last_active_at' => 'datetime',
     ];

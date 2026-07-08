@@ -39,6 +39,13 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
     protected $hidden = [
         'password',
         'remember_token',
+        'otp',
+        'otp_expires_at',
+        'google_id',
+        'banned_at',
+        'ban_reason',
+        'login_count',
+        'created_by_admin',
     ];
 
     protected function casts(): array

@@ -12,10 +12,12 @@ class Review extends Model
         'business_id',
         'rating',
         'comment',
+        'owner_response',
     ];
 
     protected $casts = [
         'rating' => 'integer',
+        'owner_response' => 'string',
     ];
 
     protected static function booted(): void

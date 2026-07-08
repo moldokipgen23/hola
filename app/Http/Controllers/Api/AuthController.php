@@ -31,6 +31,17 @@ class AuthController extends Controller
 
         $payload = $response->json();
 
+        // Verify audience (client id) when configured. This prevents tokens
+        // issued for a different OAuth client from being accepted.
+        $expectedAud = config('services.google.client_id');
+        if ($expectedAud && ($payload['aud'] ?? null) !== $expectedAud) {
+            return response()->json(['message' => 'Invalid Google token'], 401);
+        }
+
+        if (!empty($payload['exp']) && (int) $payload['exp'] < time()) {
+            return response()->json(['message' => 'Expired Google token'], 401);
+        }
+
         $user = User::updateOrCreate(
             ['google_id' => $payload['sub']],
             [
@@ -64,8 +75,8 @@ class AuthController extends Controller
 
         $user->update(['otp' => $otp, 'otp_expires_at' => now()->addMinutes(10)]);
 
-        // TODO: Integrate actual SMS provider
-        \Log::info("OTP for {$request->phone}: {$otp}");
+        // TODO: Integrate actual SMS provider. Do not log the OTP in plaintext.
+        \Log::info("OTP requested for {$request->phone}");
 
         return response()->json(['message' => 'OTP sent successfully.']);
     }
@@ -130,7 +141,7 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
             'business_name' => 'required|string|max:255',
             'business_address' => 'nullable|string|max:255',
-            'business_category_id' => 'nullable|exists:categories,id',
+            'business_category_id' => 'required|exists:categories,id',
         ]);
 
         $user = User::create([
@@ -269,7 +280,26 @@ class AuthController extends Controller
 
     public function verifyEmail(Request $request)
     {
-        $request->user()->markEmailAsVerified();
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json(['message' => 'Email already verified.']);
+        }
+
+        // Require the signed verification parameters that were emailed to the
+        // user. This prevents a logged-in user from self-verifying without
+        // actually clicking the verification link sent to their email.
+        $request->validate([
+            'id' => 'required|integer',
+            'hash' => 'required|string',
+        ]);
+
+        if ((int) $request->id !== $user->getKey()
+            || ! hash_equals((string) $request->hash, sha1($user->getEmailForVerification()))) {
+            return response()->json(['message' => 'Invalid verification link.'], 403);
+        }
+
+        $user->markEmailAsVerified();
 
         return response()->json(['message' => 'Email verified.']);
     }

@@ -108,6 +108,11 @@ class ImportController extends Controller
             }
         }
 
+        // Fallback to the "Uncategorized" category so we never write a NULL category_id
+        if (!$categoryId) {
+            $categoryId = Category::where('slug', 'uncategorized')->value('id');
+        }
+
         $slug = Str::slug($data['name']);
         $existing = Business::where('slug', $slug)->first();
         if ($existing) {
