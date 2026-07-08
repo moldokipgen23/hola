@@ -352,9 +352,18 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Analytics
     Route::get('/analytics', function () {
-        $controller = new \App\Http\Controllers\Api\AdminController();
-        $response = $controller->analytics();
-        $analytics = json_decode($response->getContent(), true);
+        $analytics = [
+            'total_views' => Business::sum('views_count'),
+            'total_saves' => Business::sum('saves_count'),
+            'total_calls' => Business::sum('call_count'),
+            'total_whatsapps' => Business::sum('whatsapp_count'),
+            'total_directions' => Business::sum('directions_count'),
+            'total_shares' => Business::sum('share_count'),
+            'total_products' => Product::count(),
+            'pending_reports' => Report::where('status', 'pending')->count(),
+            'top_businesses' => Business::orderByDesc('views_count')->limit(10)->get(),
+            'recent_reports' => Report::with('business')->orderByDesc('created_at')->limit(10)->get(),
+        ];
         return view('admin.analytics.index', compact('analytics'));
     })->name('analytics');
 
