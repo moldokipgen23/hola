@@ -93,6 +93,8 @@
                         <div class="field-group" data-skill="google_places_import">
                             <label class="block text-sm text-slate-400 mb-1">Search Query</label>
                             <input type="text" name="query" class="input-dark" placeholder="e.g., restaurants, schools">
+                            <label class="block text-sm text-slate-400 mb-1 mt-2">Area / Zipcode</label>
+                            <input type="text" name="zipcode" class="input-dark" placeholder="e.g., 795128 or Lamka, Churachandpur">
                             <div class="grid grid-cols-2 gap-2 mt-2">
                                 <div>
                                     <label class="block text-xs text-slate-500 mb-1">Latitude</label>
@@ -103,17 +105,27 @@
                                     <input type="text" name="longitude" class="input-dark" value="93.6998">
                                 </div>
                             </div>
-                            <div class="mt-2">
-                                <label class="block text-xs text-slate-500 mb-1">Radius (meters)</label>
-                                <input type="number" name="radius" class="input-dark" value="5000">
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Radius (meters)</label>
+                                    <input type="number" name="radius" class="input-dark" value="5000">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Max Results</label>
+                                    <input type="number" name="max_results" class="input-dark" value="20" min="1" max="60">
+                                </div>
                             </div>
                         </div>
 
                         <div class="field-group hidden" data-skill="ai_business_scraper">
-                            <label class="block text-sm text-slate-400 mb-1">Area</label>
-                            <input type="text" name="area" class="input-dark" value="Lamka, Churachandpur">
+                            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
+                            <input type="text" name="area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
                             <label class="block text-sm text-slate-400 mb-1 mt-2">Category</label>
                             <input type="text" name="category" class="input-dark" placeholder="e.g., restaurants, all businesses">
+                            <div class="mt-2">
+                                <label class="block text-xs text-slate-500 mb-1">Max Results</label>
+                                <input type="number" name="max_results" class="input-dark" value="30" min="1" max="50">
+                            </div>
                         </div>
 
                         <div class="field-group hidden" data-skill="auto_categorize">

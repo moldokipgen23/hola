@@ -43,7 +43,11 @@
             </select>
         </div>
     </div>
-    <div class="grid grid-cols-3 gap-4 mb-4">
+    <div class="mb-4">
+        <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
+        <input type="text" id="google-zipcode" class="input-dark" placeholder="e.g., 795128 or Lamka, Churachandpur">
+    </div>
+    <div class="grid grid-cols-4 gap-4 mb-4">
         <div>
             <label class="block text-xs text-slate-500 mb-1">Latitude</label>
             <input type="text" id="google-lat" class="input-dark" value="24.4871">
@@ -56,6 +60,10 @@
             <label class="block text-xs text-slate-500 mb-1">Radius (m)</label>
             <input type="number" id="google-radius" class="input-dark" value="5000">
         </div>
+        <div>
+            <label class="block text-xs text-slate-500 mb-1">Max Results</label>
+            <input type="number" id="google-max" class="input-dark" value="20" min="1" max="60">
+        </div>
     </div>
     <button onclick="runGoogleImport()" class="btn-primary">Search & Import</button>
 </div>
@@ -67,21 +75,27 @@
 
     <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
-            <label class="block text-sm text-slate-400 mb-1">Area</label>
-            <input type="text" id="ai-area" class="input-dark" value="Lamka, Churachandpur">
+            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
+            <input type="text" id="ai-area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
         </div>
         <div>
             <label class="block text-sm text-slate-400 mb-1">Category</label>
             <input type="text" id="ai-category" class="input-dark" placeholder="e.g., restaurants, all businesses">
         </div>
     </div>
-    <div class="mb-4">
-        <label class="block text-sm text-slate-400 mb-1">Agent</label>
-        <select id="ai-agent" class="input-dark">
-            @foreach(\App\Models\AiAgent::whereJsonContains('skills', 'ai_business_scraper')->get() as $agent)
-                <option value="{{ $agent->id }}">{{ $agent->avatar }} {{ $agent->name }}</option>
-            @endforeach
-        </select>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Agent</label>
+            <select id="ai-agent" class="input-dark">
+                @foreach(\App\Models\AiAgent::whereJsonContains('skills', 'ai_business_scraper')->get() as $agent)
+                    <option value="{{ $agent->id }}">{{ $agent->avatar }} {{ $agent->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm text-slate-400 mb-1">Max Results</label>
+            <input type="number" id="ai-max" class="input-dark" value="30" min="1" max="50">
+        </div>
     </div>
     <button onclick="runAiScrape()" class="btn-primary">Run AI Discovery</button>
 </div>
@@ -152,9 +166,11 @@ function runGoogleImport() {
         @csrf
         <input type="hidden" name="skill" value="google_places_import">
         <input type="hidden" name="query" value="${document.getElementById('google-query').value}">
+        <input type="hidden" name="zipcode" value="${document.getElementById('google-zipcode').value}">
         <input type="hidden" name="latitude" value="${document.getElementById('google-lat').value}">
         <input type="hidden" name="longitude" value="${document.getElementById('google-lng').value}">
         <input type="hidden" name="radius" value="${document.getElementById('google-radius').value}">
+        <input type="hidden" name="max_results" value="${document.getElementById('google-max').value}">
     `;
     document.body.appendChild(form);
     form.submit();
@@ -172,6 +188,7 @@ function runAiScrape() {
         <input type="hidden" name="skill" value="ai_business_scraper">
         <input type="hidden" name="area" value="${document.getElementById('ai-area').value}">
         <input type="hidden" name="category" value="${document.getElementById('ai-category').value}">
+        <input type="hidden" name="max_results" value="${document.getElementById('ai-max').value}">
     `;
     document.body.appendChild(form);
     form.submit();

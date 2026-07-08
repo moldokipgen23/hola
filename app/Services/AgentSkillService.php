@@ -75,6 +75,7 @@ class AgentSkillService
         $query = $input['query'] ?? '';
         $lat = $input['latitude'] ?? 24.4871;
         $lng = $input['longitude'] ?? 93.6998;
+        $maxResults = min($input['max_results'] ?? 20, 60);
 
         // Nearby search
         $response = Http::get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', [
@@ -89,7 +90,7 @@ class AgentSkillService
         }
 
         $data = $response->json();
-        $places = $data['results'] ?? [];
+        $places = array_slice($data['results'] ?? [], 0, $maxResults);
 
         $batch = ImportBatch::create([
             'agent_id' => $agent->id,
@@ -163,6 +164,7 @@ class AgentSkillService
 
         $area = $input['area'] ?? 'Lamka, Churachandpur';
         $category = $input['category'] ?? 'all businesses';
+        $maxResults = min($input['max_results'] ?? 30, 50);
 
         $categories = Category::pluck('name')->toArray();
         $categoryList = implode(', ', array_slice($categories, 0, 20));
@@ -182,7 +184,7 @@ Rules:
 - Only include REAL businesses that actually exist
 - Do NOT make up or hallucinate businesses
 - If you don't know many businesses, return fewer results
-- Return maximum 30 businesses
+- Return maximum {$maxResults} businesses
 - Return ONLY the JSON array, no other text
 EOT;
 
