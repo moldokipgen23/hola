@@ -263,7 +263,12 @@ EOT;
         ]);
 
         if ($response->failed()) {
-            throw new \Exception('AI API request failed: ' . $response->body());
+            $error = $response->json();
+            $message = $error['error']['message'] ?? $response->body();
+            if ($response->status() === 401) {
+                $message = 'Invalid or missing OpenRouter API key. Set OPENROUTER_API_KEY in your .env or add an API key to this agent.';
+            }
+            throw new \Exception('AI API request failed: ' . $message);
         }
 
         $result = $response->json();
