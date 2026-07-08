@@ -1016,6 +1016,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                         }
                     }
                 }
+                if (!$categoryId) {
+                    $categoryId = \App\Models\Category::where('slug', 'uncategorized')->value('id')
+                        ?? \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
+                }
 
                 $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
                 $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
@@ -1143,6 +1147,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                             break;
                         }
                     }
+                }
+                if (!$categoryId) {
+                    $categoryId = \App\Models\Category::where('slug', 'uncategorized')->value('id')
+                        ?? \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
                 }
 
                 $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
