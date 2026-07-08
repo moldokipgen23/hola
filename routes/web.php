@@ -687,7 +687,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::put('/settings', function (Request $request) {
         $settings = $request->input('settings', []);
         foreach ($settings as $key => $value) {
-            \App\Models\Setting::set($key, $value, str_starts_with($key, 'smtp') ? 'smtp' : 'general');
+            \App\Models\Setting::set($key, $value, str_starts_with($key, 'smtp') ? 'smtp' : (str_starts_with($key, 'api_key') ? 'api' : 'general'));
         }
         return redirect()->route('admin.settings')->with('success', 'Settings saved.');
     })->name('settings.update');

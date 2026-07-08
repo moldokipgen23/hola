@@ -97,7 +97,9 @@ class AgentSkillService
     private function googlePlacesImport(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
-        $apiKey = $agent->getApiKeyDecrypted() ?? config('services.google.places_api_key');
+        $apiKey = $agent->getApiKeyDecrypted()
+            ?? \App\Models\Setting::get('api_key_google_places')
+            ?? config('services.google.places_api_key');
 
         if (!$apiKey) {
             throw new \Exception('Google Places API key not configured.');

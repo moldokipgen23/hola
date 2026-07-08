@@ -53,6 +53,13 @@ class AiAgent extends Model
             return $this->api_key;
         }
 
+        $settingKey = 'api_key_' . ($this->provider ?? 'openrouter');
+        $settingValue = \App\Models\Setting::get($settingKey);
+
+        if ($settingValue) {
+            return $settingValue;
+        }
+
         return match ($this->provider) {
             'openai' => config('services.openai.api_key'),
             'deepseek' => config('services.deepseek.api_key'),

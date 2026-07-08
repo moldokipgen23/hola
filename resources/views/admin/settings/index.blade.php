@@ -29,6 +29,10 @@
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
             SMTP / Email
         </button>
+        <button type="button" onclick="switchTab('api')" data-tab="api" class="settings-tab">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            API Keys
+        </button>
     </div>
 
     <!-- Tab: General -->
@@ -216,6 +220,69 @@
             <div class="mt-5 flex gap-3">
                 <input type="email" id="testEmail" placeholder="test@example.com" class="input-dark flex-1">
                 <button type="button" onclick="sendTestEmail()" class="btn-primary px-6">Send Test Email</button>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="btn-primary">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: API Keys -->
+    <div id="tab-api" class="tab-content" style="display:none">
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-yellow-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">API Keys</h3>
+                    <p class="text-slate-500 text-xs">Global API keys for AI agents, maps, and search</p>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">AI Providers</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">DeepSeek API Key</label>
+                            <input type="password" name="settings[api_key_deepseek]" value="{{ $settings['api_key_deepseek'] ?? '' }}" class="input-dark" placeholder="sk-...">
+                            <p class="text-slate-600 text-xs mt-1">Used by agents with DeepSeek provider</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">OpenAI API Key</label>
+                            <input type="password" name="settings[api_key_openai]" value="{{ $settings['api_key_openai'] ?? '' }}" class="input-dark" placeholder="sk-...">
+                            <p class="text-slate-600 text-xs mt-1">Used by agents with OpenAI provider</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">OpenRouter API Key</label>
+                            <input type="password" name="settings[api_key_openrouter]" value="{{ $settings['api_key_openrouter'] ?? '' }}" class="input-dark" placeholder="sk-or-...">
+                            <p class="text-slate-600 text-xs mt-1">Used by agents with OpenRouter provider</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">Anthropic API Key</label>
+                            <input type="password" name="settings[api_key_anthropic]" value="{{ $settings['api_key_anthropic'] ?? '' }}" class="input-dark" placeholder="sk-ant-...">
+                            <p class="text-slate-600 text-xs mt-1">Used by agents with Anthropic provider</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-white/5 pt-6">
+                    <h4 class="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Maps & Search</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">Google Maps / Places API Key</label>
+                            <input type="password" name="settings[api_key_google_places]" value="{{ $settings['api_key_google_places'] ?? '' }}" class="input-dark" placeholder="AIza...">
+                            <p class="text-slate-600 text-xs mt-1">Places API, Maps JS, Geocoding</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">SerpAPI Key</label>
+                            <input type="password" name="settings[api_key_serpapi]" value="{{ $settings['api_key_serpapi'] ?? '' }}" class="input-dark" placeholder="...">
+                            <p class="text-slate-600 text-xs mt-1">Google search results API</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="mt-6">
