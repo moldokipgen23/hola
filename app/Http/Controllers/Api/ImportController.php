@@ -142,6 +142,8 @@ class ImportController extends Controller
             'slug' => $slug,
             'description' => $data['description'] ?? null,
             'address' => $data['address'] ?? '',
+            'locality' => $data['locality'] ?? null,
+            'district' => $data['district'] ?? 'Churachandpur',
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'phone' => $data['phone'] ?? null,
@@ -153,6 +155,9 @@ class ImportController extends Controller
             'import_batch_id' => $item->batch_id,
             'confidence' => $item->confidence,
             'photos' => count($photos) > 0 ? $photos : null,
+            'working_hours' => $data['working_hours'] ?? null,
+            'average_rating' => $data['rating'] ?? null,
+            'review_count' => $data['total_ratings'] ?? 0,
             'is_active' => true,
         ]);
 

@@ -179,21 +179,43 @@ class AgentSkillService
                 continue;
             }
 
-            // Fetch place details for phone, website, photos
+            // Fetch place details for phone, website, photos, working hours
             $phone = null;
             $website = null;
             $photoUrls = [];
+            $workingHours = null;
             if ($placeId) {
                 try {
                     $details = Http::get('https://maps.googleapis.com/maps/api/place/details/json', [
                         'place_id' => $placeId,
-                        'fields' => 'formatted_phone_number,website,opening_hours,photos,reviews',
+                        'fields' => 'formatted_phone_number,website,opening_hours,photos,reviews,address_components',
                         'key' => $apiKey,
                     ]);
                     if ($details->successful()) {
                         $detailData = $details->json('result', []);
                         $phone = $detailData['formatted_phone_number'] ?? null;
                         $website = $detailData['website'] ?? null;
+
+                        // Extract working hours
+                        if (!empty($detailData['opening_hours']['weekday_text'])) {
+                            $hoursMap = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                            $workingHours = [];
+                            foreach ($detailData['opening_hours']['weekday_text'] as $index => $text) {
+                                $day = strtolower($hoursMap[$index] ?? '');
+                                if (Str::contains($text, 'Closed')) {
+                                    $workingHours[$day] = ['open' => null, 'close' => null];
+                                } else {
+                                    $parts = explode(':', $text, 2);
+                                    $times = trim($parts[1] ?? '');
+                                    $timeParts = explode('–', $times);
+                                    $workingHours[$day] = [
+                                        'open' => trim($timeParts[0] ?? ''),
+                                        'close' => trim($timeParts[1] ?? ''),
+                                    ];
+                                }
+                            }
+                        }
+
                         if (!empty($detailData['photos'])) {
                             foreach (array_slice($detailData['photos'], 0, 3) as $photo) {
                                 if (!empty($photo['photo_reference'])) {
@@ -219,9 +241,28 @@ class AgentSkillService
                 }
             }
 
+            // Extract locality and district from address_components
+            $locality = null;
+            $district = null;
+            $addressComponents = $place['geometry']['address_components'] ?? [];
+            if (empty($addressComponents) && isset($detailData['address_components'])) {
+                $addressComponents = $detailData['address_components'];
+            }
+            foreach ($addressComponents as $component) {
+                $types = $component['types'] ?? [];
+                if (in_array('locality', $types)) {
+                    $locality = $component['long_name'] ?? null;
+                }
+                if (in_array('administrative_area_level_2', $types)) {
+                    $district = $component['long_name'] ?? null;
+                }
+            }
+
             $placeData = [
                 'name' => $name,
                 'address' => $address,
+                'locality' => $locality,
+                'district' => $district ?? 'Churachandpur',
                 'latitude' => $place['geometry']['location']['lat'] ?? null,
                 'longitude' => $place['geometry']['location']['lng'] ?? null,
                 'phone' => $phone,
@@ -231,6 +272,7 @@ class AgentSkillService
                 'types' => $place['types'] ?? [],
                 'google_place_id' => $placeId,
                 'photos' => $photoUrls,
+                'working_hours' => $workingHours,
                 'google_reviews' => $googleReviews ?? [],
                 'photo_references' => array_map(fn($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
             ];
@@ -308,6 +350,7 @@ CRITICAL RULES:
 Return ONLY a JSON array with these fields:
 - name: exact business name
 - address: full street address
+- locality: the locality/area within the city (e.g. "Lamka", "Haipauzen")
 - phone: real phone number or null
 - description: what they do (1 sentence)
 - website: website URL or null
@@ -396,6 +439,8 @@ EOT;
             $itemData = [
                 'name' => $name,
                 'address' => $address,
+                'locality' => $biz['locality'] ?? null,
+                'district' => 'Churachandpur',
                 'phone' => $phone,
                 'description' => $biz['description'] ?? null,
                 'website' => $biz['website'] ?? null,
