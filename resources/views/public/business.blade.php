@@ -191,40 +191,43 @@
         @endif
 
         <!-- Structured Data -->
+        @php
+            $structuredData = [
+                '@context' => 'https://schema.org',
+                '@type' => 'LocalBusiness',
+                'name' => $business->name,
+                'address' => [
+                    '@type' => 'PostalAddress',
+                    'streetAddress' => $business->address,
+                    'addressLocality' => $business->locality ?? 'Lamka',
+                    'addressRegion' => 'Churachandpur, Manipur',
+                    'addressCountry' => 'IN',
+                ],
+                'priceRange' => '$$',
+            ];
+            if ($business->phone) {
+                $structuredData['telephone'] = $business->phone;
+            }
+            if ($business->website) {
+                $structuredData['url'] = $business->website;
+            }
+            if ($business->latitude && $business->longitude) {
+                $structuredData['geo'] = [
+                    '@type' => 'GeoCoordinates',
+                    'latitude' => (float) $business->latitude,
+                    'longitude' => (float) $business->longitude,
+                ];
+            }
+            if ($business->average_rating) {
+                $structuredData['aggregateRating'] = [
+                    '@type' => 'AggregateRating',
+                    'ratingValue' => (float) $business->average_rating,
+                    'reviewCount' => (int) $business->review_count,
+                ];
+            }
+        @endphp
         <script type="application/ld+json">
-        {
-            "@context": "https://schema.org",
-            "@type": "LocalBusiness",
-            "name": "{{ $business->name }}",
-            "address": {
-                "@type": "PostalAddress",
-                "streetAddress": "{{ $business->address }}",
-                "addressLocality": "{{ $business->locality ?? 'Lamka' }}",
-                "addressRegion": "Churachandpur, Manipur",
-                "addressCountry": "IN"
-            },
-            @if($business->phone)
-            "telephone": "{{ $business->phone }}",
-            @endif
-            @if($business->website)
-            "url": "{{ $business->website }}",
-            @endif
-            @if($business->latitude && $business->longitude)
-            "geo": {
-                "@type": "GeoCoordinates",
-                "latitude": {{ $business->latitude }},
-                "longitude": {{ $business->longitude }}
-            },
-            @endif
-            @if($business->average_rating)
-            "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": {{ $business->average_rating }},
-                "reviewCount": {{ $business->review_count }}
-            },
-            @endif
-            "priceRange": "$$"
-        }
+        {!! json_encode($structuredData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}
         </script>
     </div>
 </div>
