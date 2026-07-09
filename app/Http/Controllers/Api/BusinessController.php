@@ -71,7 +71,7 @@ class BusinessController extends Controller
 
     public function show($slug)
     {
-        $business = Business::where('slug', $slug)
+        $business = Business::active()->where('slug', $slug)
             ->with(['category', 'subcategory', 'products'])
             ->firstOrFail();
 
@@ -84,7 +84,7 @@ class BusinessController extends Controller
 
     public function showById($id)
     {
-        $business = Business::with(['category', 'subcategory', 'products'])
+        $business = Business::active()->with(['category', 'subcategory', 'products'])
             ->findOrFail($id);
 
         return response()->json([
@@ -94,7 +94,7 @@ class BusinessController extends Controller
 
     public function related($slug)
     {
-        $business = Business::where('slug', $slug)->firstOrFail();
+        $business = Business::active()->where('slug', $slug)->firstOrFail();
 
         $related = Business::active()
             ->where('category_id', $business->category_id)

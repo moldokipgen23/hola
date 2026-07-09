@@ -1,9 +1,13 @@
 @extends('layouts.public')
 
+@php
+    $metaDescription = $business->description ?: "Find {$business->name} at {$business->address}. Call " . ($business->phone ?: 'now') . ".";
+    $ogDescription = $business->description ?: "Find {$business->name} at {$business->address}";
+@endphp
 @section('title', $business->name . ' | ' . config('app.name', 'Hola'))
-@section('description', \Illuminate\Support\Str::limit($business->description ?? "Find {$business->name} at {$business->address}. Call {$business->phone ?? 'now'}.", 160))
+@section('description', \Illuminate\Support\Str::limit($metaDescription, 160))
 @section('og_title', $business->name)
-@section('og_description', $business->description ?? "Find {$business->name} at {$business->address}")
+@section('og_description', $ogDescription)
 @if($business->photos && count($business->photos) > 0)
     @section('og_image', asset($business->photos[0]))
 @endif

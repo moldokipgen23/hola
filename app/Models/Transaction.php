@@ -21,7 +21,7 @@ class Transaction extends Model
     ];
 
     protected $casts = [
-        'amount' => 'float',
+        'amount' => 'decimal:2',
         'metadata' => 'array',
     ];
 

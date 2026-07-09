@@ -99,6 +99,14 @@ Route::post('/admin/login', function (Request $request) {
         return back()->withErrors(['email' => 'Invalid credentials.']);
     }
 
+    if ($user->banned_at) {
+        return back()->withErrors(['email' => 'Your account has been suspended.']);
+    }
+
+    if (property_exists($user, 'is_active') && !$user->is_active) {
+        return back()->withErrors(['email' => 'Your account is inactive.']);
+    }
+
     Auth::login($user);
     $request->session()->regenerate();
 
@@ -1009,7 +1017,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = null;
                 if ($categoryName) {
-                    foreach ($categories as $catId => $name) {
+                    foreach ($categories as $name => $catId) {
                         if (strtolower($name) === strtolower($categoryName)) {
                             $categoryId = $catId;
                             break;
@@ -1023,7 +1031,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
                 $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
-                if ($existing) $slug .= '-' . \Illuminate\Support\Str::random(5);
+                if ($existing) {
+                    $slug .= '-' . \Illuminate\Support\Str::random(5);
+                }
 
                 $photos = [];
                 if (!empty($data['photos']) && is_array($data['photos'])) {
@@ -1041,7 +1051,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                                 \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
                                 $photos[] = 'storage/' . $filename;
                             }
-                        } catch (\Exception $e) { continue; }
+                        } catch (\Exception $e) {
+                            continue;
+                        }
                     }
                 }
 
@@ -1141,9 +1153,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = null;
                 if ($categoryName) {
-                    foreach ($categories as $id => $name) {
+                    foreach ($categories as $name => $catId) {
                         if (strtolower($name) === strtolower($categoryName)) {
-                            $categoryId = $id;
+                            $categoryId = $catId;
                             break;
                         }
                     }

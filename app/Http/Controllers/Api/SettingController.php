@@ -31,6 +31,22 @@ class SettingController extends Controller
     public function publicSettings()
     {
         $settings = Setting::getAll();
+        
+        // Filter out sensitive settings (API keys, secrets, etc.)
+        foreach ($settings as $group => &$items) {
+            if (is_array($items)) {
+                $items = array_filter($items, function ($key) {
+                    $sensitivePatterns = ['api_key', 'secret', 'password', 'token', 'credential'];
+                    foreach ($sensitivePatterns as $pattern) {
+                        if (str_contains(strtolower($key), $pattern)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }, ARRAY_FILTER_USE_KEY);
+            }
+        }
+        
         return response()->json(['settings' => $settings]);
     }
 
