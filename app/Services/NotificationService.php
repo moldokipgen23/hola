@@ -79,10 +79,10 @@ class NotificationService
     }
 
     // Message Notifications
-    public static function messageReceived(Conversation $conversation, string $message): void
+    public static function messageReceived(Conversation $conversation, string $message, ?int $senderId = null): void
     {
-        // Notify the business owner if user sent the message
-        if ($conversation->user_id && $conversation->business_owner_id !== $conversation->user_id) {
+        // Notify the business owner if user sent the message (and sender is not the owner)
+        if ($conversation->user_id && $conversation->business_owner_id !== $conversation->user_id && $conversation->business_owner_id !== $senderId) {
             $owner = User::find($conversation->business_owner_id);
             if ($owner) {
                 self::create(
@@ -95,8 +95,8 @@ class NotificationService
             }
         }
 
-        // Notify the user if owner sent the message
-        if ($conversation->user_id) {
+        // Notify the user if owner sent the message (and sender is not the user)
+        if ($conversation->user_id && $conversation->user_id !== $senderId) {
             $user = User::find($conversation->user_id);
             if ($user) {
                 self::create(

@@ -82,7 +82,7 @@ class ChatController extends Controller
 
         $conversation->update(['last_message_at' => now()]);
 
-        NotificationService::messageReceived($conversation, $request->message);
+        NotificationService::messageReceived($conversation, $request->message, $userId);
 
         return response()->json([
             'conversation' => [
@@ -117,7 +117,7 @@ class ChatController extends Controller
 
         $conversation->update(['last_message_at' => now()]);
 
-        NotificationService::messageReceived($conversation, $request->message);
+        NotificationService::messageReceived($conversation, $request->message, $userId);
 
         return response()->json([
             'message' => [

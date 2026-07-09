@@ -887,9 +887,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $categoryName = $data['category'] ?? $data['type'] ?? null;
         $categoryId = null;
         if ($categoryName) {
-            foreach ($categories as $id => $name) {
+            foreach ($categories as $name => $catId) {
                 if (strtolower($name) === strtolower($categoryName)) {
-                    $categoryId = $id;
+                    $categoryId = $catId;
                     break;
                 }
             }

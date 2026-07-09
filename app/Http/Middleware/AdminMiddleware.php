@@ -28,6 +28,22 @@ class AdminMiddleware
             return redirect()->route('admin.login')->with('error', 'Admin access required.');
         }
 
+        if ($user->banned_at) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Your account has been suspended.'], 403);
+            }
+            auth()->logout();
+            return redirect()->route('admin.login')->with('error', 'Your account has been suspended.');
+        }
+
+        if (property_exists($user, 'is_active') && !$user->is_active) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Your account is inactive.'], 403);
+            }
+            auth()->logout();
+            return redirect()->route('admin.login')->with('error', 'Your account is inactive.');
+        }
+
         if ($level === 'super_admin' && $user->role !== 'super_admin') {
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json(['message' => 'Unauthorized. Super admin access required.'], 403);
