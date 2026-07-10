@@ -860,16 +860,16 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $request->validate([
             'search_district' => 'required|string|max:255',
             'search_state' => 'required|string|max:255',
-            'search_zipcode' => 'required|string|max:20',
-            'search_area' => 'required|string|max:255',
+            'search_zipcodes' => 'required|string|max:500',
+            'search_areas' => 'required|string|max:500',
         ]);
 
         \App\Models\Setting::set('search_district', $request->search_district, 'search');
         \App\Models\Setting::set('search_state', $request->search_state, 'search');
-        \App\Models\Setting::set('search_zipcode', $request->search_zipcode, 'search');
-        \App\Models\Setting::set('search_area', $request->search_area, 'search');
+        \App\Models\Setting::set('search_zipcodes', $request->search_zipcodes, 'search');
+        \App\Models\Setting::set('search_areas', $request->search_areas, 'search');
 
-        return back()->with('success', 'Search location updated. Agent will use this on next run.');
+        return back()->with('success', 'Search locations updated. Agent will use these on next run.');
     })->name('autopilot.location');
 
     Route::get('/agents', function () use ($agentCtrl) {

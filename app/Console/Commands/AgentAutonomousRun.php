@@ -13,35 +13,33 @@ class AgentAutonomousRun extends Command
     protected $signature = 'agent:auto-run {--skill=} {--dry-run}';
     protected $description = 'Run AI agent skills autonomously on schedule';
 
-    // Pre-configured search queries — pulled from Settings
+    // Pre-configured search queries — pulled from Settings (supports multiple areas + zipcodes)
     private function getSearchQueries(): array
     {
         $district = \App\Models\Setting::get('search_district', 'Churachandpur');
         $state = \App\Models\Setting::get('search_state', 'Manipur');
-        $zipcode = \App\Models\Setting::get('search_zipcode', '795128');
-        $area = \App\Models\Setting::get('search_area', 'Lamka');
+        $zipcodes = array_map('trim', explode(',', \App\Models\Setting::get('search_zipcodes', '795128')));
+        $areas = array_map('trim', explode(',', \App\Models\Setting::get('search_areas', 'Lamka')));
 
-        $location = "{$area}, {$district}, {$state} {$zipcode}";
-        $districtLocation = "{$district}, {$state} {$zipcode}";
-
-        return [
-            ['query' => 'restaurants', 'area' => $location],
-            ['query' => 'schools', 'area' => $districtLocation],
-            ['query' => 'pharmacies', 'area' => $location],
-            ['query' => 'hotels', 'area' => $districtLocation],
-            ['query' => 'shops', 'area' => $location],
-            ['query' => 'clinics', 'area' => $districtLocation],
-            ['query' => 'banks', 'area' => $location],
-            ['query' => 'beauty salons', 'area' => $districtLocation],
-            ['query' => 'grocery stores', 'area' => $location],
-            ['query' => 'mobile shops', 'area' => $location],
-            ['query' => 'churches', 'area' => $districtLocation],
-            ['query' => 'tuition centers', 'area' => $location],
-            ['query' => 'hardware stores', 'area' => $districtLocation],
-            ['query' => 'tailoring shops', 'area' => $location],
-            ['query' => 'photography studios', 'area' => $districtLocation],
-            ['query' => 'stationery shops', 'area' => $location],
+        $queries = [
+            'restaurants', 'schools', 'pharmacies', 'hotels', 'shops',
+            'clinics', 'banks', 'beauty salons', 'grocery stores',
+            'mobile shops', 'churches', 'tuition centers', 'hardware stores',
+            'tailoring shops', 'photography studios', 'stationery shops',
         ];
+
+        $searchQueries = [];
+        foreach ($queries as $query) {
+            // Pick a random area + zipcode combo for each query
+            $area = $areas[array_rand($areas)];
+            $zip = $zipcodes[array_rand($zipcodes)];
+            $searchQueries[] = [
+                'query' => $query,
+                'area' => "{$area}, {$district}, {$state} {$zip}",
+            ];
+        }
+
+        return $searchQueries;
     }
 
     public function handle(): int

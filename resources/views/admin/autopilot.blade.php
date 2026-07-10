@@ -110,9 +110,9 @@
     <div class="glass-card p-6 rounded-xl mb-6">
         <div class="flex items-center gap-2 mb-4">
             <span class="text-xl">📍</span>
-            <h3 class="font-semibold text-white">Search Location</h3>
+            <h3 class="font-semibold text-white">Search Locations</h3>
         </div>
-        <p class="text-slate-400 text-sm mb-3">Where the agent searches for businesses. Change this to expand to new areas.</p>
+        <p class="text-slate-400 text-sm mb-3">Where the agent searches for businesses. Add multiple locations to expand coverage.</p>
         <form method="POST" action="{{ route('admin.autopilot.location') }}">
             @csrf
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -125,24 +125,38 @@
                     <input type="text" name="search_state" value="{{ \App\Models\Setting::get('search_state', 'Manipur') }}" class="input-dark" placeholder="Manipur">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2">Zip / PIN Code</label>
-                    <input type="text" name="search_zipcode" value="{{ \App\Models\Setting::get('search_zipcode', '795128') }}" class="input-dark" placeholder="795128">
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">Zip / PIN Codes <span class="text-slate-600">(comma-separated)</span></label>
+                    <input type="text" name="search_zipcodes" value="{{ \App\Models\Setting::get('search_zipcodes', '795128') }}" class="input-dark" placeholder="795128, 795001, 795008">
+                    <p class="text-slate-600 text-xs mt-1">Add multiple: 795128, 795001, 795008</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2">Default Area (neighborhood)</label>
-                    <input type="text" name="search_area" value="{{ \App\Models\Setting::get('search_area', 'Lamka') }}" class="input-dark" placeholder="Lamka">
-                    <p class="text-slate-600 text-xs mt-1">Primary area to focus on within the district</p>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">Areas / Neighborhoods <span class="text-slate-600">(comma-separated)</span></label>
+                    <input type="text" name="search_areas" value="{{ \App\Models\Setting::get('search_areas', 'Lamka, Tuibong, New Lamka') }}" class="input-dark" placeholder="Lamka, Tuibong, New Lamka">
+                    <p class="text-slate-600 text-xs mt-1">Add multiple: Lamka, Tuibong, New Lamka</p>
                 </div>
             </div>
             <div class="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20 mb-4">
-                <p class="text-blue-400 text-xs font-semibold mb-1">Current search queries will use:</p>
-                <p class="text-slate-300 text-sm font-mono" id="searchPreview">
-                    "restaurants in Lamka, Churachandpur, Manipur 795128"
-                </p>
+                <p class="text-blue-400 text-xs font-semibold mb-1">Search queries will rotate through:</p>
+                <div class="text-slate-300 text-xs font-mono space-y-1" id="searchPreview">
+                    @php
+                        $district = \App\Models\Setting::get('search_district', 'Churachandpur');
+                        $state = \App\Models\Setting::get('search_state', 'Manipur');
+                        $zipcodes = explode(',', \App\Models\Setting::get('search_zipcodes', '795128'));
+                        $areas = explode(',', \App\Models\Setting::get('search_areas', 'Lamka, Tuibong, New Lamka'));
+                        $zipcodes = array_map('trim', $zipcodes);
+                        $areas = array_map('trim', $areas);
+                    @endphp
+                    @foreach(array_slice($areas, 0, 3) as $a)
+                        @foreach(array_slice($zipcodes, 0, 2) as $z)
+                            <div>• "restaurants in {{ $a }}, {{ $district }}, {{ $state }} {{ $z }}"</div>
+                        @endforeach
+                    @endforeach
+                    <div class="text-slate-500">... and {{ count($areas) * count($zipcodes) * 15 }} more combinations</div>
+                </div>
             </div>
             <div class="flex justify-end">
                 <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-sm font-medium">
-                    Save Location
+                    Save Locations
                 </button>
             </div>
         </form>
