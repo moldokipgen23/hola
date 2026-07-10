@@ -13,25 +13,36 @@ class AgentAutonomousRun extends Command
     protected $signature = 'agent:auto-run {--skill=} {--dry-run}';
     protected $description = 'Run AI agent skills autonomously on schedule';
 
-    // Pre-configured search queries — ONLY Churachandpur district (795128)
-    private array $searchQueries = [
-        ['query' => 'restaurants', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'schools', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'pharmacies', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'hotels', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'shops', 'area' => 'Lamka, Churachandpur 795128'],
-        ['query' => 'clinics', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'banks', 'area' => 'Lamka, Churachandpur 795128'],
-        ['query' => 'beauty salons', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'grocery stores', 'area' => 'Tuibong, Churachandpur 795128'],
-        ['query' => 'mobile shops', 'area' => 'Lamka, Churachandpur 795128'],
-        ['query' => 'churches', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'tuition centers', 'area' => 'Lamka, Churachandpur 795128'],
-        ['query' => 'hardware stores', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'tailoring shops', 'area' => 'Lamka, Churachandpur 795128'],
-        ['query' => 'photography studios', 'area' => 'Churachandpur, Manipur 795128'],
-        ['query' => 'stationery shops', 'area' => 'New Lamka, Churachandpur 795128'],
-    ];
+    // Pre-configured search queries — pulled from Settings
+    private function getSearchQueries(): array
+    {
+        $district = \App\Models\Setting::get('search_district', 'Churachandpur');
+        $state = \App\Models\Setting::get('search_state', 'Manipur');
+        $zipcode = \App\Models\Setting::get('search_zipcode', '795128');
+        $area = \App\Models\Setting::get('search_area', 'Lamka');
+
+        $location = "{$area}, {$district}, {$state} {$zipcode}";
+        $districtLocation = "{$district}, {$state} {$zipcode}";
+
+        return [
+            ['query' => 'restaurants', 'area' => $location],
+            ['query' => 'schools', 'area' => $districtLocation],
+            ['query' => 'pharmacies', 'area' => $location],
+            ['query' => 'hotels', 'area' => $districtLocation],
+            ['query' => 'shops', 'area' => $location],
+            ['query' => 'clinics', 'area' => $districtLocation],
+            ['query' => 'banks', 'area' => $location],
+            ['query' => 'beauty salons', 'area' => $districtLocation],
+            ['query' => 'grocery stores', 'area' => $location],
+            ['query' => 'mobile shops', 'area' => $location],
+            ['query' => 'churches', 'area' => $districtLocation],
+            ['query' => 'tuition centers', 'area' => $location],
+            ['query' => 'hardware stores', 'area' => $districtLocation],
+            ['query' => 'tailoring shops', 'area' => $location],
+            ['query' => 'photography studios', 'area' => $districtLocation],
+            ['query' => 'stationery shops', 'area' => $location],
+        ];
+    }
 
     public function handle(): int
     {
@@ -48,10 +59,11 @@ class AgentAutonomousRun extends Command
 
         $service = app(AgentSkillService::class);
         $results = [];
+        $searchQueries = $this->getSearchQueries();
 
         // STEP 1: Search & Import (pick a random query to avoid repetition)
         if (!$skillFilter || $skillFilter === 'google_places_import') {
-            $query = $this->searchQueries[array_rand($this->searchQueries)];
+            $query = $searchQueries[array_rand($searchQueries)];
             $this->info("  🔍 Searching: {$query['query']} in {$query['area']}");
 
             if (!$dryRun) {

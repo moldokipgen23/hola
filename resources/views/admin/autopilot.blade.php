@@ -106,6 +106,48 @@
         </form>
     </div>
 
+    {{-- Search Location --}}
+    <div class="glass-card p-6 rounded-xl mb-6">
+        <div class="flex items-center gap-2 mb-4">
+            <span class="text-xl">📍</span>
+            <h3 class="font-semibold text-white">Search Location</h3>
+        </div>
+        <p class="text-slate-400 text-sm mb-3">Where the agent searches for businesses. Change this to expand to new areas.</p>
+        <form method="POST" action="{{ route('admin.autopilot.location') }}">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">District / City</label>
+                    <input type="text" name="search_district" value="{{ \App\Models\Setting::get('search_district', 'Churachandpur') }}" class="input-dark" placeholder="Churachandpur">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">State</label>
+                    <input type="text" name="search_state" value="{{ \App\Models\Setting::get('search_state', 'Manipur') }}" class="input-dark" placeholder="Manipur">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">Zip / PIN Code</label>
+                    <input type="text" name="search_zipcode" value="{{ \App\Models\Setting::get('search_zipcode', '795128') }}" class="input-dark" placeholder="795128">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">Default Area (neighborhood)</label>
+                    <input type="text" name="search_area" value="{{ \App\Models\Setting::get('search_area', 'Lamka') }}" class="input-dark" placeholder="Lamka">
+                    <p class="text-slate-600 text-xs mt-1">Primary area to focus on within the district</p>
+                </div>
+            </div>
+            <div class="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20 mb-4">
+                <p class="text-blue-400 text-xs font-semibold mb-1">Current search queries will use:</p>
+                <p class="text-slate-300 text-sm font-mono" id="searchPreview">
+                    "restaurants in Lamka, Churachandpur, Manipur 795128"
+                </p>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-sm font-medium">
+                    Save Location
+                </button>
+            </div>
+        </form>
+    </div>
+
     {{-- Skills --}}
     <div class="glass-card p-6 rounded-xl mb-6">
         <div class="flex items-center gap-2 mb-4">

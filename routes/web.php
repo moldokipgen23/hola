@@ -856,6 +856,22 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return back()->with('success', 'Agent rules updated.');
     })->name('autopilot.prompt');
 
+    Route::post('/autopilot/location', function (\Illuminate\Http\Request $request) {
+        $request->validate([
+            'search_district' => 'required|string|max:255',
+            'search_state' => 'required|string|max:255',
+            'search_zipcode' => 'required|string|max:20',
+            'search_area' => 'required|string|max:255',
+        ]);
+
+        \App\Models\Setting::set('search_district', $request->search_district, 'search');
+        \App\Models\Setting::set('search_state', $request->search_state, 'search');
+        \App\Models\Setting::set('search_zipcode', $request->search_zipcode, 'search');
+        \App\Models\Setting::set('search_area', $request->search_area, 'search');
+
+        return back()->with('success', 'Search location updated. Agent will use this on next run.');
+    })->name('autopilot.location');
+
     Route::get('/agents', function () use ($agentCtrl) {
         $response = (new $agentCtrl())->index();
         $agents = json_decode($response->getContent(), true)['agents'];
