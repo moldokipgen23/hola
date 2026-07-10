@@ -886,19 +886,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $categories = \App\Models\Category::pluck('id', 'name')->toArray();
 
         $categoryName = $data['category'] ?? $data['type'] ?? null;
-        $categoryId = null;
-        if ($categoryName) {
-            foreach ($categories as $name => $catId) {
-                if (strtolower($name) === strtolower($categoryName)) {
-                    $categoryId = $catId;
-                    break;
-                }
-            }
-        }
-        if (!$categoryId) {
-            $categoryId = \App\Models\Category::where('slug', 'uncategorized')->value('id')
-                ?? \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
-        }
+        $categoryId = matchImportCategory($categoryName, $categories);
 
         $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
         $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
@@ -999,19 +987,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 $categories = \App\Models\Category::pluck('id', 'name')->toArray();
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
-                $categoryId = null;
-                if ($categoryName) {
-                    foreach ($categories as $name => $catId) {
-                        if (strtolower($name) === strtolower($categoryName)) {
-                            $categoryId = $catId;
-                            break;
-                        }
-                    }
-                }
-                if (!$categoryId) {
-                    $categoryId = \App\Models\Category::where('slug', 'uncategorized')->value('id')
-                        ?? \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
-                }
+                $categoryId = matchImportCategory($categoryName, $categories);
 
                 $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
                 $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
@@ -1123,19 +1099,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 $categories = \App\Models\Category::pluck('id', 'name')->toArray();
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
-                $categoryId = null;
-                if ($categoryName) {
-                    foreach ($categories as $name => $catId) {
-                        if (strtolower($name) === strtolower($categoryName)) {
-                            $categoryId = $catId;
-                            break;
-                        }
-                    }
-                }
-                if (!$categoryId) {
-                    $categoryId = \App\Models\Category::where('slug', 'uncategorized')->value('id')
-                        ?? \App\Models\Category::firstOrCreate(['name' => $categoryName ?? 'General', 'slug' => \Illuminate\Support\Str::slug($categoryName ?? 'general')])->id;
-                }
+                $categoryId = matchImportCategory($categoryName, $categories);
 
                 $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
                 $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();

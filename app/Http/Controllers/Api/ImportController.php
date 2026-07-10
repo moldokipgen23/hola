@@ -92,27 +92,8 @@ class ImportController extends Controller
 
         $categories = Category::pluck('id', 'name')->toArray();
 
-        // Auto-match category
-        $categoryId = null;
-        if (!empty($data['category'])) {
-            $categoryId = $categories[$data['category']] ?? null;
-        }
-        if (!$categoryId && !empty($data['types'])) {
-            foreach ($data['types'] as $type) {
-                foreach ($categories as $name => $id) {
-                    if (Str::contains(Str::lower($name), $type)) {
-                        $categoryId = $id;
-                        break 2;
-                    }
-                }
-            }
-        }
-
-        // Fallback to the "Uncategorized" category so we never write a NULL category_id
-        if (!$categoryId) {
-            $categoryId = Category::where('slug', 'uncategorized')->value('id')
-                ?? Category::firstOrCreate(['name' => 'Uncategorized', 'slug' => 'uncategorized'])->id;
-        }
+        // Smart category matching
+        $categoryId = matchImportCategory($data['category'] ?? $data['type'] ?? null, $categories);
 
         $slug = Str::slug($data['name']);
         $existing = Business::where('slug', $slug)->first();

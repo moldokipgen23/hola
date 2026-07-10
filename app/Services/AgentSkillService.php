@@ -808,30 +808,107 @@ EOT;
 
     private function matchCategory(array $placeTypes, array $categoryNames): ?string
     {
+        // Priority-ordered mapping: Google Place type → best category match
+        // Order matters — more specific types first
         $typeMap = [
-            'Restaurant' => ['restaurant', 'food', 'meal_takeaway', 'meal_delivery', 'cafe', 'bakery', 'bar'],
-            'School' => ['school', 'primary_school', 'secondary_school', 'university', 'college'],
-            'Hospital' => ['hospital', 'doctor', 'health', 'dentist', 'pharmacy', 'drugstore', 'physiotherapist'],
-            'Hotel' => ['hotel', 'lodging', 'guest_house', 'motel', 'resort'],
-            'Bank' => ['bank', 'atm', 'finance', 'insurance_agency'],
-            'Shop' => ['store', 'shopping_mall', 'supermarket', 'grocery_or_supermarket', 'clothing_store', 'electronics_store', 'hardware_store', 'furniture_store', 'jewelry_store', 'shoe_store', 'book_store', 'department_store', 'home_goods_store'],
-            'Gym' => ['gym', 'fitness_center', 'stadium'],
-            'Church' => ['church', 'place_of_worship', 'hindu_temple', 'mosque'],
-            'Gas Station' => ['gas_station', 'petrol_station'],
-            'Beauty' => ['beauty_salon', 'hair_care', 'spa', 'nail_salon'],
-            'Auto Repair' => ['car_repair', 'car_dealer', 'car_wash', 'auto_parts_store'],
-            'Park' => ['park', 'tourist_attraction', 'museum', 'art_gallery', 'zoo'],
-            'Real Estate' => ['real_estate_agency', 'travel_agency'],
-            'Government' => ['local_government_office', 'police', 'fire_station', 'post_office', 'courthouse'],
-            'Education' => ['school', 'primary_school', 'secondary_school', 'university', 'college', 'library'],
+            // Education (specific first)
+            'preschool' => 'Preschool',
+            'primary_school' => 'Education',
+            'secondary_school' => 'Education',
+            'university' => 'Education',
+            'college' => 'Education',
+            'school' => 'Education',
+            'library' => 'Education',
+            // Food
+            'restaurant' => 'Food & Restaurants',
+            'cafe' => 'Food & Restaurants',
+            'bakery' => 'Food & Restaurants',
+            'bar' => 'Food & Restaurants',
+            'meal_takeaway' => 'Food & Restaurants',
+            'meal_delivery' => 'Food & Restaurants',
+            'food' => 'Food & Restaurants',
+            // Health
+            'hospital' => 'Healthcare',
+            'doctor' => 'Healthcare',
+            'dentist' => 'Healthcare',
+            'pharmacy' => 'Healthcare',
+            'drugstore' => 'Healthcare',
+            'physiotherapist' => 'Healthcare',
+            'health' => 'Healthcare',
+            // Lodging
+            'hotel' => 'Hotels & Lodges',
+            'lodging' => 'Hotels & Lodges',
+            'guest_house' => 'Hotels & Lodges',
+            'motel' => 'Hotels & Lodges',
+            'resort' => 'Hotels & Lodges',
+            // Shopping
+            'store' => 'Shopping & Retail',
+            'shopping_mall' => 'Shopping & Retail',
+            'supermarket' => 'Shopping & Retail',
+            'grocery_or_supermarket' => 'Shopping & Retail',
+            'clothing_store' => 'Shopping & Retail',
+            'electronics_store' => 'Electronics & Tech',
+            'hardware_store' => 'Shopping & Retail',
+            'furniture_store' => 'Shopping & Retail',
+            'jewelry_store' => 'Shopping & Retail',
+            'shoe_store' => 'Shopping & Retail',
+            'book_store' => 'Education',
+            'department_store' => 'Shopping & Retail',
+            'home_goods_store' => 'Shopping & Retail',
+            // Finance
+            'bank' => 'Professional Services',
+            'atm' => 'Professional Services',
+            'finance' => 'Professional Services',
+            'insurance_agency' => 'Professional Services',
+            // Auto
+            'car_repair' => 'Automobiles',
+            'car_dealer' => 'Automobiles',
+            'car_wash' => 'Automobiles',
+            'auto_parts_store' => 'Automobiles',
+            // Beauty
+            'beauty_salon' => 'Beauty & Wellness',
+            'hair_care' => 'Beauty & Wellness',
+            'spa' => 'Beauty & Wellness',
+            'nail_salon' => 'Beauty & Wellness',
+            // Fitness
+            'gym' => 'Sports & Fitness',
+            'fitness_center' => 'Sports & Fitness',
+            'stadium' => 'Sports & Fitness',
+            // Worship
+            'church' => 'Professional Services',
+            'place_of_worship' => 'Professional Services',
+            // Gov
+            'local_government_office' => 'Professional Services',
+            'police' => 'Professional Services',
+            'fire_station' => 'Professional Services',
+            'post_office' => 'Professional Services',
+            // Travel
+            'real_estate_agency' => 'Professional Services',
+            'travel_agency' => 'Professional Services',
+            // Other
+            'gas_station' => 'Automobiles',
+            'petrol_station' => 'Automobiles',
+            'park' => 'Sports & Fitness',
+            'tourist_attraction' => 'Sports & Fitness',
+            'museum' => 'Sports & Fitness',
+            'art_gallery' => 'Sports & Fitness',
         ];
 
+        // Pass 1: Direct type match (most specific)
         foreach ($placeTypes as $type) {
-            foreach ($typeMap as $category => $types) {
-                if (in_array($type, $types)) {
-                    $match = collect($categoryNames)->first(fn($cn) => Str::contains(Str::lower($cn), Str::lower($category)));
-                    if ($match) return $match;
-                }
+            if (isset($typeMap[$type])) {
+                $targetName = $typeMap[$type];
+                $match = collect($categoryNames)->first(fn($cn) => strtolower(trim($cn)) === strtolower($targetName));
+                if ($match) return $match;
+            }
+        }
+
+        // Pass 2: Fuzzy contains match (fallback)
+        foreach ($placeTypes as $type) {
+            if (isset($typeMap[$type])) {
+                $targetName = $typeMap[$type];
+                $match = collect($categoryNames)->first(fn($cn) => Str::contains(Str::lower($cn), Str::lower($targetName)));
+                if ($match) return $match;
             }
         }
 
