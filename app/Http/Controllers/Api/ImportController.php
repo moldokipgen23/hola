@@ -156,7 +156,7 @@ class ImportController extends Controller
             'confidence' => $item->confidence,
             'photos' => count($photos) > 0 ? $photos : null,
             'working_hours' => $data['working_hours'] ?? null,
-            'average_rating' => $data['rating'] ?? null,
+            'average_rating' => $data['rating'] ?? 0,
             'review_count' => $data['total_ratings'] ?? 0,
             'is_active' => true,
         ]);
