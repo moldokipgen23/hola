@@ -388,7 +388,8 @@ class AgentSkillService
         }
 
         // AI MEMORY: Save search metadata on the task
-        $newPlaces = count($currentPlaceIds) - $alreadyImportedInDb - $duplicates;
+        // new_places = total found - duplicates (duplicates includes both place ID and name matches)
+        $newPlaces = count($currentPlaceIds) - $duplicates;
         $searchMetadata = [
             'query' => $searchQuery,
             'area' => $area,
@@ -1109,6 +1110,36 @@ EOT;
         $batch->update([
             'status' => 'completed',
             'pending' => $imported,
+        ]);
+
+        // Save search history (SerpAPI doesn't have place IDs, so memory is name-based only)
+        SearchHistory::create([
+            'agent_id' => $agent->id,
+            'query' => $query,
+            'area' => $area,
+            'zipcode' => $zipcode,
+            'source' => 'serpapi',
+            'total_found' => count($places),
+            'new_places' => $imported,
+            'already_imported' => $skipped,
+            'duplicates' => 0,
+            'place_ids' => null,
+        ]);
+
+        $task->update([
+            'search_metadata' => [
+                'query' => $searchQuery,
+                'area' => $area,
+                'source' => 'serpapi',
+                'total_found' => count($places),
+                'new_places' => $imported,
+                'already_imported' => $skipped,
+            ],
+            'output' => [
+                'query' => $searchQuery,
+                'total_found' => count($places),
+                'new_places' => $imported,
+            ],
         ]);
 
         return [
