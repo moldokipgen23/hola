@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Business;
 use App\Models\Setting;
+use App\Services\BunnyStorage;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -14,20 +15,10 @@ class DownloadImportPhotos extends Command
     protected $signature = 'photos:download {--limit=10} {--business-id=}';
     protected $description = 'Download external photos for imported businesses to cloud or local storage';
 
-    private function getDisk(): string
-    {
-        return Setting::get('bunny_zone_name') && Setting::get('bunny_access_key') ? 'bunny' : 'public';
-    }
-
-    private function getPhotoPath(string $slug, string $ext): string
-    {
-        return 'businesses/' . $slug . '_' . Str::random(6) . '.' . $ext;
-    }
-
     public function handle()
     {
-        $disk = $this->getDisk();
-        $this->info("Using storage disk: {$disk}");
+        $useBunny = BunnyStorage::isConfigured();
+        $this->info("Storage: " . ($useBunny ? "Bunny CDN (" . BunnyStorage::getCdnUrl() . ")" : "Local VPS disk"));
 
         $query = Business::where('source', 'import')
             ->whereNull('photos_downloaded_at')
@@ -54,10 +45,10 @@ class DownloadImportPhotos extends Command
 
             $savedPhotos = [];
             foreach ($photos as $photoUrl) {
-                // Already saved locally or on bunny
+                // Already a local or CDN URL — skip
                 if (str_starts_with($photoUrl, 'storage/') || str_starts_with($photoUrl, 'http')) {
-                    // If it's an external URL, download it
-                    if (str_starts_with($photoUrl, 'http')) {
+                    // External URL needs downloading
+                    if (str_starts_with($photoUrl, 'http') && !str_contains($photoUrl, '.b-cdn.net')) {
                         try {
                             $response = Http::timeout(10)->get($photoUrl);
                             if ($response->successful() && strlen($response->body()) > 100) {
@@ -67,16 +58,21 @@ class DownloadImportPhotos extends Command
                                     str_contains($response->header('Content-Type', ''), 'gif') => 'gif',
                                     default => 'jpg',
                                 };
-                                $path = $this->getPhotoPath($business->slug, $ext);
-                                Storage::disk($disk)->put($path, $response->body());
-                                $savedPhotos[] = $disk === 'bunny'
-                                    ? (Setting::get('bunny_pull_zone_url') ?: Setting::get('bunny_cdn_url')) . '/' . $path
-                                    : 'storage/' . $path;
+                                $filename = 'businesses/' . $business->slug . '_' . Str::random(6) . '.' . $ext;
+
+                                if ($useBunny) {
+                                    BunnyStorage::put($filename, $response->body());
+                                    $savedPhotos[] = BunnyStorage::getPublicUrl($filename);
+                                } else {
+                                    Storage::disk('public')->put($filename, $response->body());
+                                    $savedPhotos[] = 'storage/' . $filename;
+                                }
                             }
                         } catch (\Exception $e) {
                             $this->warn("  Failed: {$photoUrl}");
                         }
                     } else {
+                        // Already saved (CDN URL or local path)
                         $savedPhotos[] = $photoUrl;
                     }
                 }
