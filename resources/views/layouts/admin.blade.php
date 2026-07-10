@@ -270,6 +270,10 @@
                 </a>
 
                 <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">AI Agents</p>
+                <a href="{{ route('admin.autopilot') }}" class="sidebar-link {{ request()->routeIs('admin.autopilot') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Autopilot
+                </a>
                 <a href="{{ route('admin.agents') }}" class="sidebar-link {{ request()->routeIs('admin.agents*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     AI Agents

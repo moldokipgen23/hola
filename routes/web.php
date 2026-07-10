@@ -784,6 +784,23 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     // ─── AI Agents ───
     $agentCtrl = \App\Http\Controllers\Api\AiAgentController::class;
 
+    Route::get('/autopilot', function () {
+        $agent = \App\Models\AiAgent::first();
+        $recentTasks = $agent ? $agent->tasks()->latest()->take(20)->get() : collect();
+        $pendingImports = \App\Models\ImportItem::where('status', 'pending')->count();
+        $totalBusinesses = \App\Models\Business::where('is_active', true)->count();
+        $totalCategories = \App\Models\Category::count();
+        $todaysTasks = $agent ? $agent->tasks()->where('created_at', '>=', now()->startOfDay())->count() : 0;
+        $todaysImports = $agent ? $agent->tasks()->where('created_at', '>=', now()->startOfDay())->sum('imported_count') : 0;
+        $lastRun = $agent ? $agent->tasks()->latest()->first() : null;
+        $nextRun = now()->addMinutes(240 - (now()->timestamp % 240));
+
+        return view('admin.autopilot', compact(
+            'agent', 'recentTasks', 'pendingImports', 'totalBusinesses',
+            'totalCategories', 'todaysTasks', 'todaysImports', 'lastRun', 'nextRun'
+        ));
+    })->name('autopilot');
+
     Route::get('/agents', function () use ($agentCtrl) {
         $response = (new $agentCtrl())->index();
         $agents = json_decode($response->getContent(), true)['agents'];
