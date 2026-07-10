@@ -122,6 +122,11 @@ class Business extends Model
         return $this->hasMany(ClaimRequest::class);
     }
 
+    public function notificationLogs(): HasMany
+    {
+        return $this->hasMany(NotificationLog::class);
+    }
+
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);

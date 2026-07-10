@@ -161,6 +161,40 @@ class AgentAutonomousRun extends Command
             }
         }
 
+        // STEP 5: Google Sync — detect changes to already-imported businesses
+        if (!$skillFilter || $skillFilter === 'google_sync') {
+            $importedCount = \App\Models\Business::where('source', 'import')
+                ->where('is_active', true)
+                ->whereNotNull('external_id')
+                ->count();
+
+            if ($importedCount > 0) {
+                $this->info("  🔄 Syncing {$importedCount} businesses with Google...");
+
+                if (!$dryRun) {
+                    $task = AiAgentTask::create([
+                        'agent_id' => $agent->id,
+                        'type' => 'google_sync',
+                        'input' => ['limit' => 20],
+                        'status' => 'pending',
+                    ]);
+
+                    try {
+                        \Artisan::call('google:sync', ['--limit' => 20]);
+                        $output = \Artisan::output();
+                        $task->update(['status' => 'completed', 'output' => ['raw' => $output]]);
+                        $this->info("  ✅ Google sync complete");
+                    } catch (\Exception $e) {
+                        $this->error("  ❌ Google sync failed: {$e->getMessage()}");
+                    }
+                } else {
+                    $this->info("  [DRY RUN] Would sync {$importedCount} businesses with Google");
+                }
+            } else {
+                $this->info("  🔄 No imported businesses to sync");
+            }
+        }
+
         $pending = ImportItem::where('status', 'pending')->count();
         $this->info("");
         $this->info("📊 Pipeline complete. Pending items for review: {$pending}");
