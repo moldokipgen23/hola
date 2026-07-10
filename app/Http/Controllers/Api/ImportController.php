@@ -47,17 +47,17 @@ class ImportController extends Controller
         $item = ImportItem::with('batch')->findOrFail($id);
         $data = $item->data;
 
-        // DUPLICATE CHECK: Skip if business already exists
+        // DUPLICATE CHECK: Skip if business already exists (exclude soft-deleted)
         $existingBusiness = null;
 
         // Check by google_place_id (external_id)
         if (!empty($item->external_id)) {
-            $existingBusiness = Business::where('external_id', $item->external_id)->first();
+            $existingBusiness = Business::withoutTrashed()->where('external_id', $item->external_id)->first();
         }
 
         // Check by name + similar address
         if (!$existingBusiness && !empty($data['name'])) {
-            $existingBusiness = Business::whereRaw('LOWER(name) = ?', [Str::lower($data['name'])])->first();
+            $existingBusiness = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [Str::lower($data['name'])])->first();
             if ($existingBusiness && !empty($data['address'])) {
                 // Verify address is also similar
                 $existingAddr = Str::lower($existingBusiness->address);
@@ -72,7 +72,7 @@ class ImportController extends Controller
         // Check by phone number
         if (!$existingBusiness && !empty($data['phone'])) {
             $normalizedPhone = Str::replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-            $existingBusiness = Business::whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+            $existingBusiness = Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
         }
 
         if ($existingBusiness) {

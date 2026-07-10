@@ -854,12 +854,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         // Check by external_id
         if (!empty($item->external_id)) {
-            $existingBusiness = \App\Models\Business::withTrashed()->where('external_id', $item->external_id)->first();
+            $existingBusiness = \App\Models\Business::withoutTrashed()->where('external_id', $item->external_id)->first();
         }
 
         // Check by name + address
         if (!$existingBusiness && !empty($data['name'])) {
-            $existingBusiness = \App\Models\Business::withTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
+            $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
             if ($existingBusiness && !empty($data['address'])) {
                 similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
                 if ($percent < 50) {
@@ -871,7 +871,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         // Check by phone
         if (!$existingBusiness && !empty($data['phone'])) {
             $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-            $existingBusiness = \App\Models\Business::withTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+            $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
         }
 
         if ($existingBusiness) {
@@ -988,12 +988,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 // Check by external_id
                 if (!empty($item->external_id)) {
-                    $existingBusiness = \App\Models\Business::withTrashed()->where('external_id', $item->external_id)->first();
+                    $existingBusiness = \App\Models\Business::withoutTrashed()->where('external_id', $item->external_id)->first();
                 }
 
                 // Check by name + address
                 if (!$existingBusiness && !empty($data['name'])) {
-                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
+                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
                     if ($existingBusiness && !empty($data['address'])) {
                         similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
                         if ($percent < 50) {
@@ -1005,7 +1005,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 // Check by phone
                 if (!$existingBusiness && !empty($data['phone'])) {
                     $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
                 }
 
                 if ($existingBusiness) {
@@ -1128,12 +1128,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 // Check by external_id
                 if (!empty($item->external_id)) {
-                    $existingBusiness = \App\Models\Business::withTrashed()->where('external_id', $item->external_id)->first();
+                    $existingBusiness = \App\Models\Business::withoutTrashed()->where('external_id', $item->external_id)->first();
                 }
 
                 // Check by name + address
                 if (!$existingBusiness && !empty($data['name'])) {
-                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
+                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
                     if ($existingBusiness && !empty($data['address'])) {
                         similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
                         if ($percent < 50) {
@@ -1145,7 +1145,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 // Check by phone
                 if (!$existingBusiness && !empty($data['phone'])) {
                     $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-                    $existingBusiness = \App\Models\Business::withTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
+                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
                 }
 
                 if ($existingBusiness) {
@@ -1264,8 +1264,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $imported = 0;
         $skipped = 0;
 
-        // Pre-load existing for duplicate detection
-        $existingNames = \App\Models\Business::pluck('name')->map(fn($n) => strtolower($n))->toArray();
+        // Pre-load existing for duplicate detection (exclude soft-deleted)
+        $existingNames = \App\Models\Business::withoutTrashed()->pluck('name')->map(fn($n) => strtolower($n))->toArray();
 
         foreach ($csvData as $row) {
             $data = array_combine($headers, $row);

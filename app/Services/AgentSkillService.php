@@ -114,25 +114,48 @@ class AgentSkillService
         $location = implode(' ', array_filter([$area, $zipcode]));
         $searchQuery = $query . ($location ? ' in ' . $location : '');
 
-        // Text Search - no geocoding needed
-        $response = Http::get('https://maps.googleapis.com/maps/api/place/textsearch/json', [
-            'query' => $searchQuery,
-            'key' => $apiKey,
-        ]);
+        // Text Search with pagination (Google returns max 20 per page)
+        $places = [];
+        $pageToken = null;
+        $maxPages = 3; // 3 pages x 20 = 60 max
 
-        if ($response->failed()) {
-            throw new \Exception('Google Places API request failed: ' . $response->body());
+        for ($page = 0; $page < $maxPages && count($places) < $maxResults; $page++) {
+            $params = [
+                'query' => $searchQuery,
+                'key' => $apiKey,
+            ];
+            if ($pageToken) {
+                $params['pagetoken'] = $pageToken;
+            }
+
+            $response = Http::get('https://maps.googleapis.com/maps/api/place/textsearch/json', $params);
+
+            if ($response->failed()) {
+                throw new \Exception('Google Places API request failed: ' . $response->body());
+            }
+
+            $data = $response->json();
+
+            if (($data['status'] ?? '') !== 'OK' && ($data['status'] ?? '') !== 'ZERO_RESULTS') {
+                if ($page === 0) {
+                    $errorMsg = $data['error_message'] ?? $data['status'] ?? 'Unknown error';
+                    throw new \Exception('Google Places API error: ' . $errorMsg);
+                }
+                break;
+            }
+
+            $places = array_merge($places, $data['results'] ?? []);
+            $pageToken = $data['next_page_token'] ?? null;
+
+            if (!$pageToken) {
+                break;
+            }
+
+            // Google requires a short delay before using next_page_token
+            usleep(2000000);
         }
 
-        $data = $response->json();
-
-        if (($data['status'] ?? '') !== 'OK' && ($data['status'] ?? '') !== 'ZERO_RESULTS') {
-            $errorMsg = $data['error_message'] ?? $data['status'] ?? 'Unknown error';
-            throw new \Exception('Google Places API error: ' . $errorMsg);
-        }
-
-        $data = $response->json();
-        $places = array_slice($data['results'] ?? [], 0, $maxResults);
+        $places = array_slice($places, 0, $maxResults);
 
         $batch = ImportBatch::create([
             'agent_id' => $agent->id,
@@ -146,9 +169,9 @@ class AgentSkillService
         $skipped = 0;
         $categories = Category::pluck('id', 'name')->toArray();
 
-        // Pre-load existing businesses for duplicate detection
-        $existingPlaceIds = Business::whereNotNull('external_id')->pluck('external_id')->toArray();
-        $existingNames = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+        // Pre-load existing ACTIVE businesses for duplicate detection (exclude soft-deleted)
+        $existingPlaceIds = Business::withoutTrashed()->whereNotNull('external_id')->pluck('external_id')->toArray();
+        $existingNames = Business::withoutTrashed()->pluck('name')->map(fn($n) => Str::lower($n))->toArray();
 
         foreach ($places as $place) {
             $placeId = $place['place_id'] ?? null;
@@ -166,7 +189,7 @@ class AgentSkillService
             $normalizedAddress = Str::lower(trim($address));
             if (in_array($normalizedName, $existingNames)) {
                 // Double-check with address to allow same name in different locations
-                $existingWithSameName = Business::whereRaw('LOWER(name) = ?', [$normalizedName])->first();
+                $existingWithSameName = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [$normalizedName])->first();
                 if ($existingWithSameName && Str::contains(Str::lower($existingWithSameName->address), substr($normalizedAddress, 0, 10))) {
                     $skipped++;
                     continue;
