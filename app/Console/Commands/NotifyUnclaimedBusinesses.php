@@ -62,7 +62,8 @@ class NotifyUnclaimedBusinesses extends Command
             // Try channels in order of preference
             if ($channel === 'all' || $channel === 'email') {
                 if ($notEmail && $business->email) {
-                    $sent = $this->sendEmail($business->email, 'Your business is on Hola - Claim it now!', $message);
+                    $subject = $this->buildEmailSubject($business);
+                    $sent = $this->sendEmail($business->email, $subject, $message);
                 }
             }
 
@@ -112,9 +113,19 @@ class NotifyUnclaimedBusinesses extends Command
 
     private function buildClaimMessage(Business $business, string $claimUrl): string
     {
-        $name = $business->name;
+        $template = Setting::get('template_claim_sms', null);
+        $siteName = Setting::get('site_name', 'Hola');
+        $district = Setting::get('district', 'Churachandpur');
 
-        return "Hi! Your business \"{$name}\" is listed on Hola - Churachandpur's #1 business directory.\n\n" .
+        if ($template) {
+            return str_replace(
+                ['{business_name}', '{claim_url}', '{site_name}', '{district}', '{address}', '{phone}'],
+                [$business->name, $claimUrl, $siteName, $district, $business->address ?? '', $business->phone ?? ''],
+                $template
+            );
+        }
+
+        return "Hi! Your business \"{$business->name}\" is listed on {$siteName} - {$district}'s #1 business directory.\n\n" .
             "Claim your listing for FREE to:\n" .
             "- Update your business info\n" .
             "- Add photos & products\n" .
@@ -122,6 +133,23 @@ class NotifyUnclaimedBusinesses extends Command
             "- Get found by more customers\n\n" .
             "Claim now: {$claimUrl}\n\n" .
             "Questions? Reply to this message.";
+    }
+
+    private function buildEmailSubject(Business $business): string
+    {
+        $template = Setting::get('template_claim_subject', null);
+        $siteName = Setting::get('site_name', 'Hola');
+        $district = Setting::get('district', 'Churachandpur');
+
+        if ($template) {
+            return str_replace(
+                ['{business_name}', '{site_name}', '{district}'],
+                [$business->name, $siteName, $district],
+                $template
+            );
+        }
+
+        return "Your business is on {$siteName} - Claim it now!";
     }
 
     private function sendEmail(string $to, string $subject, string $body): bool

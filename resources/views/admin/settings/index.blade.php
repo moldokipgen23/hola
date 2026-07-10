@@ -565,6 +565,142 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Notification Templates -->
+                <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 text-amber-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </div>
+                        <div>
+                            <h4 class="text-white text-sm font-semibold">Message Templates</h4>
+                            <p class="text-slate-500 text-xs">Customize the messages sent to business owners. Use variables below.</p>
+                        </div>
+                    </div>
+
+                    <!-- Variables Reference -->
+                    <div class="p-3 bg-slate-900/50 rounded-lg border border-slate-600/30 mb-5">
+                        <p class="text-slate-400 text-xs font-semibold mb-2">Available Variables (copy & paste into templates):</p>
+                        <div class="flex flex-wrap gap-2">
+                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{business_name}'}</code>
+                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{claim_url}'}</code>
+                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{site_name}'}</code>
+                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{district}'}</code>
+                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{address}'}</code>
+                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{phone}'}</code>
+                        </div>
+                    </div>
+
+                    <!-- Template: Claim Invitation -->
+                    <div class="mb-5">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Claim Invitation (sent to unclaimed businesses)</h5>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
+                                <input type="text" name="settings[template_claim_subject]" value="{{ $settings['template_claim_subject'] ?? 'Your business is on {site_name} - Claim it now!' }}" class="input-dark">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
+                                <textarea name="settings[template_claim_body]" rows="5" class="input-dark font-mono text-xs">{{ $settings['template_claim_body'] ?? 'Hi! Your business "{business_name}" is listed on {site_name} - {district}'s #1 business directory.
+
+Claim your listing for FREE to:
+- Update your business info
+- Add photos & products
+- Respond to reviews
+- Get found by more customers
+
+Claim now: {claim_url}
+
+Questions? Reply to this message.' }}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Telegram/WhatsApp Message</label>
+                                <textarea name="settings[template_claim_sms]" rows="5" class="input-dark font-mono text-xs">{{ $settings['template_claim_sms'] ?? 'Hi! Your business "{business_name}" is listed on {site_name} - {district}'s #1 business directory.
+
+Claim your listing for FREE to:
+- Update your business info
+- Add photos & products
+- Respond to reviews
+- Get found by more customers
+
+Claim now: {claim_url}' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Template: Claim Approved -->
+                    <div class="mb-5">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Claim Approved (sent when admin approves)</h5>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
+                                <input type="text" name="settings[template_approved_subject]" value="{{ $settings['template_approved_subject'] ?? 'Your business claim has been approved!' }}" class="input-dark">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
+                                <textarea name="settings[template_approved_body]" rows="4" class="input-dark font-mono text-xs">{{ $settings['template_approved_body'] ?? 'Great news! Your claim for "{business_name}" has been approved.
+
+You can now:
+- Edit your business details
+- Upload photos
+- Add products for sale
+- Respond to reviews
+
+Log in to get started: {claim_url}' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Template: Claim Rejected -->
+                    <div class="mb-5">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Claim Rejected (sent when admin rejects)</h5>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
+                                <input type="text" name="settings[template_rejected_subject]" value="{{ $settings['template_rejected_subject'] ?? 'Update on your business claim' }}" class="input-dark">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
+                                <textarea name="settings[template_rejected_body]" rows="4" class="input-dark font-mono text-xs">{{ $settings['template_rejected_body'] ?? 'Unfortunately, your claim for "{business_name}" could not be verified at this time.
+
+If you believe this is an error, please contact us or try again with valid proof of ownership.
+
+Thank you for your interest in {site_name}.' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Template: Review Request (after claiming) -->
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Review Request (sent to owners after 7 days)</h5>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
+                                <input type="text" name="settings[template_review_subject]" value="{{ $settings['template_review_subject'] ?? 'How is your experience with {site_name}?' }}" class="input-dark">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
+                                <textarea name="settings[template_review_body]" rows="3" class="input-dark font-mono text-xs">{{ $settings['template_review_body'] ?? 'Hi! You claimed "{business_name}" on {site_name} 7 days ago.
+
+How has it been? We'd love to hear your feedback to improve the platform.
+
+Your feedback helps us serve Churachandpur better!' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="mt-6">
