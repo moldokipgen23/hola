@@ -316,7 +316,7 @@ class AdminController extends Controller
     {
         $reports = Report::with(['business', 'user'])
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(20);
 
         return response()->json(['reports' => $reports]);
     }

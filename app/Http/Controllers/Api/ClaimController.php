@@ -16,7 +16,7 @@ class ClaimController extends Controller
     {
         $claims = ClaimRequest::with(['user', 'business'])
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(20);
 
         return response()->json(['claims' => $claims]);
     }

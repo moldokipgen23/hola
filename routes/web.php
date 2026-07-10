@@ -43,11 +43,13 @@ Route::get('/categories', function () {
 })->name('public.categories');
 
 Route::get('/map', function () {
-    $businesses = \App\Models\Business::where('is_active', true)
-        ->whereNotNull('latitude')
-        ->whereNotNull('longitude')
-        ->with('category')
-        ->get();
+    $businesses = \Illuminate\Support\Facades\Cache::remember('map_businesses', 300, function () {
+        return \App\Models\Business::where('is_active', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->with('category')
+            ->get();
+    });
     return view('public.map', compact('businesses'));
 })->name('public.map');
 
@@ -78,14 +80,15 @@ Route::get('/robots.txt', function () {
 
 // Sitemap
 Route::get('/sitemap.xml', function () {
-    $businesses = \App\Models\Business::where('is_active', true)->get();
-    $categories = \App\Models\Category::all();
+    $data = \Illuminate\Support\Facades\Cache::remember('sitemap_data', 3600, function () {
+        return [
+            'businesses' => \App\Models\Business::where('is_active', true)->get(),
+            'categories' => \App\Models\Category::all(),
+            'settings' => \App\Models\Setting::pluck('value', 'key')->toArray(),
+        ];
+    });
 
-    return response()->view('public.sitemap', [
-        'businesses' => $businesses,
-        'categories' => $categories,
-        'settings' => \App\Models\Setting::pluck('value', 'key')->toArray(),
-    ], 200, ['Content-Type' => 'application/xml']);
+    return response()->view('public.sitemap', $data, 200, ['Content-Type' => 'application/xml']);
 });
 
 // Admin Login
@@ -114,7 +117,7 @@ Route::post('/admin/login', function (Request $request) {
     \App\Services\ActivityLogService::log('admin_login', $user);
 
     return redirect()->route('admin.dashboard');
-})->name('admin.login.post');
+})->middleware('throttle:5,1')->name('admin.login.post');
 
 Route::post('/admin/logout', function () {
     \App\Services\ActivityLogService::log('admin_logout');
@@ -568,7 +571,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'business_id' => 'required|exists:businesses,id',
             'name' => 'required|max:255',
             'price' => 'nullable|numeric|min:0',
-            'availability' => 'nullable|in:in_stock,out_of_stock,pre_order',
+            'availability' => 'nullable|in:in_stock,out_of_stock,limited',
         ]);
         $validated['slug'] = $request->slug ?: \Illuminate\Support\Str::slug($request->name);
         $validated['description'] = $request->description;
@@ -590,7 +593,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'business_id' => 'required|exists:businesses,id',
             'name' => 'required|max:255',
             'price' => 'nullable|numeric|min:0',
-            'availability' => 'nullable|in:in_stock,out_of_stock,pre_order',
+            'availability' => 'nullable|in:in_stock,out_of_stock,limited',
         ]);
         $validated['slug'] = $request->slug ?: \Illuminate\Support\Str::slug($request->name);
         $validated['description'] = $request->description;

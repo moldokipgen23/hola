@@ -45,6 +45,7 @@ class Business extends Model
         'whatsapp_count',
         'directions_count',
         'share_count',
+        'last_synced_at',
         'created_by',
     ];
 

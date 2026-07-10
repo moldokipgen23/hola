@@ -31,10 +31,11 @@ class AuthController extends Controller
 
         $payload = $response->json();
 
-        // Verify audience (client id) when configured. This prevents tokens
-        // issued for a different OAuth client from being accepted.
         $expectedAud = config('services.google.client_id');
-        if ($expectedAud && ($payload['aud'] ?? null) !== $expectedAud) {
+        if (!$expectedAud) {
+            return response()->json(['message' => 'Google authentication not configured.'], 503);
+        }
+        if (($payload['aud'] ?? null) !== $expectedAud) {
             return response()->json(['message' => 'Invalid Google token'], 401);
         }
 
@@ -66,12 +67,13 @@ class AuthController extends Controller
     {
         $request->validate(['phone' => 'required|string']);
 
-        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $user = User::where('phone', $request->phone)->first();
 
-        $user = User::firstOrCreate(
-            ['phone' => $request->phone],
-            ['name' => 'User', 'password' => Hash::make(Str::random(16))]
-        );
+        if (!$user) {
+            return response()->json(['message' => 'No account found with this phone number. Please register first.'], 404);
+        }
+
+        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         $user->update(['otp' => $otp, 'otp_expires_at' => now()->addMinutes(10)]);
 

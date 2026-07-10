@@ -17,6 +17,7 @@ class ImportBatch extends Model
         'approved',
         'rejected',
         'skipped',
+        'pending',
         'status',
         'config',
         'error',
