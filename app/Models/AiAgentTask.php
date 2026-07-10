@@ -15,6 +15,7 @@ class AiAgentTask extends Model
         'status',
         'result_count',
         'imported_count',
+        'search_metadata',
         'cost',
         'duration_ms',
         'error',
@@ -23,6 +24,7 @@ class AiAgentTask extends Model
     protected $casts = [
         'input' => 'array',
         'output' => 'array',
+        'search_metadata' => 'array',
         'cost' => 'decimal:4',
     ];
 

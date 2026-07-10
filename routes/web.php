@@ -830,6 +830,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Import ───
 
+    Route::get('/search-history', function () {
+        $history = \App\Models\SearchHistory::with('agent:id,name,avatar')
+            ->latest()
+            ->paginate(20);
+        return view('admin.search-history', compact('history'));
+    })->name('search-history');
+
     Route::get('/import', function () {
         $batches = \App\Models\ImportBatch::withCount('items')
             ->with('agent:id,name,avatar')

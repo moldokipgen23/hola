@@ -6,6 +6,7 @@ use App\Models\AiAgent;
 use App\Models\AiAgentTask;
 use App\Models\ImportBatch;
 use App\Models\ImportItem;
+use App\Models\SearchHistory;
 use App\Models\Business;
 use App\Models\Category;
 use Illuminate\Support\Facades\Http;
@@ -157,6 +158,31 @@ class AgentSkillService
 
         $places = array_slice($places, 0, $maxResults);
 
+        // AI MEMORY: Build memory from previous search tasks for this agent
+        $previousPlaceIds = [];
+        $previousSearches = AiAgentTask::where('agent_id', $agent->id)
+            ->where('type', 'google_places_import')
+            ->where('id', '!=', $task->id)
+            ->whereNotNull('search_metadata')
+            ->orderByDesc('created_at')
+            ->limit(20)
+            ->get();
+
+        foreach ($previousSearches as $prevTask) {
+            $meta = $prevTask->search_metadata ?? [];
+            if (!empty($meta['place_ids'])) {
+                $previousPlaceIds = array_merge($previousPlaceIds, $meta['place_ids']);
+            }
+        }
+        $previousPlaceIds = array_unique($previousPlaceIds);
+
+        // Track current search results for memory
+        $currentPlaceIds = [];
+        $newPlaces = 0;
+        $alreadyImportedInDb = 0;
+        $seenInPreviousSearch = 0;
+        $disappearedPlaceIds = [];
+
         $batch = ImportBatch::create([
             'agent_id' => $agent->id,
             'source' => 'google_places',
@@ -178,6 +204,17 @@ class AgentSkillService
             $placeId = $place['place_id'] ?? null;
             $name = $place['name'] ?? '';
             $address = $place['formatted_address'] ?? $place['vicinity'] ?? '';
+
+            // Track place ID for memory
+            if ($placeId) {
+                $currentPlaceIds[] = $placeId;
+                if (in_array($placeId, $existingPlaceIds)) {
+                    $alreadyImportedInDb++;
+                }
+                if (in_array($placeId, $previousPlaceIds)) {
+                    $seenInPreviousSearch++;
+                }
+            }
 
             // DUPLICATE CHECK 1: Already exists by Google Place ID
             $isDuplicate = false;
@@ -344,6 +381,47 @@ class AgentSkillService
             'rejected' => $duplicates,
         ]);
 
+        // Detect disappeared businesses (were in previous searches but not in current)
+        if (!empty($previousPlaceIds)) {
+            $disappearedPlaceIds = array_diff($previousPlaceIds, $currentPlaceIds);
+            $disappearedPlaceIds = array_values($disappearedPlaceIds);
+        }
+
+        // AI MEMORY: Save search metadata on the task
+        $newPlaces = count($currentPlaceIds) - $alreadyImportedInDb - $duplicates;
+        $searchMetadata = [
+            'query' => $searchQuery,
+            'area' => $area,
+            'place_ids' => $currentPlaceIds,
+            'total_found' => count($currentPlaceIds),
+            'new_places' => max(0, $newPlaces),
+            'already_imported' => $alreadyImportedInDb,
+            'seen_in_previous_search' => $seenInPreviousSearch,
+            'duplicates_this_search' => $duplicates,
+            'disappeared_count' => count($disappearedPlaceIds),
+            'disappeared_place_ids' => $disappearedPlaceIds,
+            'search_number' => $previousSearches->count() + 1,
+        ];
+
+        $task->update([
+            'search_metadata' => $searchMetadata,
+            'output' => $searchMetadata,
+        ]);
+
+        // Save to search_history table for long-term memory
+        SearchHistory::create([
+            'agent_id' => $agent->id,
+            'query' => $query,
+            'area' => $area,
+            'zipcode' => $zipcode,
+            'source' => 'google_places',
+            'total_found' => count($currentPlaceIds),
+            'new_places' => max(0, $newPlaces),
+            'already_imported' => $alreadyImportedInDb,
+            'duplicates' => $duplicates,
+            'place_ids' => $currentPlaceIds,
+        ]);
+
         return [
             'count' => count($places),
             'imported' => $imported,
@@ -351,6 +429,7 @@ class AgentSkillService
             'duplicates' => $duplicates,
             'batch_id' => $batch->id,
             'cost' => 0.0,
+            'search_metadata' => $searchMetadata,
         ];
     }
 

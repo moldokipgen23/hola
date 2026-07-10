@@ -208,6 +208,23 @@
                                     {{ $task['result_count'] }} results, {{ $task['imported_count'] }} imported
                                     @if($task['cost'] > 0) · ${{ number_format($task['cost'], 4) }} @endif
                                 </p>
+                                @if(!empty($task['search_metadata']))
+                                    <div class="flex gap-2 mt-1 text-[10px]">
+                                        @if(($task['search_metadata']['new_places'] ?? 0) > 0)
+                                            <span class="text-emerald-400">✨ {{ $task['search_metadata']['new_places'] }} new</span>
+                                        @endif
+                                        @if(($task['search_metadata']['already_imported'] ?? 0) > 0)
+                                            <span class="text-yellow-400">📦 {{ $task['search_metadata']['already_imported'] }} already in DB</span>
+                                        @endif
+                                        @if(($task['search_metadata']['seen_in_previous_search'] ?? 0) > 0)
+                                            <span class="text-blue-400">🔍 {{ $task['search_metadata']['seen_in_previous_search'] }} seen before</span>
+                                        @endif
+                                        @if(($task['search_metadata']['disappeared_count'] ?? 0) > 0)
+                                            <span class="text-red-400">❌ {{ $task['search_metadata']['disappeared_count'] }} disappeared</span>
+                                        @endif
+                                        <span class="text-slate-600">Search #{{ $task['search_metadata']['search_number'] ?? '?' }}</span>
+                                    </div>
+                                @endif
                             </div>
                             <span class="text-xs text-slate-500">{{ \Carbon\Carbon::parse($task['created_at'])->diffForHumans() }}</span>
                         </div>
