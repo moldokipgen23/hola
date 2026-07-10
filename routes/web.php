@@ -1052,6 +1052,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         }
         $message = "Approved {$approved} items.";
         if ($skipped > 0) $message .= " Skipped {$skipped} duplicates.";
+
+        if ($approved > 0) {
+            \Illuminate\Support\Facades\Artisan::call('photos:download', ['--limit' => $approved]);
+        }
+
         return back()->with('success', $message);
     })->name('import.bulk-approve');
 
@@ -1174,6 +1179,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         $message = "Approved {$approved} items.";
         if ($skipped > 0) $message .= " Skipped {$skipped} duplicates.";
+
+        if ($approved > 0) {
+            \Illuminate\Support\Facades\Artisan::call('photos:download', ['--limit' => $approved]);
+        }
+
         return back()->with('success', $message);
     })->name('import.approve-all');
 

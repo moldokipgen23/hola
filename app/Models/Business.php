@@ -28,6 +28,7 @@ class Business extends Model
         'email',
         'website',
         'photos',
+        'photos_downloaded_at',
         'working_hours',
         'claim_status',
         'verification_status',
@@ -52,6 +53,7 @@ class Business extends Model
     protected $casts = [
         'photos' => 'array',
         'working_hours' => 'array',
+        'photos_downloaded_at' => 'datetime',
         'latitude' => 'float',
         'longitude' => 'float',
         'is_featured' => 'boolean',
