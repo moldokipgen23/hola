@@ -56,7 +56,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                     @foreach($business->photos as $photo)
                         <div class="aspect-square rounded-xl overflow-hidden bg-white/5">
-                            <img src="{{ $photo }}" alt="Business photo" class="w-full h-full object-cover">
+                            <img src="{{ str_starts_with($photo, 'http') ? $photo : asset($photo) }}" alt="Business photo" class="w-full h-full object-cover">
                         </div>
                     @endforeach
                 </div>

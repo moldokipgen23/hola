@@ -49,7 +49,7 @@
             <a href="/business/{{ $business->slug }}" class="glass-card p-4 hover:border-blue-500/30 transition">
                 @if($business->photos && count($business->photos) > 0)
                     <div class="h-40 rounded-xl overflow-hidden mb-3 bg-slate-800">
-                        <img src="{{ asset($business->photos[0]) }}" alt="{{ $business->name }}" class="w-full h-full object-cover">
+                        <img src="{{ str_starts_with($business->photos[0], 'http') ? $business->photos[0] : asset($business->photos[0]) }}" alt="{{ $business->name }}" class="w-full h-full object-cover">
                     </div>
                 @endif
                 <h3 class="text-white font-semibold">{{ $business->name }}</h3>

@@ -9,7 +9,7 @@
 @section('og_title', $business->name)
 @section('og_description', $ogDescription)
 @if($business->photos && count($business->photos) > 0)
-    @section('og_image', asset($business->photos[0]))
+    @section('og_image', str_starts_with($business->photos[0], 'http') ? $business->photos[0] : asset($business->photos[0]))
 @endif
 
 @section('content')
@@ -33,7 +33,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                     @foreach($business->photos as $photo)
                         <div class="rounded-lg overflow-hidden bg-slate-800 aspect-square">
-                            <img src="{{ asset($photo) }}" alt="{{ $business->name }}" class="w-full h-full object-cover">
+                            <img src="{{ str_starts_with($photo, 'http') ? $photo : asset($photo) }}" alt="{{ $business->name }}" class="w-full h-full object-cover">
                         </div>
                     @endforeach
                 </div>

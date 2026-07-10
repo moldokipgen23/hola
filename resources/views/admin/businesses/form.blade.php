@@ -136,7 +136,7 @@
                 @if(isset($business) && !empty($business->photos))
                     <div class="flex gap-2 mt-2">
                         @foreach($business->photos as $photo)
-                            <img src="{{ Storage::url($photo) }}" class="w-16 h-16 object-cover rounded">
+                            <img src="{{ str_starts_with($photo, 'http') ? $photo : asset($photo) }}" class="w-16 h-16 object-cover rounded">
                         @endforeach
                     </div>
                 @endif
