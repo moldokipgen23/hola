@@ -80,15 +80,13 @@ Route::get('/robots.txt', function () {
 
 // Sitemap
 Route::get('/sitemap.xml', function () {
-    $data = \Illuminate\Support\Facades\Cache::remember('sitemap_data', 3600, function () {
-        return [
-            'businesses' => \App\Models\Business::where('is_active', true)->get(),
-            'categories' => \App\Models\Category::all(),
-            'settings' => \App\Models\Setting::pluck('value', 'key')->toArray(),
-        ];
-    });
+    $businesses = \App\Models\Business::where('is_active', true)->select('slug', 'updated_at')->get();
+    $categories = \App\Models\Category::select('slug')->get();
 
-    return response()->view('public.sitemap', $data, 200, ['Content-Type' => 'application/xml']);
+    return response()->view('public.sitemap', [
+        'businesses' => $businesses,
+        'categories' => $categories,
+    ], 200, ['Content-Type' => 'application/xml']);
 });
 
 // Admin Login
