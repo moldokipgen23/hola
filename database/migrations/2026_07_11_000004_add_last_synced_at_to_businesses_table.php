@@ -8,9 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('businesses', function (Blueprint $table) {
-            $table->timestamp('last_synced_at')->nullable()->after('photos_downloaded_at');
-        });
+        if (!Schema::hasColumn('businesses', 'last_synced_at')) {
+            Schema::table('businesses', function (Blueprint $table) {
+                $table->timestamp('last_synced_at')->nullable()->after('photos_downloaded_at');
+            });
+        }
     }
 
     public function down(): void
