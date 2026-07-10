@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 class NotifyUnclaimedBusinesses extends Command
 {
     protected $signature = 'business:notify-unclaimed {--days=3} {--limit=50} {--dry-run}';
-    protected $description = 'Notify unclaimed businesses via email/SMS to claim their listing on Hola';
+    protected $description = 'Notify unclaimed businesses via free channels (Email + Telegram + WhatsApp CallMeBot)';
 
     public function handle(): int
     {
@@ -19,11 +19,15 @@ class NotifyUnclaimedBusinesses extends Command
         $dryRun = $this->option('dry-run');
         $limit = $this->option('limit');
 
-        // Find businesses that were imported 3+ days ago and haven't been claimed
+        $channel = Setting::get('notify_preferred_channel', 'email');
+        $notEmail = Setting::get('notify_email', '1') === '1';
+        $notTelegram = Setting::get('notify_telegram', '0') === '1';
+        $notWhatsApp = Setting::get('notify_whatsapp', '0') === '1';
+
+        // Find businesses that were imported X+ days ago and haven't been claimed
         $businesses = Business::where('claim_status', 'unclaimed')
             ->where('source', 'import')
             ->where('is_active', true)
-            ->whereNotNull('phone')
             ->where('created_at', '<=', now()->subDays($days))
             ->whereDoesntHave('notificationLogs', function ($q) {
                 $q->where('type', 'claim_invitation');
@@ -36,67 +40,66 @@ class NotifyUnclaimedBusinesses extends Command
             return 0;
         }
 
-        $this->info("📧 Found {$businesses->count()} unclaimed businesses to notify ({$days}+ days old)");
+        $this->info("📧 Found {$businesses->count()} unclaimed businesses ({$days}+ days old)");
+        $this->info("   Channel: {$channel} | Email: " . ($notEmail ? 'ON' : 'OFF') . " | Telegram: " . ($notTelegram ? 'ON' : 'OFF') . " | WhatsApp: " . ($notWhatsApp ? 'ON' : 'OFF'));
 
         $notified = 0;
         $failed = 0;
 
         foreach ($businesses as $business) {
-            $this->info("  → {$business->name} ({$business->phone})");
+            $this->info("  → {$business->name}");
 
             if ($dryRun) {
-                $this->info("    [DRY RUN] Would send claim invitation");
+                $this->info("    [DRY RUN] Would notify via {$channel}");
                 $notified++;
                 continue;
             }
 
-            try {
-                // Build the claim message
-                $message = $this->buildClaimMessage($business);
+            $claimUrl = "https://hola.ehlom.com/claim/{$business->slug}";
+            $message = $this->buildClaimMessage($business, $claimUrl);
+            $sent = false;
 
-                // Try WhatsApp first (if available), then SMS
-                $sent = false;
-
-                // Try WhatsApp via Twilio
-                $sent = $this->sendWhatsApp($business->phone, $message);
-
-                // Fallback to SMS
-                if (!$sent) {
-                    $sent = $this->sendSMS($business->phone, $message);
+            // Try channels in order of preference
+            if ($channel === 'all' || $channel === 'email') {
+                if ($notEmail && $business->email) {
+                    $sent = $this->sendEmail($business->email, 'Your business is on Hola - Claim it now!', $message);
                 }
-
-                if ($sent) {
-                    NotificationLog::create([
-                        'business_id' => $business->id,
-                        'type' => 'claim_invitation',
-                        'channel' => 'sms',
-                        'recipient' => $business->phone,
-                        'message' => $message,
-                        'status' => 'sent',
-                        'sent_at' => now(),
-                    ]);
-                    $notified++;
-                    $this->info("    ✅ Sent");
-                } else {
-                    NotificationLog::create([
-                        'business_id' => $business->id,
-                        'type' => 'claim_invitation',
-                        'channel' => 'sms',
-                        'recipient' => $business->phone,
-                        'message' => $message,
-                        'status' => 'failed',
-                    ]);
-                    $failed++;
-                    $this->warn("    ❌ Failed to send");
-                }
-
-                // Rate limit
-                usleep(500000);
-
-            } catch (\Exception $e) {
-                $failed++;
-                $this->warn("    ❌ Error: {$e->getMessage()}");
             }
+
+            if (!$sent && ($channel === 'all' || $channel === 'telegram')) {
+                if ($notTelegram) {
+                    $sent = $this->sendTelegram($message);
+                }
+            }
+
+            if (!$sent && ($channel === 'all' || $channel === 'whatsapp')) {
+                if ($notWhatsApp && $business->phone) {
+                    $sent = $this->sendWhatsAppCallMeBot($business->phone, $message);
+                }
+            }
+
+            // Log the attempt (even if failed, to avoid re-notifying)
+            try {
+                NotificationLog::create([
+                    'business_id' => $business->id,
+                    'type' => 'claim_invitation',
+                    'channel' => $sent ? $channel : 'none',
+                    'recipient' => $business->email ?? $business->phone ?? 'unknown',
+                    'message' => $message,
+                    'status' => $sent ? 'sent' : 'failed',
+                    'sent_at' => $sent ? now() : null,
+                ]);
+            } catch (\Exception $e) { /* log failure should not block */ }
+
+            if ($sent) {
+                $notified++;
+                $this->info("    ✅ Sent via {$channel}");
+            } else {
+                $failed++;
+                $this->warn("    ❌ Failed (no channel configured or no contact info)");
+            }
+
+            usleep(500000);
         }
 
         $this->info("");
@@ -107,70 +110,81 @@ class NotifyUnclaimedBusinesses extends Command
         return 0;
     }
 
-    private function buildClaimMessage(Business $business): string
+    private function buildClaimMessage(Business $business, string $claimUrl): string
     {
         $name = $business->name;
-        $claimUrl = "https://hola.ehlom.com/claim/{$business->slug}";
 
-        return "Hi! Your business \"{$name}\" is listed on Hola - Churachandpur's #1 business directory. 🌟\n\n" .
+        return "Hi! Your business \"{$name}\" is listed on Hola - Churachandpur's #1 business directory.\n\n" .
             "Claim your listing for FREE to:\n" .
-            "✅ Update your business info\n" .
-            "✅ Add photos & products\n" .
-            "✅ Respond to reviews\n" .
-            "✅ Get found by more customers\n\n" .
+            "- Update your business info\n" .
+            "- Add photos & products\n" .
+            "- Respond to reviews\n" .
+            "- Get found by more customers\n\n" .
             "Claim now: {$claimUrl}\n\n" .
             "Questions? Reply to this message.";
     }
 
-    private function sendWhatsApp(string $phone, string $message): bool
+    private function sendEmail(string $to, string $subject, string $body): bool
     {
         try {
-            $accountSid = config('services.twilio.sid');
-            $authToken = config('services.twilio.token');
-            $from = config('services.twilio.whatsapp_from');
+            $fromAddress = Setting::get('smtp_from_address', config('mail.from.address'));
+            $fromName = Setting::get('smtp_from_name', config('mail.from.name', 'Hola'));
 
-            if (!$accountSid || !$authToken || !$from) {
-                return false;
-            }
+            if (!$fromAddress) return false;
 
-            $to = 'whatsapp:' . $this->normalizePhone($phone);
+            \Illuminate\Support\Facades\Mail::raw(
+                $body,
+                function ($message) use ($to, $subject, $fromAddress, $fromName) {
+                    $message->to($to)
+                            ->subject($subject)
+                            ->from($fromAddress, $fromName);
+                }
+            );
 
-            $response = Http::withBasicAuth($accountSid, $authToken)
-                ->post("https://api.twilio.com/2010-04-01/Accounts/{$accountSid}/Messages.json", [
-                    'From' => $from,
-                    'To' => $to,
-                    'Body' => $message,
-                ]);
-
-            return $response->successful();
+            return true;
         } catch (\Exception $e) {
+            $this->warn("    Email failed: {$e->getMessage()}");
             return false;
         }
     }
 
-    private function sendSMS(string $phone, string $message): bool
+    private function sendTelegram(string $message): bool
     {
         try {
-            $accountSid = config('services.twilio.sid');
-            $authToken = config('services.twilio.token');
-            $from = config('services.twilio.sms_from');
+            $token = Setting::get('telegram_bot_token');
+            $chatId = Setting::get('telegram_chat_id');
 
-            if (!$accountSid || !$authToken || !$from) {
-                $this->warn("    Twilio not configured, skipping SMS");
-                return false;
-            }
+            if (!$token || !$chatId) return false;
 
-            $to = $this->normalizePhone($phone);
-
-            $response = Http::withBasicAuth($accountSid, $authToken)
-                ->post("https://api.twilio.com/2010-04-01/Accounts/{$accountSid}/Messages.json", [
-                    'From' => $from,
-                    'To' => $to,
-                    'Body' => $message,
-                ]);
+            $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+                'chat_id' => $chatId,
+                'text' => $message,
+            ]);
 
             return $response->successful();
         } catch (\Exception $e) {
+            $this->warn("    Telegram failed: {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    private function sendWhatsAppCallMeBot(string $phone, string $message): bool
+    {
+        try {
+            $apiKey = Setting::get('callmebot_api_key');
+            if (!$apiKey) return false;
+
+            $to = $this->normalizePhone($phone);
+
+            $response = Http::get("https://api.callmebot.com/whatsapp.php", [
+                'phone' => $to,
+                'text' => $message,
+                'apikey' => $apiKey,
+            ]);
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            $this->warn("    WhatsApp failed: {$e->getMessage()}");
             return false;
         }
     }
@@ -179,7 +193,6 @@ class NotifyUnclaimedBusinesses extends Command
     {
         $phone = preg_replace('/[^0-9+]/', '', $phone);
         if (!str_starts_with($phone, '+')) {
-            // Assume India (+91) if 10 digits
             if (strlen($phone) === 10) {
                 $phone = '+91' . $phone;
             }

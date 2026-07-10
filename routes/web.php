@@ -733,6 +733,33 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         }
     })->name('settings.test-email');
 
+    Route::post('/settings/test-telegram', function (Request $request) {
+        $request->validate(['message' => 'required|string']);
+
+        $token = \App\Models\Setting::get('telegram_bot_token');
+        $chatId = \App\Models\Setting::get('telegram_chat_id');
+
+        if (!$token || !$chatId) {
+            return response()->json(['message' => 'Telegram bot token and chat ID not configured.'], 422);
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+                'chat_id' => $chatId,
+                'text' => $request->message,
+                'parse_mode' => 'HTML',
+            ]);
+
+            if ($response->successful()) {
+                return response()->json(['message' => 'Test Telegram message sent successfully!']);
+            }
+
+            return response()->json(['message' => 'Failed: ' . ($response->json('description') ?? 'Unknown error')], 500);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed: ' . $e->getMessage()], 500);
+        }
+    })->name('settings.test-telegram');
+
     // Analytics
     Route::get('/analytics', function () {
         $analytics = [
