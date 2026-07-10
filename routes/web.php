@@ -971,6 +971,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $categoryName = $data['category'] ?? $data['type'] ?? null;
         $categoryId = matchImportCategory($categoryName, $categories);
 
+        // Detect area
+        $areaId = $data['area_id'] ?? null;
+        if (!$areaId && !empty($data['latitude']) && !empty($data['longitude'])) {
+            $area = \App\Models\Area::findByCoordinates($data['latitude'], $data['longitude']);
+            if ($area) $areaId = $area->id;
+        }
+        if (!$areaId) {
+            $otherArea = \App\Models\Area::where('slug', 'other')->where('is_active', true)->first();
+            if ($otherArea) $areaId = $otherArea->id;
+        }
+
         $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
         $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
         if ($existing) {
@@ -981,6 +992,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'name' => $data['name'] ?? 'Unknown Business',
             'slug' => $slug,
             'category_id' => $categoryId,
+            'area_id' => $areaId,
             'description' => $data['description'] ?? null,
             'address' => $data['address'] ?? $data['location'] ?? '',
             'locality' => $data['locality'] ?? null,
@@ -1076,8 +1088,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 if ($existingBusiness) {
                     $item->update(['status' => 'rejected', 'notes' => "Duplicate: {$existingBusiness->name}"]);
                     if ($item->batch) {
-                        $item->batch->increment('rejected');
-                        $item->batch->decrement('pending');
+                    $item->batch->increment('rejected');
+                    $item->batch->decrement('pending');
                     }
                     $skipped++;
                     continue;
@@ -1086,6 +1098,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 $categories = \App\Models\Category::pluck('id', 'name')->toArray();
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = matchImportCategory($categoryName, $categories);
+
+                // Detect area
+                $areaId = $data['area_id'] ?? null;
+                if (!$areaId && !empty($data['latitude']) && !empty($data['longitude'])) {
+                    $area = \App\Models\Area::findByCoordinates($data['latitude'], $data['longitude']);
+                    if ($area) $areaId = $area->id;
+                }
+                if (!$areaId) {
+                    $otherArea = \App\Models\Area::where('slug', 'other')->where('is_active', true)->first();
+                    if ($otherArea) $areaId = $otherArea->id;
+                }
 
                 $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
                 $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
@@ -1097,6 +1120,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'name' => $data['name'] ?? 'Unknown Business',
                     'slug' => $slug,
                     'category_id' => $categoryId,
+                    'area_id' => $areaId,
                     'description' => $data['description'] ?? null,
                     'address' => $data['address'] ?? $data['location'] ?? '',
                     'locality' => $data['locality'] ?? null,
@@ -1212,6 +1236,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = matchImportCategory($categoryName, $categories);
 
+                // Detect area
+                $areaId = $data['area_id'] ?? null;
+                if (!$areaId && !empty($data['latitude']) && !empty($data['longitude'])) {
+                    $area = \App\Models\Area::findByCoordinates($data['latitude'], $data['longitude']);
+                    if ($area) $areaId = $area->id;
+                }
+                if (!$areaId) {
+                    $otherArea = \App\Models\Area::where('slug', 'other')->where('is_active', true)->first();
+                    if ($otherArea) $areaId = $otherArea->id;
+                }
+
                 $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
                 $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
                 if ($existing) {
@@ -1222,6 +1257,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'name' => $data['name'] ?? 'Unknown Business',
                     'slug' => $slug,
                     'category_id' => $categoryId,
+                    'area_id' => $areaId,
                     'description' => $data['description'] ?? null,
                     'address' => $data['address'] ?? $data['location'] ?? '',
                     'locality' => $data['locality'] ?? null,

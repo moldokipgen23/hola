@@ -13,20 +13,24 @@ class AgentAutonomousRun extends Command
     protected $signature = 'agent:auto-run {--skill=} {--dry-run}';
     protected $description = 'Run AI agent skills autonomously on schedule';
 
-    // Pre-configured search queries for Churachandpur/Lamka
+    // Pre-configured search queries — ONLY Churachandpur district (795128)
     private array $searchQueries = [
-        ['query' => 'restaurants', 'area' => 'Lamka, Churachandpur'],
-        ['query' => 'schools', 'area' => 'Churachandpur, Manipur'],
-        ['query' => 'pharmacies', 'area' => 'Lamka, Churachandpur'],
-        ['query' => 'hotels', 'area' => 'Churachandpur, Manipur'],
-        ['query' => 'shops', 'area' => 'New Lamka, Churachandpur'],
-        ['query' => 'clinics', 'area' => 'Churachandpur, Manipur'],
-        ['query' => 'banks', 'area' => 'Lamka, Churachandpur'],
-        ['query' => 'beauty salons', 'area' => 'Churachandpur, Manipur'],
-        ['query' => 'grocery stores', 'area' => 'Tuibong, Churachandpur'],
-        ['query' => 'mobile shops', 'area' => 'Lamka, Churachandpur'],
-        ['query' => 'churches', 'area' => 'Churachandpur, Manipur'],
-        ['query' => 'tuition centers', 'area' => 'Lamka, Churachandpur'],
+        ['query' => 'restaurants', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'schools', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'pharmacies', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'hotels', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'shops', 'area' => 'Lamka, Churachandpur 795128'],
+        ['query' => 'clinics', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'banks', 'area' => 'Lamka, Churachandpur 795128'],
+        ['query' => 'beauty salons', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'grocery stores', 'area' => 'Tuibong, Churachandpur 795128'],
+        ['query' => 'mobile shops', 'area' => 'Lamka, Churachandpur 795128'],
+        ['query' => 'churches', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'tuition centers', 'area' => 'Lamka, Churachandpur 795128'],
+        ['query' => 'hardware stores', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'tailoring shops', 'area' => 'Lamka, Churachandpur 795128'],
+        ['query' => 'photography studios', 'area' => 'Churachandpur, Manipur 795128'],
+        ['query' => 'stationery shops', 'area' => 'New Lamka, Churachandpur 795128'],
     ];
 
     public function handle(): int

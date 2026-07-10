@@ -15,6 +15,7 @@ class Business extends Model
     protected $fillable = [
         'category_id',
         'subcategory_id',
+        'area_id',
         'name',
         'slug',
         'description',
@@ -100,6 +101,11 @@ class Business extends Model
     public function subcategory(): BelongsTo
     {
         return $this->belongsTo(Subcategory::class);
+    }
+
+    public function area(): BelongsTo
+    {
+        return $this->belongsTo(Area::class);
     }
 
     public function products(): HasMany

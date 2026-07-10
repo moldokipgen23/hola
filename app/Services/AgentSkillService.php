@@ -14,6 +14,14 @@ use Illuminate\Support\Str;
 
 class AgentSkillService
 {
+    // Churachandpur district bounds (roughly)
+    const DISTRICT_BOUNDS = [
+        'north' => 24.4500,
+        'south' => 24.2000,
+        'east'  => 93.8500,
+        'west'  => 93.5500,
+    ];
+
     public function run(AiAgent $agent, AiAgentTask $task): array
     {
         $task->update(['status' => 'running']);
@@ -156,6 +164,19 @@ class AgentSkillService
         }
 
         $places = array_slice($places, 0, $maxResults);
+
+        // FILTER: Only keep businesses within Churachandpur district bounds
+        $bounds = self::DISTRICT_BOUNDS;
+        $placesBeforeFilter = count($places);
+        $places = array_filter($places, function ($place) use ($bounds) {
+            $lat = $place['geometry']['location']['lat'] ?? null;
+            $lng = $place['geometry']['location']['lng'] ?? null;
+            if (!$lat || !$lng) return true; // keep if no coordinates (will be checked later)
+            return $lat >= $bounds['south'] && $lat <= $bounds['north']
+                && $lng >= $bounds['west'] && $lng <= $bounds['east'];
+        });
+        $places = array_values($places);
+        $filteredOut = $placesBeforeFilter - count($places);
 
         // AI MEMORY: Build memory from previous search tasks for this agent
         $previousPlaceIds = [];
@@ -343,6 +364,7 @@ class AgentSkillService
             // Extract locality and district from address_components
             $locality = null;
             $district = null;
+            $areaId = null;
             $addressComponents = $place['geometry']['address_components'] ?? [];
             if (empty($addressComponents) && isset($detailData['address_components'])) {
                 $addressComponents = $detailData['address_components'];
@@ -357,13 +379,39 @@ class AgentSkillService
                 }
             }
 
+            // AUTO-DETECT AREA: Try coordinates first, then name match
+            $lat = $place['geometry']['location']['lat'] ?? null;
+            $lng = $place['geometry']['location']['lng'] ?? null;
+            if ($lat && $lng) {
+                $area = \App\Models\Area::findByCoordinates($lat, $lng);
+                if ($area) {
+                    $areaId = $area->id;
+                }
+            }
+            // Fallback: try matching by locality name or address keywords
+            if (!$areaId) {
+                $searchText = strtolower($name . ' ' . $address . ' ' . ($locality ?? ''));
+                $area = \App\Models\Area::where('is_active', true)->get()->first(function ($a) use ($searchText) {
+                    return Str::contains($searchText, strtolower($a->name));
+                });
+                if ($area) {
+                    $areaId = $area->id;
+                }
+            }
+            // Final fallback: "Other" area
+            if (!$areaId) {
+                $otherArea = \App\Models\Area::where('slug', 'other')->where('is_active', true)->first();
+                if ($otherArea) $areaId = $otherArea->id;
+            }
+
             $placeData = [
                 'name' => $name,
                 'address' => $address,
                 'locality' => $locality,
                 'district' => $district ?? 'Churachandpur',
-                'latitude' => $place['geometry']['location']['lat'] ?? null,
-                'longitude' => $place['geometry']['location']['lng'] ?? null,
+                'area_id' => $areaId,
+                'latitude' => $lat,
+                'longitude' => $lng,
                 'phone' => $phone,
                 'website' => $website,
                 'rating' => $place['rating'] ?? null,
