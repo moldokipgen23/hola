@@ -906,30 +906,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             $slug .= '-' . \Illuminate\Support\Str::random(5);
         }
 
-        // Download photos if available
-        $photos = [];
-        if (!empty($data['photos']) && is_array($data['photos'])) {
-            foreach ($data['photos'] as $photoUrl) {
-                try {
-                    $response = \Illuminate\Support\Facades\Http::timeout(15)->get($photoUrl);
-                    if ($response->successful() && strlen($response->body()) > 100) {
-                        $ext = match ($response->header('Content-Type')) {
-                            'image/png' => 'png',
-                            'image/webp' => 'webp',
-                            'image/gif' => 'gif',
-                            default => 'jpg',
-                        };
-                        $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.' . $ext;
-                        \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
-                        $photos[] = 'storage/' . $filename;
-                    }
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::warning("Photo download failed: {$photoUrl} - " . $e->getMessage());
-                    continue;
-                }
-            }
-        }
-
         \App\Models\Business::create([
             'name' => $data['name'] ?? 'Unknown Business',
             'slug' => $slug,
@@ -949,7 +925,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'is_active' => true,
             'source' => 'import',
             'import_batch_id' => $item->batch_id,
-            'photos' => count($photos) > 0 ? $photos : null,
+            'photos' => !empty($data['photos']) && is_array($data['photos']) ? $data['photos'] : null,
         ]);
 
         $item->update(['status' => 'approved']);
@@ -973,6 +949,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Bulk import actions
     Route::post('/import/bulk-approve', function (\Illuminate\Http\Request $request) {
+        set_time_limit(120);
         $ids = json_decode($request->input('ids', '[]'), true);
         if (empty($ids)) return back()->with('error', 'No items selected.');
 
@@ -1041,27 +1018,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 }
 
                 $photos = [];
-                if (!empty($data['photos']) && is_array($data['photos'])) {
-                    foreach ($data['photos'] as $photoUrl) {
-                        try {
-                            $response = \Illuminate\Support\Facades\Http::timeout(15)->get($photoUrl);
-                            if ($response->successful() && strlen($response->body()) > 100) {
-                                $ext = match ($response->header('Content-Type')) {
-                                    'image/png' => 'png',
-                                    'image/webp' => 'webp',
-                                    'image/gif' => 'gif',
-                                    default => 'jpg',
-                                };
-                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.' . $ext;
-                                \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
-                                $photos[] = 'storage/' . $filename;
-                            }
-                        } catch (\Exception $e) {
-                            continue;
-                        }
-                    }
-                }
-
                 \App\Models\Business::create([
                     'name' => $data['name'] ?? 'Unknown Business',
                     'slug' => $slug,
@@ -1083,7 +1039,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'external_id' => $item->external_id,
                     'import_batch_id' => $item->batch_id,
                     'confidence' => $item->confidence,
-                    'photos' => count($photos) > 0 ? $photos : null,
+                    'photos' => !empty($data['photos']) && is_array($data['photos']) ? $data['photos'] : null,
                 ]);
 
                 $item->update(['status' => 'approved']);
@@ -1115,6 +1071,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('import.bulk-reject');
 
     Route::post('/import/approve-all', function () {
+        set_time_limit(120);
         $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->get();
         $approved = 0;
         $skipped = 0;
@@ -1180,28 +1137,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     $slug .= '-' . \Illuminate\Support\Str::random(5);
                 }
 
-                $photos = [];
-                if (!empty($data['photos']) && is_array($data['photos'])) {
-                    foreach ($data['photos'] as $photoUrl) {
-                        try {
-                            $response = \Illuminate\Support\Facades\Http::timeout(15)->get($photoUrl);
-                            if ($response->successful() && strlen($response->body()) > 100) {
-                                $ext = match ($response->header('Content-Type')) {
-                                    'image/png' => 'png',
-                                    'image/webp' => 'webp',
-                                    'image/gif' => 'gif',
-                                    default => 'jpg',
-                                };
-                                $filename = 'businesses/' . $slug . '_' . \Illuminate\Support\Str::random(6) . '.' . $ext;
-                                \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $response->body());
-                                $photos[] = 'storage/' . $filename;
-                            }
-                        } catch (\Exception $e) {
-                            continue;
-                        }
-                    }
-                }
-
                 \App\Models\Business::create([
                     'name' => $data['name'] ?? 'Unknown Business',
                     'slug' => $slug,
@@ -1223,7 +1158,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'external_id' => $item->external_id,
                     'import_batch_id' => $item->batch_id,
                     'confidence' => $item->confidence,
-                    'photos' => count($photos) > 0 ? $photos : null,
+                    'photos' => !empty($data['photos']) && is_array($data['photos']) ? $data['photos'] : null,
                 ]);
 
                 $item->update(['status' => 'approved']);
