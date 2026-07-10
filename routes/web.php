@@ -929,6 +929,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'photos' => !empty($data['photos']) && is_array($data['photos']) ? $data['photos'] : null,
         ]);
 
+        $newBusiness = \App\Models\Business::where('slug', $slug)->first();
+        if ($newBusiness && $item->batch && $item->batch->agent_id) {
+            \App\Models\AgentImportedBusiness::create([
+                'agent_id' => $item->batch->agent_id,
+                'business_id' => $newBusiness->id,
+                'batch_id' => $item->batch_id,
+                'google_place_id' => $item->external_id,
+                'business_name' => $data['name'] ?? 'Unknown Business',
+                'address' => $data['address'] ?? null,
+                'imported_at' => now(),
+            ]);
+        }
+
         $item->update(['status' => 'approved']);
         if ($item->batch) {
             $item->batch->increment('approved');
@@ -1029,6 +1042,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'confidence' => $item->confidence,
                     'photos' => !empty($data['photos']) && is_array($data['photos']) ? $data['photos'] : null,
                 ]);
+
+                $newBusiness = \App\Models\Business::where('slug', $slug)->first();
+                if ($newBusiness && $item->batch && $item->batch->agent_id) {
+                    \App\Models\AgentImportedBusiness::create([
+                        'agent_id' => $item->batch->agent_id,
+                        'business_id' => $newBusiness->id,
+                        'batch_id' => $item->batch_id,
+                        'google_place_id' => $item->external_id,
+                        'business_name' => $data['name'] ?? 'Unknown Business',
+                        'address' => $data['address'] ?? null,
+                        'imported_at' => now(),
+                    ]);
+                }
 
                 $item->update(['status' => 'approved']);
                 if ($item->batch) {
@@ -1141,6 +1167,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'confidence' => $item->confidence,
                     'photos' => !empty($data['photos']) && is_array($data['photos']) ? $data['photos'] : null,
                 ]);
+
+                $newBusiness = \App\Models\Business::where('slug', $slug)->first();
+                if ($newBusiness && $item->batch && $item->batch->agent_id) {
+                    \App\Models\AgentImportedBusiness::create([
+                        'agent_id' => $item->batch->agent_id,
+                        'business_id' => $newBusiness->id,
+                        'batch_id' => $item->batch_id,
+                        'google_place_id' => $item->external_id,
+                        'business_name' => $data['name'] ?? 'Unknown Business',
+                        'address' => $data['address'] ?? null,
+                        'imported_at' => now(),
+                    ]);
+                }
 
                 $item->update(['status' => 'approved']);
                 if ($item->batch) {

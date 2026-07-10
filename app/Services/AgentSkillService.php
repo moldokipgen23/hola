@@ -176,6 +176,16 @@ class AgentSkillService
         }
         $previousPlaceIds = array_unique($previousPlaceIds);
 
+        // AI MEMORY: Load ALL businesses this agent has ever imported (census checklist)
+        $agentImportedPlaceIds = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+            ->whereNotNull('google_place_id')
+            ->pluck('google_place_id')
+            ->toArray();
+        $agentImportedNames = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+            ->pluck('business_name')
+            ->map(fn($n) => Str::lower(trim($n)))
+            ->toArray();
+
         // Track current search results for memory
         $currentPlaceIds = [];
         $newPlaces = 0;
@@ -216,12 +226,20 @@ class AgentSkillService
                 }
             }
 
-            // DUPLICATE CHECK 1: Already exists by Google Place ID
+            // DUPLICATE CHECK 1: Already exists by Google Place ID (global DB)
             $isDuplicate = false;
             $duplicateReason = '';
             if ($placeId && in_array($placeId, $existingPlaceIds)) {
                 $isDuplicate = true;
                 $duplicateReason = 'Google Place ID already in database';
+            }
+
+            // DUPLICATE CHECK 1b: This agent already imported this business (census memory)
+            if (!$isDuplicate && $placeId && in_array($placeId, $agentImportedPlaceIds)) {
+                $isDuplicate = true;
+                $importedRecord = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+                    ->where('google_place_id', $placeId)->first();
+                $duplicateReason = "You already imported this business" . ($importedRecord ? " on {$importedRecord->imported_at->format('M d, Y')}" : '');
             }
 
             // DUPLICATE CHECK 2: Same name+address combination
@@ -232,6 +250,16 @@ class AgentSkillService
                 if ($existingWithSameName && Str::contains(Str::lower($existingWithSameName->address), substr($normalizedAddress, 0, 10))) {
                     $isDuplicate = true;
                     $duplicateReason = "Name matches existing business: {$existingWithSameName->name}";
+                }
+            }
+
+            // DUPLICATE CHECK 2b: This agent imported a business with this name (census memory)
+            if (!$isDuplicate && in_array($normalizedName, $agentImportedNames)) {
+                $importedByName = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+                    ->whereRaw('LOWER(business_name) = ?', [$normalizedName])->first();
+                if ($importedByName) {
+                    $isDuplicate = true;
+                    $duplicateReason = "You already imported \"{$importedByName->business_name}\"" . ($importedByName->imported_at ? " on {$importedByName->imported_at->format('M d, Y')}" : '');
                 }
             }
 

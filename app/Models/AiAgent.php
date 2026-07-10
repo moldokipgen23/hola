@@ -52,6 +52,11 @@ class AiAgent extends Model
         return $this->hasMany(SearchHistory::class, 'agent_id');
     }
 
+    public function importedBusinesses(): HasMany
+    {
+        return $this->hasMany(AgentImportedBusiness::class, 'agent_id');
+    }
+
     public function hasSkill(string $skill): bool
     {
         return in_array($skill, $this->skills ?? []);
