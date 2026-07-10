@@ -160,31 +160,41 @@ class AgentSkillService
 
         // AI MEMORY: Build memory from previous search tasks for this agent
         $previousPlaceIds = [];
-        $previousSearches = AiAgentTask::where('agent_id', $agent->id)
-            ->where('type', 'google_places_import')
-            ->where('id', '!=', $task->id)
-            ->whereNotNull('search_metadata')
-            ->orderByDesc('created_at')
-            ->limit(20)
-            ->get();
+        try {
+            $previousSearches = AiAgentTask::where('agent_id', $agent->id)
+                ->where('type', 'google_places_import')
+                ->where('id', '!=', $task->id)
+                ->whereNotNull('search_metadata')
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get();
 
-        foreach ($previousSearches as $prevTask) {
-            $meta = $prevTask->search_metadata ?? [];
-            if (!empty($meta['place_ids'])) {
-                $previousPlaceIds = array_merge($previousPlaceIds, $meta['place_ids']);
+            foreach ($previousSearches as $prevTask) {
+                $meta = $prevTask->search_metadata ?? [];
+                if (!empty($meta['place_ids'])) {
+                    $previousPlaceIds = array_merge($previousPlaceIds, $meta['place_ids']);
+                }
             }
+            $previousPlaceIds = array_unique($previousPlaceIds);
+        } catch (\Exception $e) {
+            $previousSearches = collect();
         }
-        $previousPlaceIds = array_unique($previousPlaceIds);
 
         // AI MEMORY: Load ALL businesses this agent has ever imported (census checklist)
-        $agentImportedPlaceIds = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
-            ->whereNotNull('google_place_id')
-            ->pluck('google_place_id')
-            ->toArray();
-        $agentImportedNames = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
-            ->pluck('business_name')
-            ->map(fn($n) => Str::lower(trim($n)))
-            ->toArray();
+        try {
+            $agentImportedPlaceIds = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+                ->whereNotNull('google_place_id')
+                ->pluck('google_place_id')
+                ->toArray();
+            $agentImportedNames = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+                ->pluck('business_name')
+                ->map(fn($n) => Str::lower(trim($n)))
+                ->toArray();
+        } catch (\Exception $e) {
+            // Memory table might not exist yet — fall back to empty
+            $agentImportedPlaceIds = [];
+            $agentImportedNames = [];
+        }
 
         // Track current search results for memory
         $currentPlaceIds = [];
@@ -432,15 +442,18 @@ class AgentSkillService
             'search_number' => $previousSearches->count() + 1,
         ];
 
-        $task->update([
-            'search_metadata' => $searchMetadata,
-            'output' => $searchMetadata,
-        ]);
+        try {
+            $task->update([
+                'search_metadata' => $searchMetadata,
+                'output' => $searchMetadata,
+            ]);
+        } catch (\Exception $e) { /* memory write failure should not block search */ }
 
         // Save to search_history table for long-term memory
-        SearchHistory::create([
-            'agent_id' => $agent->id,
-            'query' => $query,
+        try {
+            SearchHistory::create([
+                'agent_id' => $agent->id,
+                'query' => $query,
             'area' => $area,
             'zipcode' => $zipcode,
             'source' => 'google_places',
@@ -448,8 +461,9 @@ class AgentSkillService
             'new_places' => max(0, $newPlaces),
             'already_imported' => $alreadyImportedInDb,
             'duplicates' => $duplicates,
-            'place_ids' => $currentPlaceIds,
-        ]);
+                'place_ids' => $currentPlaceIds,
+            ]);
+        } catch (\Exception $e) { /* memory write failure should not block search */ }
 
         return [
             'count' => count($places),
@@ -1141,25 +1155,26 @@ EOT;
         ]);
 
         // Save search history (SerpAPI doesn't have place IDs, so memory is name-based only)
-        SearchHistory::create([
-            'agent_id' => $agent->id,
-            'query' => $query,
-            'area' => $area,
-            'zipcode' => $zipcode,
-            'source' => 'serpapi',
-            'total_found' => count($places),
-            'new_places' => $imported,
-            'already_imported' => $skipped,
-            'duplicates' => 0,
-            'place_ids' => null,
-        ]);
-
-        $task->update([
-            'search_metadata' => [
-                'query' => $searchQuery,
+        try {
+            SearchHistory::create([
+                'agent_id' => $agent->id,
+                'query' => $query,
                 'area' => $area,
+                'zipcode' => $zipcode,
                 'source' => 'serpapi',
                 'total_found' => count($places),
+                'new_places' => $imported,
+                'already_imported' => $skipped,
+                'duplicates' => 0,
+                'place_ids' => null,
+            ]);
+
+            $task->update([
+                'search_metadata' => [
+                    'query' => $searchQuery,
+                    'area' => $area,
+                    'source' => 'serpapi',
+                    'total_found' => count($places),
                 'new_places' => $imported,
                 'already_imported' => $skipped,
             ],
@@ -1169,6 +1184,7 @@ EOT;
                 'new_places' => $imported,
             ],
         ]);
+        } catch (\Exception $e) { /* memory write failure should not block search */ }
 
         return [
             'count' => count($places),

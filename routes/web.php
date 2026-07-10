@@ -931,15 +931,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         $newBusiness = \App\Models\Business::where('slug', $slug)->first();
         if ($newBusiness && $item->batch && $item->batch->agent_id) {
-            \App\Models\AgentImportedBusiness::create([
-                'agent_id' => $item->batch->agent_id,
-                'business_id' => $newBusiness->id,
-                'batch_id' => $item->batch_id,
-                'google_place_id' => $item->external_id,
-                'business_name' => $data['name'] ?? 'Unknown Business',
-                'address' => $data['address'] ?? null,
-                'imported_at' => now(),
-            ]);
+            try {
+                \App\Models\AgentImportedBusiness::create([
+                    'agent_id' => $item->batch->agent_id,
+                    'business_id' => $newBusiness->id,
+                    'batch_id' => $item->batch_id,
+                    'google_place_id' => $item->external_id,
+                    'business_name' => $data['name'] ?? 'Unknown Business',
+                    'address' => $data['address'] ?? null,
+                    'imported_at' => now(),
+                ]);
+            } catch (\Exception $e) { /* memory failure should not block approve */ }
         }
 
         $item->update(['status' => 'approved']);
