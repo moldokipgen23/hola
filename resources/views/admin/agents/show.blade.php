@@ -109,17 +109,6 @@
                             </div>
                         </div>
 
-                        <div class="field-group hidden" data-skill="ai_business_scraper">
-                            <label class="block text-sm text-slate-400 mb-1">Area / Zipcode</label>
-                            <input type="text" name="area" class="input-dark" value="Lamka, Churachandpur" placeholder="e.g., 795128 or Lamka, Churachandpur">
-                            <label class="block text-sm text-slate-400 mb-1 mt-2">Category</label>
-                            <input type="text" name="category" class="input-dark" placeholder="e.g., restaurants, all businesses">
-                            <div class="mt-2">
-                                <label class="block text-xs text-slate-500 mb-1">Max Results</label>
-                                <input type="number" name="max_results" class="input-dark" value="30" min="1" max="50">
-                            </div>
-                        </div>
-
                         <div class="field-group hidden" data-skill="serpapi_business_search">
                             <label class="block text-sm text-slate-400 mb-1">Search Query</label>
                             <input type="text" name="query" class="input-dark" placeholder="e.g., restaurants, hotels, shops">

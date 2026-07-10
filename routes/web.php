@@ -801,6 +801,34 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         ));
     })->name('autopilot');
 
+    Route::post('/autopilot/toggle', function (\Illuminate\Http\Request $request) {
+        $agent = \App\Models\AiAgent::first();
+        if (!$agent) return back()->with('error', 'No agent found.');
+
+        $agent->update(['status' => $agent->status === 'active' ? 'paused' : 'active']);
+
+        \App\Models\ActivityLog::create([
+            'action' => 'autopilot_toggled',
+            'user_id' => auth()->id(),
+            'properties' => ['new_status' => $agent->status],
+        ]);
+
+        return back()->with('success', "Autopilot {$agent->status}.");
+    })->name('autopilot.toggle');
+
+    Route::post('/autopilot/prompt', function (\Illuminate\Http\Request $request) {
+        $request->validate([
+            'system_prompt' => 'required|string|max:5000',
+        ]);
+
+        $agent = \App\Models\AiAgent::first();
+        if (!$agent) return back()->with('error', 'No agent found.');
+
+        $agent->update(['system_prompt' => $request->system_prompt]);
+
+        return back()->with('success', 'Agent rules updated.');
+    })->name('autopilot.prompt');
+
     Route::get('/agents', function () use ($agentCtrl) {
         $response = (new $agentCtrl())->index();
         $agents = json_decode($response->getContent(), true)['agents'];

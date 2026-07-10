@@ -22,7 +22,6 @@ class AgentSkillService
         try {
             $result = match ($task->type) {
                 'google_places_import' => $this->googlePlacesImport($agent, $task),
-                'ai_business_scraper' => $this->aiBusinessScraper($agent, $task),
                 'serpapi_business_search' => $this->serpapiBusinessSearch($agent, $task),
                 'auto_categorize' => $this->autoCategorize($agent, $task),
                 'duplicate_detector' => $this->duplicateDetector($agent, $task),

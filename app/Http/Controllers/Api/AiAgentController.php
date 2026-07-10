@@ -31,7 +31,7 @@ class AiAgentController extends Controller
             'model' => 'required|string|max:255',
             'system_prompt' => 'nullable|string',
             'skills' => 'required|array|min:1',
-            'skills.*' => 'string|in:google_places_import,serpapi_business_search,ai_business_scraper,auto_categorize,duplicate_detector,description_writer,quality_checker,csv_importer',
+            'skills.*' => 'string|in:google_places_import,serpapi_business_search,auto_categorize,duplicate_detector,description_writer,quality_checker,csv_importer',
             'config' => 'nullable|array',
         ]);
 
@@ -68,7 +68,7 @@ class AiAgentController extends Controller
             'model' => 'sometimes|string|max:255',
             'system_prompt' => 'nullable|string',
             'skills' => 'sometimes|array|min:1',
-            'skills.*' => 'string|in:google_places_import,serpapi_business_search,ai_business_scraper,auto_categorize,duplicate_detector,description_writer,quality_checker,csv_importer',
+            'skills.*' => 'string|in:google_places_import,serpapi_business_search,auto_categorize,duplicate_detector,description_writer,quality_checker,csv_importer',
             'status' => 'sometimes|in:active,paused',
             'config' => 'nullable|array',
         ]);

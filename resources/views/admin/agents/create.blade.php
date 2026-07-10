@@ -88,7 +88,6 @@
                     $skills = [
                         'google_places_import' => ['Import businesses from Google Maps', '🏪'],
                         'serpapi_business_search' => ['Search businesses via Google (SerpAPI)', '🌐'],
-                        'ai_business_scraper' => ['Discover businesses via AI', '🤖'],
                         'auto_categorize' => ['AI-powered business categorization', '🏷️'],
                         'duplicate_detector' => ['Find and flag duplicate listings', '🔎'],
                         'description_writer' => ['Generate business descriptions', '✍️'],
