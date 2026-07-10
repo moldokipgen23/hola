@@ -29,6 +29,10 @@
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
             SMTP / Email
         </button>
+        <button type="button" onclick="switchTab('storage')" data-tab="storage" class="settings-tab">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+            Storage
+        </button>
         <button type="button" onclick="switchTab('api')" data-tab="api" class="settings-tab">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
             API Keys
@@ -220,6 +224,70 @@
             <div class="mt-5 flex gap-3">
                 <input type="email" id="testEmail" placeholder="test@example.com" class="input-dark flex-1">
                 <button type="button" onclick="sendTestEmail()" class="btn-primary px-6">Send Test Email</button>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="btn-primary">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Storage -->
+    <div id="tab-storage" class="tab-content" style="display:none">
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-cyan-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">Cloud Storage (Bunny CDN)</h3>
+                    <p class="text-slate-500 text-xs">Store business photos on Bunny CDN instead of VPS disk</p>
+                </div>
+            </div>
+
+            <div class="p-4 bg-cyan-500/5 rounded-xl border border-cyan-500/20 mb-6">
+                <p class="text-cyan-400 text-xs font-semibold mb-1">How to set up Bunny Storage (2 minutes):</p>
+                <ol class="text-slate-500 text-xs space-y-1 list-decimal list-inside">
+                    <li>Go to <a href="https://panel.bunny.net/" target="_blank" class="text-cyan-400 hover:underline">panel.bunny.net</a> → Storage → Add Storage Zone</li>
+                    <li>Choose a name (e.g. <code class="bg-slate-800 px-1 rounded">hola-photos</code>), select a region close to India</li>
+                    <li>Go to CDN → Add CDN Zone → link it to your storage zone</li>
+                    <li>Copy the values below into the fields</li>
+                </ol>
+            </div>
+
+            <div class="space-y-5">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Storage Zone Name</label>
+                        <input type="text" name="settings[bunny_zone_name]" value="{{ $settings['bunny_zone_name'] ?? '' }}" class="input-dark" placeholder="hola-photos">
+                        <p class="text-slate-600 text-xs mt-1">The name you chose when creating the zone</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Access Key (API Key)</label>
+                        <input type="password" name="settings[bunny_access_key]" value="{{ $settings['bunny_access_key'] ?? '' }}" class="input-dark" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                        <p class="text-slate-600 text-xs mt-1">Found under Access Keys in your storage zone</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">CDN URL</label>
+                        <input type="url" name="settings[bunny_cdn_url]" value="{{ $settings['bunny_cdn_url'] ?? '' }}" class="input-dark" placeholder="https://hola-photos.b-cdn.net">
+                        <p class="text-slate-600 text-xs mt-1">Your CDN zone URL (e.g. https://yourname.b-cdn.net)</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Pull Zone URL (optional)</label>
+                        <input type="url" name="settings[bunny_pull_zone_url]" value="{{ $settings['bunny_pull_zone_url'] ?? '' }}" class="input-dark" placeholder="https://photos.hola.ehlom.com">
+                        <p class="text-slate-600 text-xs mt-1">Custom domain if you set one up (leave empty to use CDN URL)</p>
+                    </div>
+                </div>
+
+                @if(($settings['bunny_zone_name'] ?? '') && ($settings['bunny_access_key'] ?? ''))
+                <div class="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <p class="text-green-400 text-xs font-semibold">Bunny Storage is configured and active</p>
+                </div>
+                @else
+                <div class="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                    <p class="text-yellow-400 text-xs font-semibold">Not configured yet — photos will be stored on VPS disk</p>
+                </div>
+                @endif
             </div>
 
             <div class="mt-6">

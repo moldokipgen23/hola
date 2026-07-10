@@ -60,6 +60,19 @@ return [
             'report' => false,
         ],
 
+        'bunny' => [
+            'driver' => 's3',
+            'key' => env('BUNNY_ACCESS_KEY', \App\Models\Setting::get('bunny_access_key')),
+            'secret' => env('BUNNY_SECRET_KEY', \App\Models\Setting::get('bunny_secret_key')),
+            'region' => 'us-east-1',
+            'bucket' => env('BUNNY_BUCKET', \App\Models\Setting::get('bunny_zone_name')),
+            'url' => env('BUNNY_CDN_URL', \App\Models\Setting::get('bunny_cdn_url')),
+            'endpoint' => env('BUNNY_ENDPOINT', 'https://' . (\App\Models\Setting::get('bunny_zone_name') ?? '') . '.storage.bunnycdn.com'),
+            'use_path_style_endpoint' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
