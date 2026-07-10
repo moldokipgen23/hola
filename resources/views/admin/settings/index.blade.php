@@ -246,12 +246,11 @@
             </div>
 
             <div class="p-4 bg-cyan-500/5 rounded-xl border border-cyan-500/20 mb-6">
-                <p class="text-cyan-400 text-xs font-semibold mb-1">How to set up Bunny Storage (2 minutes):</p>
+                <p class="text-cyan-400 text-xs font-semibold mb-1">How to set up Bunny Storage:</p>
                 <ol class="text-slate-500 text-xs space-y-1 list-decimal list-inside">
-                    <li>Go to <a href="https://panel.bunny.net/" target="_blank" class="text-cyan-400 hover:underline">panel.bunny.net</a> → Storage → Add Storage Zone</li>
-                    <li>Choose a name (e.g. <code class="bg-slate-800 px-1 rounded">hola-photos</code>), select a region close to India</li>
-                    <li>Go to CDN → Add CDN Zone → link it to your storage zone</li>
-                    <li>Copy the values below into the fields</li>
+                    <li>Go to <a href="https://panel.bunny.net/" target="_blank" class="text-cyan-400 hover:underline">panel.bunny.net</a> → Storage → Access → copy the <strong>API / HTTP</strong> key</li>
+                    <li>Click <strong>"+ Connect Pull Zone"</strong> to create a CDN endpoint (required for photos to load publicly)</li>
+                    <li>Copy the Pull Zone URL (e.g. <code class="bg-slate-800 px-1 rounded">https://hola-storage1.b-cdn.net</code>) into the CDN URL field below</li>
                 </ol>
             </div>
 
@@ -259,13 +258,26 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Storage Zone Name</label>
-                        <input type="text" name="settings[bunny_zone_name]" value="{{ $settings['bunny_zone_name'] ?? '' }}" class="input-dark" placeholder="hola-photos">
+                        <input type="text" name="settings[bunny_zone_name]" value="{{ $settings['bunny_zone_name'] ?? '' }}" class="input-dark" placeholder="hola-storage1">
                         <p class="text-slate-600 text-xs mt-1">The name you chose when creating the zone</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Storage Region</label>
+                        <select name="settings[bunny_region]" class="input-dark">
+                            <option value="sg" {{ ($settings['bunny_region'] ?? 'sg') === 'sg' ? 'selected' : '' }}>Singapore (SG)</option>
+                            <option value="ny" {{ ($settings['bunny_region'] ?? '') === 'ny' ? 'selected' : '' }}>New York (NY)</option>
+                            <option value="la" {{ ($settings['bunny_region'] ?? '') === 'la' ? 'selected' : '' }}>Los Angeles (LA)</option>
+                            <option value="syd" {{ ($settings['bunny_region'] ?? '') === 'syd' ? 'selected' : '' }}>Sydney (SYD)</option>
+                            <option value="br" {{ ($settings['bunny_region'] ?? '') === 'br' ? 'selected' : '' }}>Sao Paulo (BR)</option>
+                            <option value="jh" {{ ($settings['bunny_region'] ?? '') === 'jh' ? 'selected' : '' }}>Johannesburg (JHB)</option>
+                            <option value="ams" {{ ($settings['bunny_region'] ?? '') === 'ams' ? 'selected' : '' }}>Amsterdam (AMS)</option>
+                        </select>
+                        <p class="text-slate-600 text-xs mt-1">Must match the region you selected in Bunny.net</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Access Key (API Key)</label>
                         <input type="password" name="settings[bunny_access_key]" value="{{ $settings['bunny_access_key'] ?? '' }}" class="input-dark" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-                        <p class="text-slate-600 text-xs mt-1">Found under Access Keys in your storage zone</p>
+                        <p class="text-slate-600 text-xs mt-1">Found under Access → API / HTTP tab in your storage zone</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">CDN URL</label>

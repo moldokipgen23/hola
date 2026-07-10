@@ -26,7 +26,9 @@ class BunnyStorage
 
     public static function getStorageUrl(): string
     {
-        return 'https://' . Setting::get('bunny_zone_name') . '.storage.bunnycdn.com';
+        $zoneName = Setting::get('bunny_zone_name');
+        $region = Setting::get('bunny_region', 'sg');
+        return "https://{$region}-s3.storage.bunnycdn.com";
     }
 
     public static function put(string $path, string $contents): bool
