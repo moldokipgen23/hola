@@ -924,7 +924,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'review_count' => $data['total_ratings'] ?? 0,
             'is_active' => true,
             'source' => 'import',
+            'external_id' => $item->external_id,
             'import_batch_id' => $item->batch_id,
+            'confidence' => $item->confidence,
             'photos' => !empty($data['photos']) && is_array($data['photos']) ? $data['photos'] : null,
         ]);
 
@@ -1017,20 +1019,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     $slug .= '-' . \Illuminate\Support\Str::random(5);
                 }
 
-                $photos = [];
                 \App\Models\Business::create([
                     'name' => $data['name'] ?? 'Unknown Business',
                     'slug' => $slug,
                     'category_id' => $categoryId,
                     'description' => $data['description'] ?? null,
-                    'address' => $data['address'] ?? '',
+                    'address' => $data['address'] ?? $data['location'] ?? '',
                     'locality' => $data['locality'] ?? null,
                     'district' => $data['district'] ?? 'Churachandpur',
                     'phone' => $data['phone'] ?? null,
                     'email' => $data['email'] ?? null,
                     'website' => $data['website'] ?? null,
-                    'latitude' => $data['latitude'] ?? null,
-                    'longitude' => $data['longitude'] ?? null,
+                    'latitude' => $data['latitude'] ?? $data['lat'] ?? null,
+                    'longitude' => $data['longitude'] ?? $data['lng'] ?? null,
                     'working_hours' => $data['working_hours'] ?? null,
                     'average_rating' => $data['rating'] ?? 0,
                     'review_count' => $data['total_ratings'] ?? 0,

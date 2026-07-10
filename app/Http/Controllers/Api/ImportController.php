@@ -57,7 +57,7 @@ class ImportController extends Controller
 
         // Check by name + similar address
         if (!$existingBusiness && !empty($data['name'])) {
-            $existingBusiness = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [Str::lower($data['name'])])->first();
+            $existingBusiness = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [Str::lower(trim($data['name']))])->first();
             if ($existingBusiness && !empty($data['address'])) {
                 // Verify address is also similar
                 $existingAddr = Str::lower($existingBusiness->address);
@@ -110,7 +110,8 @@ class ImportController extends Controller
 
         // Fallback to the "Uncategorized" category so we never write a NULL category_id
         if (!$categoryId) {
-            $categoryId = Category::where('slug', 'uncategorized')->value('id');
+            $categoryId = Category::where('slug', 'uncategorized')->value('id')
+                ?? Category::firstOrCreate(['name' => 'Uncategorized', 'slug' => 'uncategorized'])->id;
         }
 
         $slug = Str::slug($data['name']);
