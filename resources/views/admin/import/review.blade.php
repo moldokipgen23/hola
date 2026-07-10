@@ -12,7 +12,7 @@
 
 @section('content')
 <div class="mb-6 flex items-center justify-between">
-    <p class="text-slate-400">{{ $items->total() }} items pending review</p>
+    <p class="text-slate-400">{{ $items->total() }} items {{ $status === 'duplicate' ? 'flagged as duplicates' : 'pending review' }}</p>
     @if($items->count() > 0)
         <div class="flex gap-2">
             <form method="POST" action="{{ route('admin.import.approve-all') }}">
@@ -160,7 +160,16 @@
                             <span class="px-2 py-0.5 text-xs rounded-full bg-slate-700/50 text-slate-400">
                                 {{ $item->batch->source ?? 'unknown' }}
                             </span>
+                            @if($item->status === 'duplicate')
+                                <span class="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400 font-semibold">
+                                    DUPLICATE
+                                </span>
+                            @endif
                         </div>
+
+                        @if($item->status === 'duplicate' && $item->notes)
+                            <p class="text-xs text-red-400/80 mb-1">⚠ {{ $item->notes }}</p>
+                        @endif
 
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-400">
                             @if(!empty($item->data['address']))

@@ -839,10 +839,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('import');
 
     Route::get('/import/review', function () {
-        $query = \App\Models\ImportItem::where('status', 'pending')->with('batch:id,name,source');
+        $status = request('status', 'pending');
+        $query = \App\Models\ImportItem::whereIn('status', [$status, 'duplicate'])->with('batch:id,name,source');
         if (request('batch_id')) $query->where('batch_id', request('batch_id'));
+        if ($status === 'all') {
+            $query->whereIn('status', ['pending', 'duplicate']);
+        }
         $items = $query->latest()->paginate(20);
-        return view('admin.import.review', compact('items'));
+        return view('admin.import.review', compact('items', 'status'));
     })->name('import.review');
 
     Route::post('/import/review/{id}/approve', function ($id) {

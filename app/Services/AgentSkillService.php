@@ -167,6 +167,7 @@ class AgentSkillService
 
         $imported = 0;
         $skipped = 0;
+        $duplicates = 0;
         $categories = Category::pluck('id', 'name')->toArray();
 
         // Pre-load existing ACTIVE businesses for duplicate detection (exclude soft-deleted)
@@ -178,21 +179,22 @@ class AgentSkillService
             $name = $place['name'] ?? '';
             $address = $place['formatted_address'] ?? $place['vicinity'] ?? '';
 
-            // DUPLICATE CHECK 1: Skip if google_place_id already exists
+            // DUPLICATE CHECK 1: Already exists by Google Place ID
+            $isDuplicate = false;
+            $duplicateReason = '';
             if ($placeId && in_array($placeId, $existingPlaceIds)) {
-                $skipped++;
-                continue;
+                $isDuplicate = true;
+                $duplicateReason = 'Google Place ID already in database';
             }
 
-            // DUPLICATE CHECK 2: Skip if name+address combination already exists
+            // DUPLICATE CHECK 2: Same name+address combination
             $normalizedName = Str::lower(trim($name));
             $normalizedAddress = Str::lower(trim($address));
-            if (in_array($normalizedName, $existingNames)) {
-                // Double-check with address to allow same name in different locations
+            if (!$isDuplicate && in_array($normalizedName, $existingNames)) {
                 $existingWithSameName = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [$normalizedName])->first();
                 if ($existingWithSameName && Str::contains(Str::lower($existingWithSameName->address), substr($normalizedAddress, 0, 10))) {
-                    $skipped++;
-                    continue;
+                    $isDuplicate = true;
+                    $duplicateReason = "Name matches existing business: {$existingWithSameName->name}";
                 }
             }
 
@@ -321,23 +323,32 @@ class AgentSkillService
                 'data' => $placeData,
                 'external_id' => $placeId,
                 'confidence' => $confidence,
+                'status' => $isDuplicate ? 'duplicate' : 'pending',
+                'notes' => $isDuplicate ? $duplicateReason : null,
             ]);
 
             // Track for future duplicate detection
             if ($placeId) $existingPlaceIds[] = $placeId;
             $existingNames[] = $normalizedName;
-            $imported++;
+
+            if ($isDuplicate) {
+                $duplicates++;
+            } else {
+                $imported++;
+            }
         }
 
         $batch->update([
             'status' => 'completed',
             'pending' => $imported,
+            'rejected' => $duplicates,
         ]);
 
         return [
             'count' => count($places),
             'imported' => $imported,
             'skipped' => $skipped,
+            'duplicates' => $duplicates,
             'batch_id' => $batch->id,
             'cost' => 0.0,
         ];
