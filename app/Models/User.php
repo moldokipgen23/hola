@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVerifyEmail
+class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes, \Illuminate\Auth\MustVerifyEmail;
@@ -135,7 +135,7 @@ class User extends Authenticatable implements \Illuminate\Contracts\Auth\MustVer
         return $this->is_active && !$this->isBanned();
     }
 
-    public function ban(string $reason = null): void
+    public function ban(?string $reason = null): void
     {
         $this->update([
             'banned_at' => now(),
