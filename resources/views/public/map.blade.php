@@ -17,16 +17,19 @@
 @section('scripts')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const businesses = @json($businesses->map(fn($b) => [
+@php
+    $mapData = $businesses->map(fn($b) => [
         'name' => $b->name,
         'slug' => $b->slug,
         'lat' => $b->latitude,
         'lng' => $b->longitude,
         'category' => $b->category?->name,
         'address' => $b->address,
-    ]));
+    ])->values()->toArray();
+@endphp
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const businesses = {!! json_encode($mapData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
 
     const map = L.map('map').setView([24.33, 93.70], 13);
 
