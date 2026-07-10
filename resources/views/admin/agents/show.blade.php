@@ -140,8 +140,14 @@
                         </div>
 
                         <div class="field-group hidden" data-skill="auto_categorize">
-                            <label class="block text-sm text-slate-400 mb-1">Batch ID (optional)</label>
-                            <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all pending">
+                            <label class="block text-sm text-slate-400 mb-1">Scope</label>
+                            <select name="scope" class="input-dark">
+                                <option value="pending">Pending imports only</option>
+                                <option value="existing">Existing businesses only</option>
+                                <option value="all">All (pending + existing)</option>
+                            </select>
+                            <label class="block text-sm text-slate-400 mb-1 mt-2">Batch ID (optional)</label>
+                            <input type="number" name="batch_id" class="input-dark" placeholder="Leave empty for all">
                             <div class="mt-2">
                                 <label class="block text-xs text-slate-500 mb-1">Max Items</label>
                                 <input type="number" name="max_results" class="input-dark" value="30" min="1" max="100">

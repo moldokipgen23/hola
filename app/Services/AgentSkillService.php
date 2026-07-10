@@ -646,28 +646,45 @@ EOT;
         $api = $this->getApiConfig($agent);
         $batchId = $input['batch_id'] ?? null;
         $maxResults = $input['max_results'] ?? 30;
+        $scope = $input['scope'] ?? 'pending'; // 'pending' or 'existing' or 'all'
 
         if (!$api['api_key']) {
             throw new \Exception('API key not configured for AI categorization.');
         }
 
-        $query = ImportItem::where('status', 'pending')->whereNull('data->category');
-        if ($batchId) $query->where('batch_id', $batchId);
-        $items = $query->limit($maxResults)->get();
+        // Build query based on scope
+        $items = collect();
+        $existingCategorized = collect();
 
-        if ($items->isEmpty()) {
-            return ['count' => 0, 'imported' => 0, 'cost' => 0];
+        if ($scope === 'pending' || $scope === 'all') {
+            $query = ImportItem::where('status', 'pending')->whereNull('data->category');
+            if ($batchId) $query->where('batch_id', $batchId);
+            $items = $query->limit($maxResults)->get();
+        }
+
+        if ($scope === 'existing' || $scope === 'all') {
+            $existingCategorized = Business::where('is_active', true)
+                ->where('source', 'import')
+                ->limit($maxResults)
+                ->get();
+        }
+
+        if ($items->isEmpty() && $existingCategorized->isEmpty()) {
+            return ['count' => 0, 'imported' => 0, 'cost' => 0, 'categories_created' => 0];
         }
 
         $existingCategories = Category::pluck('name')->toArray();
         $catList = !empty($existingCategories) ? implode("\n- ", $existingCategories) : 'No categories exist yet. Create new ones.';
 
         $businessList = [];
+
+        // Pending import items
         foreach ($items as $item) {
             $d = $item->data;
             $types = $d['types'] ?? [];
             $businessList[] = [
-                'id' => $item->id,
+                'source' => 'import',
+                'source_id' => $item->id,
                 'name' => $d['name'] ?? '',
                 'address' => $d['address'] ?? '',
                 'types' => $types,
@@ -675,7 +692,20 @@ EOT;
             ];
         }
 
-        $json = json_encode($businessList, JSON_PRETTY_PRINT);
+        // Existing businesses
+        foreach ($existingCategorized as $biz) {
+            $businessList[] = [
+                'source' => 'business',
+                'source_id' => $biz->id,
+                'name' => $biz->name ?? '',
+                'address' => $biz->address ?? '',
+                'types' => [],
+                'description' => substr($biz->description ?? '', 0, 100),
+                'current_category' => $biz->category->name ?? 'General',
+            ];
+        }
+
+        $json = json_encode(array_slice($businessList, 0, $maxResults), JSON_PRETTY_PRINT);
 
         $prompt = <<<EOT
 You are a business categorization expert. For each business below, pick the BEST matching category.
@@ -683,9 +713,12 @@ You are a business categorization expert. For each business below, pick the BEST
 EXISTING CATEGORIES:
 - {$catList}
 
-If NO existing category fits, suggest a NEW category name (make it concise, e.g., "Tuition Center", "Hardware Store").
+RULES:
+1. Pick the BEST existing category that fits
+2. If NO existing category fits, suggest a NEW category name (concise, e.g., "Tuition Center", "Hardware Store", "Church", "NGO")
+3. For businesses with "current_category" field — only change it if the current one is WRONG
 
-Return ONLY a JSON array with: id, category (the category name), is_new (true if you created a new category).
+Return ONLY a JSON array with: source, source_id, category (the category name), is_new (true if you created a new category), changed (true if category was changed).
 
 Businesses:
 {$json}
@@ -697,11 +730,11 @@ EOT;
         ])->timeout(60)->post($api['endpoint'], [
             'model' => $api['model'],
             'messages' => [
-                ['role' => 'system', 'content' => 'You are a business categorization AI. Return only valid JSON array. Be precise.'],
+                ['role' => 'system', 'content' => 'You are a business categorization AI. Return only valid JSON array. Be precise and thoughtful.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
             'temperature' => 0.2,
-            'max_tokens' => 2000,
+            'max_tokens' => 3000,
         ]);
 
         if ($response->failed()) {
@@ -718,13 +751,16 @@ EOT;
 
         $categorized = 0;
         $created = [];
+        $changed = 0;
 
         foreach ($mappings as $map) {
-            $itemId = $map['id'] ?? null;
+            $source = $map['source'] ?? null;
+            $sourceId = $map['source_id'] ?? null;
             $catName = $map['category'] ?? null;
             $isNew = $map['is_new'] ?? false;
+            $wasChanged = $map['changed'] ?? false;
 
-            if (!$itemId || !$catName) continue;
+            if (!$sourceId || !$catName) continue;
 
             // Create category if new
             if ($isNew && !in_array($catName, $existingCategories) && !in_array($catName, $created)) {
@@ -738,21 +774,35 @@ EOT;
                 $existingCategories[] = $catName;
             }
 
-            $item = $items->firstWhere('id', $itemId);
-            if ($item) {
-                $data = $item->data;
-                $data['category'] = $catName;
-                $item->update([
-                    'data' => $data,
-                    'confidence' => min(($item->confidence ?? 0.5) + 0.15, 1.0),
-                ]);
-                $categorized++;
+            if ($source === 'import') {
+                $item = $items->firstWhere('id', $sourceId);
+                if ($item) {
+                    $data = $item->data;
+                    $data['category'] = $catName;
+                    $item->update([
+                        'data' => $data,
+                        'confidence' => min(($item->confidence ?? 0.5) + 0.15, 1.0),
+                    ]);
+                    $categorized++;
+                }
+            } elseif ($source === 'business' && $wasChanged) {
+                $biz = $existingCategorized->firstWhere('id', $sourceId);
+                if ($biz) {
+                    $cat = Category::where('name', $catName)->first();
+                    if ($cat) {
+                        $biz->update(['category_id' => $cat->id]);
+                        $changed++;
+                        $categorized++;
+                    }
+                }
             }
         }
 
         return [
-            'count' => $items->count(),
+            'count' => count($businessList),
             'imported' => $categorized,
+            'categories_created' => count($created),
+            'existing_reorganized' => $changed,
             'cost' => round(($result['usage']['total_tokens'] ?? 0) * 0.00000014, 4),
         ];
     }
@@ -1045,7 +1095,13 @@ EOT;
             }
         }
 
-        return null;
+        // Pass 3: No match found — create a new category from the first Google type
+        $newCatName = ucfirst(str_replace('_', ' ', $placeTypes[0] ?? 'general'));
+        $newCat = Category::firstOrCreate(
+            ['name' => $newCatName, 'slug' => Str::slug($newCatName)],
+            ['icon' => '📂', 'is_active' => true]
+        );
+        return $newCat->name;
     }
 
     private function serpapiBusinessSearch(AiAgent $agent, AiAgentTask $task): array
