@@ -71,13 +71,11 @@ Route::get('/area/{slug}', function ($slug) {
 })->name('public.area');
 
 Route::get('/map', function () {
-    $businesses = \Illuminate\Support\Facades\Cache::remember('map_businesses', 300, function () {
-        return \App\Models\Business::where('is_active', true)
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->with('category')
-            ->get();
-    });
+    $businesses = \App\Models\Business::where('is_active', true)
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->with('category')
+        ->get();
     return view('public.map', compact('businesses'));
 })->name('public.map');
 

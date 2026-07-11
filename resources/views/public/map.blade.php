@@ -1,16 +1,19 @@
 @extends('layouts.public')
 
-@section('title', 'Business Map | ' . config('app.name', 'Hola'))
+@section('title', 'Business Map | Hola - Churachandpur Directory')
 @section('description', 'Browse local businesses on an interactive map in Lamka, Churachandpur, Manipur, India')
 
 @section('content')
-<h1 class="text-3xl font-bold text-white mb-2">Business Map</h1>
-<p class="text-slate-400 mb-6">Explore businesses near you on the interactive map</p>
+<div class="bg-white border-b border-slate-100">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Business Map</h1>
+        <p class="text-slate-500 text-sm">Explore businesses near you on the interactive map</p>
+    </div>
+</div>
 
-<div id="map" class="rounded-xl overflow-hidden border border-white/10" style="height: 600px;"></div>
-
-<div class="mt-6 text-sm text-slate-500">
-    Showing {{ $businesses->count() }} businesses with location data
+<div class="max-w-6xl mx-auto px-4 py-6">
+    <div id="map" class="rounded-xl overflow-hidden border border-slate-200" style="height: 600px;"></div>
+    <p class="mt-4 text-sm text-slate-500">Showing {{ $businesses->count() }} businesses with location data</p>
 </div>
 @endsection
 
@@ -43,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!b.lat || !b.lng) return;
         const marker = L.marker([b.lat, b.lng]).addTo(map);
         marker.bindPopup(
-            '<a href="/business/' + b.slug + '" style="color:#3b82f6;font-weight:600;text-decoration:none;">' + b.name + '</a>' +
+            '<a href="/business/' + b.slug + '" style="color:#0d9488;font-weight:600;text-decoration:none;">' + b.name + '</a>' +
             (b.category ? '<br><span style="font-size:12px;color:#94a3b8;">' + b.category + '</span>' : '') +
             (b.address ? '<br><span style="font-size:12px;color:#64748b;">' + b.address + '</span>' : '')
         );
