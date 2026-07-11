@@ -206,7 +206,54 @@
                                 <div>📞 {{ $item->data['phone'] }}</div>
                             @endif
                             @if(!empty($item->data['category']))
-                                <div>📂 {{ $item->data['category'] }}</div>
+                                @php
+                                    $catDisplay = $item->data['category'];
+                                    $nameLower = strtolower($item->data['name'] ?? '');
+                                    // Show subcategory name when category is generic
+                                    if ($catDisplay === 'Healthcare') {
+                                        if (str_contains($nameLower, 'pharmacy') || str_contains($nameLower, 'pharma') || str_contains($nameLower, 'medical store') || str_contains($nameLower, 'drugstore') || str_contains($nameLower, 'medico') || str_contains($nameLower, 'chemist')) {
+                                            $catDisplay = 'Pharmacies';
+                                        } elseif (str_contains($nameLower, 'hospital')) {
+                                            $catDisplay = 'Hospitals';
+                                        } elseif (str_contains($nameLower, 'clinic')) {
+                                            $catDisplay = 'Clinics';
+                                        } elseif (str_contains($nameLower, 'dental') || str_contains($nameLower, 'dentist')) {
+                                            $catDisplay = 'Dental';
+                                        } elseif (str_contains($nameLower, 'diagnostic') || str_contains($nameLower, 'lab')) {
+                                            $catDisplay = 'Diagnostic Lab';
+                                        }
+                                    } elseif ($catDisplay === 'Hotels & Lodges') {
+                                        if (str_contains($nameLower, 'resort')) $catDisplay = 'Resorts';
+                                        elseif (str_contains($nameLower, 'guest house') || str_contains($nameLower, 'guesthouse')) $catDisplay = 'Guest Houses';
+                                        elseif (str_contains($nameLower, 'homestay') || str_contains($nameLower, 'home stay')) $catDisplay = 'Homestays';
+                                        else $catDisplay = 'Hotels';
+                                    } elseif ($catDisplay === 'Sports & Fitness') {
+                                        if (str_contains($nameLower, 'football') || str_contains($nameLower, 'turf')) $catDisplay = 'Football Turf';
+                                        elseif (str_contains($nameLower, 'swimming') || str_contains($nameLower, 'pool')) $catDisplay = 'Swimming Pool';
+                                        elseif (str_contains($nameLower, 'gym') || str_contains($nameLower, 'fitness')) $catDisplay = 'Gyms';
+                                        elseif (str_contains($nameLower, 'picnic') || str_contains($nameLower, 'amusement')) $catDisplay = 'Picnic Spot';
+                                    } elseif ($catDisplay === 'Food & Restaurants') {
+                                        if (str_contains($nameLower, 'cafe') || str_contains($nameLower, 'coffee')) $catDisplay = 'Cafes';
+                                        elseif (str_contains($nameLower, 'bakery') || str_contains($nameLower, 'bread') || str_contains($nameLower, 'cake')) $catDisplay = 'Bakeries';
+                                        elseif (str_contains($nameLower, 'fast food') || str_contains($nameLower, 'burger') || str_contains($nameLower, 'pizza')) $catDisplay = 'Fast Food';
+                                        else $catDisplay = 'Restaurants';
+                                    } elseif ($catDisplay === 'Shopping & Retail') {
+                                        if (str_contains($nameLower, 'mall') || str_contains($nameLower, 'shopping')) $catDisplay = 'Shopping Mall';
+                                        elseif (str_contains($nameLower, 'grocery') || str_contains($nameLower, 'kirana')) $catDisplay = 'Grocery Stores';
+                                        elseif (str_contains($nameLower, 'hardware') || str_contains($nameLower, 'paint')) $catDisplay = 'Hardware Stores';
+                                        elseif (str_contains($nameLower, 'stationery') || str_contains($nameLower, 'book')) $catDisplay = 'Stationery';
+                                        else $catDisplay = 'Shops';
+                                    } elseif ($catDisplay === 'Electronics & Tech') {
+                                        if (str_contains($nameLower, 'mobile') || str_contains($nameLower, 'phone')) $catDisplay = 'Mobile Shops';
+                                        elseif (str_contains($nameLower, 'computer') || str_contains($nameLower, 'laptop') || str_contains($nameLower, 'pc')) $catDisplay = 'Computer Stores';
+                                        else $catDisplay = 'Electronics Store';
+                                    } elseif ($catDisplay === 'Education') {
+                                        if (str_contains($nameLower, 'college')) $catDisplay = 'Colleges';
+                                        elseif (str_contains($nameLower, 'tuition') || str_contains($nameLower, 'coaching')) $catDisplay = 'Tuition Centers';
+                                        else $catDisplay = 'Schools';
+                                    }
+                                @endphp
+                                <div>📂 {{ $catDisplay }}</div>
                             @endif
                             @if(!empty($item->data['website']))
                                 <div>🌐 {{ $item->data['website'] }}</div>
