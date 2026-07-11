@@ -1575,7 +1575,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         }
 
         if ($remaining > 0) {
-            return redirect()->route('import.review')->with('success', $message)->with('continue_approve', true);
+            return redirect()->route('admin.import.review')->with('success', $message)->with('continue_approve', true);
         }
 
         return back()->with('success', $message);
