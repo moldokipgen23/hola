@@ -1235,6 +1235,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         $categoryName = $data['category'] ?? $data['type'] ?? null;
         $categoryId = matchImportCategory($categoryName, $categories);
+        $subcategoryId = matchImportSubcategory($categoryName, $data['name'] ?? null, $categoryId);
 
         // Detect area
         $areaId = $data['area_id'] ?? null;
@@ -1253,11 +1254,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             $slug .= '-' . \Illuminate\Support\Str::random(5);
         }
 
-        \App\Models\Business::create([
-            'name' => $data['name'] ?? 'Unknown Business',
-            'slug' => $slug,
-            'category_id' => $categoryId,
-            'area_id' => $areaId,
+                \App\Models\Business::create([
+                    'name' => $data['name'] ?? 'Unknown Business',
+                    'slug' => $slug,
+                    'category_id' => $categoryId,
+                    'subcategory_id' => $subcategoryId,
+                    'area_id' => $areaId,
             'description' => $data['description'] ?? null,
             'address' => $data['address'] ?? $data['location'] ?? '',
             'locality' => $data['locality'] ?? null,
@@ -1496,6 +1498,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = matchImportCategory($categoryName, $categories);
+                $subcategoryId = matchImportSubcategory($categoryName, $data['name'] ?? null, $categoryId);
 
                 $areaId = $data['area_id'] ?? null;
                 if (!$areaId && !empty($data['latitude']) && !empty($data['longitude'])) {
@@ -1570,9 +1573,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         if ($skipped > 0) $message .= " Skipped {$skipped} duplicates.";
         if ($remaining > 0) $message .= " {$remaining} remaining.";
 
-        if ($approved > 0) {
-            \Illuminate\Support\Facades\Artisan::call('photos:download', ['--limit' => $approved]);
-        }
+        // Photos download runs in background via scheduler — skip here for speed
 
         return back()->with('success', $message);
     })->name('import.approve-all');
