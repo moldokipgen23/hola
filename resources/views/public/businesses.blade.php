@@ -33,7 +33,7 @@
             <div>
                 <select name="area" class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-300">
                     <option value="">All Areas</option>
-                    @foreach(\App\Models\Area::active()->where('slug', '!=', 'other')->where('business_count', '>', 0)->orderBy('name')->get() as $area)
+                    @foreach(\App\Models\Area::active()->where('slug', '!=', 'other')->withCount('businesses')->where('businesses_count', '>', 0)->orderBy('name')->get() as $area)
                         <option value="{{ $area->slug }}" {{ request('area') == $area->slug ? 'selected' : '' }}>{{ $area->name }}</option>
                     @endforeach
                 </select>

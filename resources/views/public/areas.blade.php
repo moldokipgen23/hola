@@ -21,7 +21,7 @@
                     </div>
                     <div>
                         <h2 class="text-base font-semibold text-slate-900">{{ $area->name }}</h2>
-                        <p class="text-sm text-slate-500">{{ $area->business_count }} {{ Str::plural('business', $area->business_count) }}</p>
+                        <p class="text-sm text-slate-500">{{ $area->businesses_count }} {{ Str::plural('business', $area->businesses_count) }}</p>
                     </div>
                 </div>
             </a>

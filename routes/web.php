@@ -54,7 +54,7 @@ Route::get('/categories', function () {
 })->name('public.categories');
 
 Route::get('/areas', function () {
-    $areas = \App\Models\Area::active()->where('slug', '!=', 'other')->orderBy('business_count', 'desc')->get();
+    $areas = \App\Models\Area::active()->where('slug', '!=', 'other')->withCount('businesses')->orderByDesc('businesses_count')->get();
     return view('public.areas', compact('areas'));
 })->name('public.areas');
 

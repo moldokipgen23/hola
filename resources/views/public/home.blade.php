@@ -40,11 +40,11 @@
         <div class="mt-6 flex flex-wrap justify-center gap-2">
             <span class="text-sm text-slate-400 mr-1">Popular:</span>
             @php
-                $areas = \App\Models\Area::active()->where('slug', '!=', 'other')->where('business_count', '>', 0)->orderBy('business_count', 'desc')->limit(4)->get();
+                $areas = \App\Models\Area::active()->where('slug', '!=', 'other')->withCount('businesses')->where('businesses_count', '>', 0)->orderByDesc('businesses_count')->limit(4)->get();
             @endphp
             @foreach($areas as $area)
                 <a href="/area/{{ $area->slug }}" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-sm text-slate-600 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors">
-                    {{ $area->name }} <span class="text-slate-400 text-xs">({{ $area->business_count }})</span>
+                    {{ $area->name }} <span class="text-slate-400 text-xs">({{ $area->businesses_count }})</span>
                 </a>
             @endforeach
         </div>
@@ -113,7 +113,7 @@
         </div>
 
         @php
-            $areasList = \App\Models\Area::active()->where('slug', '!=', 'other')->where('business_count', '>', 0)->orderBy('business_count', 'desc')->limit(6)->get();
+            $areasList = \App\Models\Area::active()->where('slug', '!=', 'other')->withCount('businesses')->where('businesses_count', '>', 0)->orderByDesc('businesses_count')->limit(6)->get();
         @endphp
 
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -125,7 +125,7 @@
                         </div>
                         <div>
                             <p class="text-sm font-semibold text-slate-800">{{ $area->name }}</p>
-                            <p class="text-xs text-slate-400">{{ $area->business_count }} {{ Str::plural('business', $area->business_count) }}</p>
+                            <p class="text-xs text-slate-400">{{ $area->businesses_count }} {{ Str::plural('business', $area->businesses_count) }}</p>
                         </div>
                     </div>
                 </a>
@@ -252,7 +252,7 @@
         @php
             $totalBiz = \App\Models\Business::active()->count();
             $totalCats = \App\Models\Category::active()->count();
-            $totalAreas = \App\Models\Area::active()->where('slug', '!=', 'other')->where('business_count', '>', 0)->count();
+            $totalAreas = \App\Models\Area::active()->where('slug', '!=', 'other')->withCount('businesses')->where('businesses_count', '>', 0)->count();
             $totalReviews = \App\Models\Review::count();
         @endphp
         <div class="stat-card rounded-xl border border-slate-100 p-5 text-center">
