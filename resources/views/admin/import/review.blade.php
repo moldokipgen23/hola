@@ -255,5 +255,13 @@ function bulkReject() {
     document.getElementById('bulk-form').action = '{{ route("admin.import.bulk-reject") }}';
     document.getElementById('bulk-form').submit();
 }
+
+@if(session('continue_approve'))
+setTimeout(function() {
+    if (confirm('Continuing to approve remaining items...')) {
+        document.querySelector('form[action="{{ route("admin.import.approve-all") }}"]')?.submit();
+    }
+}, 500);
+@endif
 </script>
 @endsection

@@ -1230,8 +1230,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('import.bulk-reject');
 
     Route::post('/import/approve-all', function () {
-        set_time_limit(120);
-        $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->get();
+        set_time_limit(90);
+        $batchSize = 10;
+        $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->limit($batchSize)->get();
         $approved = 0;
         $skipped = 0;
 
@@ -1239,26 +1240,20 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             try {
                 $data = $item->data;
 
-                // DUPLICATE CHECK
                 $existingBusiness = null;
 
-                // Check by external_id
                 if (!empty($item->external_id)) {
                     $existingBusiness = \App\Models\Business::withoutTrashed()->where('external_id', $item->external_id)->first();
                 }
 
-                // Check by name + address
                 if (!$existingBusiness && !empty($data['name'])) {
-                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name'], " \t\n\r\0\x0B,"))])->first();
+                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name']))])->first();
                     if ($existingBusiness && !empty($data['address'])) {
                         similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
-                        if ($percent < 50) {
-                            $existingBusiness = null;
-                        }
+                        if ($percent < 50) $existingBusiness = null;
                     }
                 }
 
-                // Check by phone
                 if (!$existingBusiness && !empty($data['phone'])) {
                     $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
                     $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
@@ -1278,7 +1273,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = matchImportCategory($categoryName, $categories);
 
-                // Detect area
                 $areaId = $data['area_id'] ?? null;
                 if (!$areaId && !empty($data['latitude']) && !empty($data['longitude'])) {
                     $area = \App\Models\Area::findByCoordinates($data['latitude'], $data['longitude']);
@@ -1289,9 +1283,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     if ($otherArea) $areaId = $otherArea->id;
                 }
 
-                $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business', " \t\n\r\0\x0B,"));
-                $existing = \App\Models\Business::withTrashed()->where('slug', $slug)->first();
-                if ($existing) {
+                $slug = \Illuminate\Support\Str::slug(trim($data['name'] ?? 'unknown-business'));
+                if (\App\Models\Business::withTrashed()->where('slug', $slug)->exists()) {
                     $slug .= '-' . \Illuminate\Support\Str::random(5);
                 }
 
@@ -1344,11 +1337,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             }
         }
 
+        $remaining = \App\Models\ImportItem::where('status', 'pending')->count();
         $message = "Approved {$approved} items.";
         if ($skipped > 0) $message .= " Skipped {$skipped} duplicates.";
+        if ($remaining > 0) $message .= " {$remaining} remaining.";
 
         if ($approved > 0) {
             \Illuminate\Support\Facades\Artisan::call('photos:download', ['--limit' => $approved]);
+        }
+
+        if ($remaining > 0) {
+            return redirect()->route('import.review')->with('success', $message)->with('continue_approve', true);
         }
 
         return back()->with('success', $message);
