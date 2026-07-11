@@ -293,7 +293,7 @@
 
         searchSpinner.classList.remove('hidden');
         searchTimeout = setTimeout(() => {
-            fetch(`/api/search?q=${encodeURIComponent(q)}&limit=8`)
+            fetch(`/api/instant-search?q=${encodeURIComponent(q)}&limit=8`)
                 .then(r => r.json())
                 .then(data => {
                     searchSpinner.classList.add('hidden');

@@ -57,8 +57,8 @@ Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/popular', [ProductController::class, 'popular']);
 Route::get('/products/{slug}', [ProductController::class, 'show']);
 
-// Public instant search
-Route::get('/search', function (\Illuminate\Http\Request $request) {
+// Public instant search (quick results for search dropdown)
+Route::get('/instant-search', function (\Illuminate\Http\Request $request) {
     $q = $request->input('q', '');
     $limit = min($request->input('limit', 8), 20);
 
