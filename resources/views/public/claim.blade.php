@@ -25,9 +25,8 @@
     @endif
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {{-- Form --}}
         <div class="md:col-span-2">
-            <form method="POST" action="{{ route('public.claim.submit', $business->id) }}" class="bg-white rounded-xl border border-slate-100 p-6">
+            <form method="POST" action="{{ route('public.claim.send-otp', $business->id) }}" class="bg-white rounded-xl border border-slate-100 p-6">
                 @csrf
                 <div class="space-y-4">
                     <div>
@@ -43,9 +42,10 @@
                         @error('email')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                        <input type="tel" name="phone" value="{{ old('phone') }}" required
+                        <label class="block text-sm font-medium text-slate-700 mb-1">WhatsApp Number (for verification)</label>
+                        <input type="tel" name="phone" value="{{ old('phone', $business->phone ?? '') }}" required placeholder="+91XXXXXXXXXX"
                             class="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100">
+                        <p class="text-xs text-slate-400 mt-1">We'll send a verification code here. Include country code (+91).</p>
                         @error('phone')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
                     <div>
@@ -64,19 +64,22 @@
                         <textarea name="message" rows="3" class="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-100" placeholder="Any additional details...">{{ old('message') }}</textarea>
                     </div>
                 </div>
-                <button type="submit" class="w-full mt-6 px-4 py-3 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors">Submit Claim Request</button>
+                <button type="submit" class="w-full mt-6 px-4 py-3 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors">Send Verification Code</button>
             </form>
         </div>
 
-        {{-- Sidebar --}}
         <div class="space-y-4">
             <div class="bg-slate-50 rounded-xl border border-slate-100 p-5">
-                <h3 class="text-sm font-semibold text-slate-900 mb-3">Claim Process</h3>
+                <h3 class="text-sm font-semibold text-slate-900 mb-3">How Verification Works</h3>
                 <div class="space-y-3 text-xs text-slate-500">
-                    <div class="flex gap-2"><span class="text-primary-500 font-bold">1</span> Submit your claim with proof of ownership</div>
-                    <div class="flex gap-2"><span class="text-primary-500 font-bold">2</span> Our team reviews within 24 hours</div>
-                    <div class="flex gap-2"><span class="text-primary-500 font-bold">3</span> Once approved, you can manage this listing</div>
+                    <div class="flex gap-2"><span class="text-primary-500 font-bold">1</span> Enter your details and WhatsApp number</div>
+                    <div class="flex gap-2"><span class="text-primary-500 font-bold">2</span> We send a 6-digit code via WhatsApp</div>
+                    <div class="flex gap-2"><span class="text-primary-500 font-bold">3</span> Enter the code to verify your identity</div>
+                    <div class="flex gap-2"><span class="text-primary-500 font-bold">4</span> Claim submitted for admin review</div>
                 </div>
+            </div>
+            <div class="bg-primary-50 rounded-xl border border-primary-100 p-5">
+                <p class="text-xs text-primary-700"><strong>Tip:</strong> If WhatsApp doesn't work, we'll send the code to your email instead.</p>
             </div>
             <a href="/business/{{ $business->slug }}" class="block text-center px-4 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:border-primary-300 transition">Back to {{ $business->name }}</a>
         </div>

@@ -98,7 +98,7 @@ Route::get('/claim/{id}', function ($id) {
     return view('public.claim', compact('business'));
 })->name('public.claim');
 
-Route::post('/claim/{id}', function ($id) {
+Route::post('/claim/{id}/send-otp', function ($id) {
     $business = \App\Models\Business::withoutTrashed()->findOrFail($id);
     $request = request()->validate([
         'name' => 'required|string|max:255',
@@ -108,12 +108,127 @@ Route::post('/claim/{id}', function ($id) {
         'message' => 'nullable|string|max:1000',
     ]);
 
-    $user = \App\Models\User::where('email', $request['email'])->first();
-    if (!$user) {
-        $user = \App\Models\User::create([
+    $otp = \App\Models\ClaimVerification::generateOtp();
+    $expiresAt = now()->addMinutes(10);
+
+    $normalizedPhone = str_replace([' ', '-', '(', ')'], '', $request['phone']);
+    if (!str_starts_with($normalizedPhone, '+')) {
+        $normalizedPhone = '+91' . $normalizedPhone;
+    }
+
+    \App\Models\ClaimVerification::create([
+        'business_id' => $id,
+        'phone' => $normalizedPhone,
+        'email' => $request['email'],
+        'otp' => $otp,
+        'channel' => 'whatsapp',
+        'expires_at' => $expiresAt,
+    ]);
+
+    session([
+        'claim_data' => [
+            'business_id' => $id,
             'name' => $request['name'],
             'email' => $request['email'],
-            'phone' => $request['phone'],
+            'phone' => $normalizedPhone,
+            'relation' => $request['relation'],
+            'message' => $request['message'] ?? '',
+        ],
+        'claim_otp_id' => null,
+    ]);
+
+    // Store otp_id in session for verification
+    $verification = \App\Models\ClaimVerification::where('business_id', $id)
+        ->where('email', $request['email'])
+        ->latest()
+        ->first();
+    session(['claim_otp_id' => $verification->id]);
+
+    // Send via WhatsApp (CallMeBot)
+    $sent = false;
+    try {
+        $message = "Your Hola verification code is: *{$otp}\n\nThis code expires in 10 minutes.\nDo not share this code with anyone.";
+        $response = \Illuminate\Support\Facades\Http::timeout(10)
+            ->post('https://api.callmebot.com/whatsapp.php', [
+                'phone' => $normalizedPhone,
+                'text' => $message,
+                'apikey' => config('services.callmebot.api_key', ''),
+            ]);
+        $sent = $response->successful();
+    } catch (\Exception $e) {
+        $sent = false;
+    }
+
+    // Fallback: send OTP via email
+    if (!$sent && !empty($request['email'])) {
+        try {
+            \Illuminate\Support\Facades\Mail::raw(
+                "Your Hola verification code is: {$otp}\n\nThis code expires in 10 minutes.",
+                function ($mail) use ($request, $otp) {
+                    $mail->to($request['email'])
+                        ->subject('Hola — Verification Code')
+                        ->from('noreply@hola.ehlom.com', 'Hola');
+                }
+            );
+            $sent = true;
+            // Update channel to email
+            $verification->update(['channel' => 'email']);
+        } catch (\Exception $e) {
+            $sent = false;
+        }
+    }
+
+    if ($sent) {
+        return redirect()->route('public.claim.verify', $id)
+            ->with('success', "Verification code sent to your " . ($verification->channel === 'whatsapp' ? 'WhatsApp' : 'email') . ".");
+    }
+
+    return back()->with('error', 'Failed to send verification code. Please try again.');
+})->name('public.claim.send-otp');
+
+Route::get('/claim/{id}/verify', function ($id) {
+    $business = \App\Models\Business::withoutTrashed()->findOrFail($id);
+    $claimData = session('claim_data');
+
+    if (!$claimData || $claimData['business_id'] != $id) {
+        return redirect()->route('public.claim', $id)
+            ->with('error', 'Session expired. Please start again.');
+    }
+
+    return view('public.claim-verify', compact('business'));
+})->name('public.claim.verify');
+
+Route::post('/claim/{id}/verify', function ($id) {
+    $business = \App\Models\Business::withoutTrashed()->findOrFail($id);
+    $claimData = session('claim_data');
+    $otpId = session('claim_otp_id');
+
+    if (!$claimData || $claimData['business_id'] != $id || !$otpId) {
+        return redirect()->route('public.claim', $id)
+            ->with('error', 'Session expired. Please start again.');
+    }
+
+    $request = request()->validate([
+        'otp' => 'required|string|size:6',
+    ]);
+
+    $verification = \App\Models\ClaimVerification::findOrFail($otpId);
+
+    if ($verification->isExpired()) {
+        return back()->with('error', 'Code expired. Please request a new one.');
+    }
+
+    if (!$verification->verify($request['otp'])) {
+        return back()->with('error', 'Invalid code. Please try again.');
+    }
+
+    // Create user if not exists
+    $user = \App\Models\User::where('email', $claimData['email'])->first();
+    if (!$user) {
+        $user = \App\Models\User::create([
+            'name' => $claimData['name'],
+            'email' => $claimData['email'],
+            'phone' => $claimData['phone'],
             'password' => bcrypt('password'),
             'role' => 'customer',
         ]);
@@ -125,19 +240,78 @@ Route::post('/claim/{id}', function ($id) {
         ->first();
 
     if ($existingClaim) {
-        return back()->with('error', 'You already have a pending claim for this business.');
+        return redirect()->route('public.business', $business->slug)
+            ->with('error', 'You already have a pending claim for this business.');
     }
 
     \App\Models\ClaimRequest::create([
         'business_id' => $id,
         'user_id' => $user->id,
         'status' => 'pending',
-        'notes' => "Relation: {$request['relation']}. " . ($request['message'] ?? ''),
+        'notes' => "Relation: {$claimData['relation']}. Verified via OTP. " . ($claimData['message'] ?? ''),
     ]);
 
+    session()->forget(['claim_data', 'claim_otp_id']);
+
     return redirect()->route('public.business', $business->slug)
-        ->with('success', 'Claim submitted! We will review it within 24 hours.');
-})->name('public.claim.submit');
+        ->with('success', 'Identity verified! Claim submitted. We will review it within 24 hours.');
+})->name('public.claim.verify.submit');
+
+Route::post('/claim/{id}/resend-otp', function ($id) {
+    $verification = \App\Models\ClaimVerification::where('business_id', $id)
+        ->latest()
+        ->first();
+
+    if (!$verification) {
+        return back()->with('error', 'No verification found. Please start again.');
+    }
+
+    $otp = \App\Models\ClaimVerification::generateOtp();
+    $verification->update([
+        'otp' => $otp,
+        'expires_at' => now()->addMinutes(10),
+        'verified' => false,
+    ]);
+
+    $sent = false;
+    if ($verification->channel === 'whatsapp') {
+        try {
+            $message = "Your Hola verification code is: *{$otp}\n\nThis code expires in 10 minutes.";
+            $response = \Illuminate\Support\Facades\Http::timeout(10)
+                ->post('https://api.callmebot.com/whatsapp.php', [
+                    'phone' => $verification->phone,
+                    'text' => $message,
+                    'apikey' => config('services.callmebot.api_key', ''),
+                ]);
+            $sent = $response->successful();
+        } catch (\Exception $e) {
+            $sent = false;
+        }
+    }
+
+    if (!$sent) {
+        try {
+            \Illuminate\Support\Facades\Mail::raw(
+                "Your Hola verification code is: {$otp}\n\nThis code expires in 10 minutes.",
+                function ($mail) use ($verification, $otp) {
+                    $mail->to($verification->email)
+                        ->subject('Hola — Verification Code')
+                        ->from('noreply@hola.ehlom.com', 'Hola');
+                }
+            );
+            $sent = true;
+            $verification->update(['channel' => 'email']);
+        } catch (\Exception $e) {
+            $sent = false;
+        }
+    }
+
+    if ($sent) {
+        return back()->with('success', 'New code sent.');
+    }
+
+    return back()->with('error', 'Failed to resend code.');
+})->name('public.claim.resend-otp');
 
 // Login redirect (for auth middleware)
 Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
