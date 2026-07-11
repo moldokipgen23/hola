@@ -34,15 +34,41 @@
         <div class="lg:col-span-2 space-y-6">
             {{-- Photo Gallery --}}
             @if(!empty($business->photos) && count($business->photos) > 0)
-                <div class="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                    <div class="h-64 md:h-80 bg-slate-100 relative" onclick="openLightbox(0)">
-                        <img src="{{ str_starts_with($business->photos[0], 'http') ? $business->photos[0] : asset($business->photos[0]) }}" alt="{{ $business->name }}" class="w-full h-full object-cover cursor-pointer">
-                        <span class="absolute bottom-3 right-3 px-2 py-1 rounded-lg bg-black/50 text-white text-xs">{{ count($business->photos) }} photos</span>
-                    </div>
-                    @if(count($business->photos) > 1)
-                        <div class="flex gap-2 p-3 overflow-x-auto">
+                <div class="bg-white rounded-xl border border-slate-100 overflow-hidden" x-data="photoGallery()">
+                    {{-- Main Carousel --}}
+                    <div class="relative h-64 md:h-80 bg-slate-100 overflow-hidden">
+                        <div class="flex transition-transform duration-300 h-full" :style="'transform: translateX(-' + (current * 100) + '%)'">
                             @foreach($business->photos as $i => $photo)
-                                <button onclick="openLightbox({{ $i }})" class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 {{ $i === 0 ? 'border-primary-500' : 'border-transparent' }} hover:border-primary-300 transition">
+                                <div class="w-full h-full flex-shrink-0 cursor-pointer" @click="openLightbox({{ $i }})">
+                                    <img src="{{ str_starts_with($photo, 'http') ? $photo : asset($photo) }}" alt="{{ $business->name }} photo {{ $i + 1 }}" class="w-full h-full object-cover" loading="{{ $i < 2 ? 'eager' : 'lazy' }}">
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- Arrow buttons --}}
+                        @if(count($business->photos) > 1)
+                            <button @click="prev()" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors backdrop-blur-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            <button @click="next()" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors backdrop-blur-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </button>
+                            {{-- Counter --}}
+                            <span class="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-black/50 text-white text-xs font-medium backdrop-blur-sm" x-text="(current + 1) + ' / {{ count($business->photos) }}'"></span>
+                        @endif
+                        {{-- Dot indicators --}}
+                        @if(count($business->photos) > 1 && count($business->photos) <= 15)
+                            <div class="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                                @foreach($business->photos as $i => $photo)
+                                    <button @click="current = {{ $i }}" class="w-2 h-2 rounded-full transition-all duration-300" :class="current === {{ $i }} ? 'bg-white w-5' : 'bg-white/50'"></button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                    {{-- Thumbnails --}}
+                    @if(count($business->photos) > 1)
+                        <div class="flex gap-2 p-3 overflow-x-auto scrollbar-hide">
+                            @foreach($business->photos as $i => $photo)
+                                <button @click="current = {{ $i }}" class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all duration-200" :class="current === {{ $i }} ? 'border-primary-500 opacity-100' : 'border-transparent opacity-60 hover:opacity-100'">
                                     <img src="{{ str_starts_with($photo, 'http') ? $photo : asset($photo) }}" alt="" class="w-full h-full object-cover" loading="lazy">
                                 </button>
                             @endforeach
@@ -388,6 +414,15 @@
 
 @push('scripts')
 <script>
+function photoGallery() {
+    return {
+        current: 0,
+        total: {{ count($business->photos ?? []) }},
+        next() { if (this.current < this.total - 1) this.current++; else this.current = 0; },
+        prev() { if (this.current > 0) this.current--; else this.current = this.total - 1; },
+    }
+}
+
 const photos = {!! json_encode(!empty($business->photos) ? collect($business->photos)->map(fn($p) => str_starts_with($p, 'http') ? $p : asset($p))->values()->toArray() : []) !!};
 let currentPhoto = 0;
 
