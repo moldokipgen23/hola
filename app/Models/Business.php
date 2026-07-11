@@ -47,6 +47,9 @@ class Business extends Model
         'whatsapp_count',
         'directions_count',
         'share_count',
+        'service_type',
+        'is_bookable',
+        'price_range',
         'last_synced_at',
         'created_by',
     ];
@@ -65,6 +68,8 @@ class Business extends Model
         'whatsapp_count' => 'integer',
         'directions_count' => 'integer',
         'share_count' => 'integer',
+        'is_bookable' => 'boolean',
+        'price_range' => 'integer',
         'average_rating' => 'float',
         'review_count' => 'integer',
     ];
@@ -111,6 +116,11 @@ class Business extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    public function services(): HasMany
+    {
+        return $this->hasMany(Service::class)->orderBy('sort_order');
     }
 
     public function savedByUsers(): HasMany

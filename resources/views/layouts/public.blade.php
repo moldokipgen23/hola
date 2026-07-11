@@ -38,6 +38,8 @@
         }
     </script>
 
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%233b82f6'/><stop offset='100%25' stop-color='%238b5cf6'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23g)'/><text x='50' y='68' font-family='Arial,sans-serif' font-size='55' font-weight='bold' fill='white' text-anchor='middle'>H</text></svg>">
+
     @yield('head')
 
     <style>
@@ -171,6 +173,16 @@
         }
     </script>
 
+    {{-- Back to Top --}}
+    <button id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" class="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full bg-primary-500 text-white shadow-lg hover:bg-primary-600 transition-all hidden">
+        <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+    </button>
+
     @yield('scripts')
+    <script>
+        window.addEventListener('scroll', () => {
+            document.getElementById('backToTop').classList.toggle('hidden', window.scrollY < 300);
+        });
+    </script>
 </body>
 </html>
