@@ -32,9 +32,17 @@ class AgentAutonomousRun extends Command
         $priority2 = [
             'grocery stores', 'mobile shops', 'beauty salons',
             'hardware stores', 'stationery shops', 'tailoring shops',
-            'photography studios', 'banks', 'tuition centers',
+            'photography studios', 'tuition centers', 'catering services',
         ];
-        $queries = array_merge($priority1, $priority2);
+        // Priority 3: Public/utility businesses (least frequent)
+        $priority3 = [
+            'banks', 'atm', 'post office', 'police station',
+            'fire station', 'community hall', 'churches', 'temples',
+            'mosques', 'government offices', 'petrol pumps',
+            'hospitals', 'clinics', 'diagnostic labs', 'blood banks',
+            'water supply', 'electricity office', 'telecom office',
+        ];
+        $queries = array_merge($priority1, $priority2, $priority3);
 
         $searchQueries = [];
         foreach ($queries as $query) {
