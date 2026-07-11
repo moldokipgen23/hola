@@ -1458,37 +1458,34 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('import.bulk-delete-duplicates');
 
     Route::post('/import/approve-all', function () {
-        set_time_limit(90);
-        $batchSize = 10;
-        $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->limit($batchSize)->get();
+        set_time_limit(300);
+        $items = \App\Models\ImportItem::where('status', 'pending')->with('batch')->get();
         $approved = 0;
         $skipped = 0;
+
+        // Pre-load categories and existing businesses for fast matching
+        $categories = \App\Models\Category::pluck('id', 'name')->toArray();
+        $existingPlaceIds = \App\Models\Business::withoutTrashed()->whereNotNull('external_id')->pluck('external_id')->toArray();
+        $existingNames = \App\Models\Business::withoutTrashed()->pluck('name')->map(fn($n) => strtolower($n))->toArray();
 
         foreach ($items as $item) {
             try {
                 $data = $item->data;
+                $placeId = $item->external_id;
+                $name = strtolower(trim($data['name'] ?? ''));
+                $cleanName = preg_replace('/\s*[-–,]\s*(churachandpur|lamka|manipur|india).*$/i', '', $name);
 
-                $existingBusiness = null;
-
-                if (!empty($item->external_id)) {
-                    $existingBusiness = \App\Models\Business::withoutTrashed()->where('external_id', $item->external_id)->first();
+                // Fast duplicate check using pre-loaded arrays
+                $isDuplicate = false;
+                if ($placeId && in_array($placeId, $existingPlaceIds)) {
+                    $isDuplicate = true;
+                }
+                if (!$isDuplicate && (in_array($name, $existingNames) || in_array($cleanName, $existingNames))) {
+                    $isDuplicate = true;
                 }
 
-                if (!$existingBusiness && !empty($data['name'])) {
-                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [strtolower(trim($data['name']))])->first();
-                    if ($existingBusiness && !empty($data['address'])) {
-                        similar_text(strtolower($existingBusiness->address), strtolower($data['address']), $percent);
-                        if ($percent < 50) $existingBusiness = null;
-                    }
-                }
-
-                if (!$existingBusiness && !empty($data['phone'])) {
-                    $normalizedPhone = str_replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-                    $existingBusiness = \App\Models\Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
-                }
-
-                if ($existingBusiness) {
-                    $item->update(['status' => 'rejected', 'notes' => "Duplicate: {$existingBusiness->name}"]);
+                if ($isDuplicate) {
+                    $item->update(['status' => 'rejected', 'notes' => 'Duplicate detected during approve-all']);
                     if ($item->batch) {
                         $item->batch->increment('rejected');
                         $item->batch->decrement('pending');
@@ -1497,7 +1494,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     continue;
                 }
 
-                $categories = \App\Models\Category::pluck('id', 'name')->toArray();
                 $categoryName = $data['category'] ?? $data['type'] ?? null;
                 $categoryId = matchImportCategory($categoryName, $categories);
 
@@ -1554,6 +1550,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     ]);
                 }
 
+                // Add to pre-loaded arrays to prevent duplicates within this batch
+                if ($placeId) $existingPlaceIds[] = $placeId;
+                $existingNames[] = $name;
+
                 $item->update(['status' => 'approved']);
                 if ($item->batch) {
                     $item->batch->increment('approved');
@@ -1572,10 +1572,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         if ($approved > 0) {
             \Illuminate\Support\Facades\Artisan::call('photos:download', ['--limit' => $approved]);
-        }
-
-        if ($remaining > 0) {
-            return redirect()->route('admin.import.review')->with('success', $message)->with('continue_approve', true);
         }
 
         return back()->with('success', $message);

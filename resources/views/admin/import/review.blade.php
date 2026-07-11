@@ -283,12 +283,11 @@ function bulkReject() {
     document.getElementById('bulk-form').submit();
 }
 
-@if(session('continue_approve'))
+@if(session('continue_approve') && session('success') && preg_match('/(\d+) remaining/', session('success'), $m) && $m[1] > 0)
+// Auto-continue silently — no dialog
 setTimeout(function() {
-    if (confirm('Continuing to approve remaining items...')) {
-        document.querySelector('form[action="{{ route("admin.import.approve-all") }}"]')?.submit();
-    }
-}, 500);
+    document.querySelector('form[action="{{ route("admin.import.approve-all") }}"]')?.submit();
+}, 200);
 @endif
 </script>
 @endsection
