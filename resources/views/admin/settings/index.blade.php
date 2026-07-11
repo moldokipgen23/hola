@@ -600,33 +600,18 @@
                         <div class="space-y-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                <input type="text" name="settings[template_claim_subject]" value="{{ $settings['template_claim_subject'] ?? 'Your business is on {site_name} - Claim it now!' }}" class="input-dark">
+                                @php $claimSubject = $settings['template_claim_subject'] ?? "Your business is on {site_name} - Claim it now!"; @endphp
+                                <input type="text" name="settings[template_claim_subject]" value="{{ $claimSubject }}" class="input-dark">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                <textarea name="settings[template_claim_body]" rows="5" class="input-dark font-mono text-xs">{{ $settings['template_claim_body'] ?? 'Hi! Your business "{business_name}" is listed on {site_name} - {district}'s #1 business directory.
-
-Claim your listing for FREE to:
-- Update your business info
-- Add photos & products
-- Respond to reviews
-- Get found by more customers
-
-Claim now: {claim_url}
-
-Questions? Reply to this message.' }}</textarea>
+                                @php $claimBody = $settings['template_claim_body'] ?? "Hi! Your business \"{business_name}\" is listed on {site_name} - {district}s #1 business directory.\n\nClaim your listing for FREE to:\n- Update your business info\n- Add photos & products\n- Respond to reviews\n- Get found by more customers\n\nClaim now: {claim_url}\n\nQuestions? Reply to this message."; @endphp
+                                <textarea name="settings[template_claim_body]" rows="5" class="input-dark font-mono text-xs">{{ $claimBody }}</textarea>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Telegram/WhatsApp Message</label>
-                                <textarea name="settings[template_claim_sms]" rows="5" class="input-dark font-mono text-xs">{{ $settings['template_claim_sms'] ?? 'Hi! Your business "{business_name}" is listed on {site_name} - {district}'s #1 business directory.
-
-Claim your listing for FREE to:
-- Update your business info
-- Add photos & products
-- Respond to reviews
-- Get found by more customers
-
-Claim now: {claim_url}' }}</textarea>
+                                @php $claimSms = $settings['template_claim_sms'] ?? "Hi! Your business \"{business_name}\" is listed on {site_name} - {district}s #1 business directory.\n\nClaim your listing for FREE to:\n- Update your business info\n- Add photos & products\n- Respond to reviews\n- Get found by more customers\n\nClaim now: {claim_url}"; @endphp
+                                <textarea name="settings[template_claim_sms]" rows="5" class="input-dark font-mono text-xs">{{ $claimSms }}</textarea>
                             </div>
                         </div>
                     </div>
