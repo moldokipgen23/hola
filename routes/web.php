@@ -93,6 +93,52 @@ Route::get('/business/{slug}', function ($slug) {
     return view('public.business', compact('business'));
 })->name('public.business');
 
+Route::get('/claim/{id}', function ($id) {
+    $business = \App\Models\Business::withoutTrashed()->findOrFail($id);
+    return view('public.claim', compact('business'));
+})->name('public.claim');
+
+Route::post('/claim/{id}', function ($id) {
+    $business = \App\Models\Business::withoutTrashed()->findOrFail($id);
+    $request = request()->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|max:255',
+        'phone' => 'required|string|max:20',
+        'relation' => 'required|string|max:100',
+        'message' => 'nullable|string|max:1000',
+    ]);
+
+    $user = \App\Models\User::where('email', $request['email'])->first();
+    if (!$user) {
+        $user = \App\Models\User::create([
+            'name' => $request['name'],
+            'email' => $request['email'],
+            'phone' => $request['phone'],
+            'password' => bcrypt('password'),
+            'role' => 'customer',
+        ]);
+    }
+
+    $existingClaim = \App\Models\ClaimRequest::where('business_id', $id)
+        ->where('user_id', $user->id)
+        ->where('status', 'pending')
+        ->first();
+
+    if ($existingClaim) {
+        return back()->with('error', 'You already have a pending claim for this business.');
+    }
+
+    \App\Models\ClaimRequest::create([
+        'business_id' => $id,
+        'user_id' => $user->id,
+        'status' => 'pending',
+        'notes' => "Relation: {$request['relation']}. " . ($request['message'] ?? ''),
+    ]);
+
+    return redirect()->route('public.business', $business->slug)
+        ->with('success', 'Claim submitted! We will review it within 24 hours.');
+})->name('public.claim.submit');
+
 // Login redirect (for auth middleware)
 Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
 
