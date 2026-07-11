@@ -1,46 +1,65 @@
 @extends('layouts.public')
 
-@section('title', $category->name . ' | ' . config('app.name', 'Hola'))
+@section('title', $category->name . ' | Hola - Churachandpur Directory')
 @section('description', "Browse {$category->name} businesses in Lamka, Churachandpur, Manipur, India")
 
 @section('content')
-<div class="text-sm text-slate-500 mb-4">
-    <a href="/" class="hover:text-white">Home</a>
-    <span class="mx-2">›</span>
-    <a href="/categories" class="hover:text-white">Categories</a>
-    <span class="mx-2">›</span>
-    <span class="text-white">{{ $category->name }}</span>
-</div>
-
-<h1 class="text-3xl font-bold text-white mb-2">{{ $category->name }}</h1>
-<p class="text-slate-400 mb-6">{{ $businesses->total() }} businesses</p>
-
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    @forelse($businesses as $business)
-        <a href="/business/{{ $business->slug }}" class="glass-card p-4 hover:border-blue-500/30 transition">
-            @if($business->photos && count($business->photos) > 0)
-                <div class="h-40 rounded-xl overflow-hidden mb-3 bg-slate-800">
-                    <img src="{{ str_starts_with($business->photos[0], 'http') ? $business->photos[0] : asset($business->photos[0]) }}" alt="{{ $business->name }}" class="w-full h-full object-cover" loading="lazy">
-                </div>
-            @endif
-            <h3 class="text-white font-semibold">{{ $business->name }}</h3>
-            <p class="text-slate-500 text-sm">{{ $business->address }}</p>
-            @if($business->average_rating)
-                <div class="flex items-center gap-1 mt-2">
-                    <span class="text-yellow-400">★</span>
-                    <span class="text-white text-sm">{{ $business->average_rating }}</span>
-                    <span class="text-slate-500 text-sm">({{ $business->review_count }})</span>
-                </div>
-            @endif
-        </a>
-    @empty
-        <div class="col-span-3 text-center py-12">
-            <p class="text-slate-500">No businesses in this category yet.</p>
+<div class="bg-white border-b border-slate-100">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="flex items-center gap-2 text-sm text-slate-400 mb-3">
+            <a href="/" class="hover:text-primary-600">Home</a>
+            <span>/</span>
+            <a href="/categories" class="hover:text-primary-600">Categories</a>
+            <span>/</span>
+            <span class="text-slate-600">{{ $category->name }}</span>
         </div>
-    @endforelse
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{{ $category->name }}</h1>
+        <p class="text-slate-500 text-sm">{{ $businesses->total() }} {{ Str::plural('business', $businesses->total()) }}</p>
+    </div>
 </div>
 
-<div class="mt-6">
-    {{ $businesses->links() }}
+<div class="max-w-6xl mx-auto px-4 py-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        @forelse($businesses as $biz)
+            <a href="/business/{{ $biz->slug }}" class="business-card bg-white rounded-xl border border-slate-100 overflow-hidden hover:border-primary-200">
+                <div class="h-44 bg-slate-100 relative overflow-hidden">
+                    @if(!empty($biz->photos) && is_array($biz->photos) && count($biz->photos) > 0)
+                        <img src="{{ str_starts_with($biz->photos[0], 'http') ? $biz->photos[0] : asset($biz->photos[0]) }}" alt="{{ $biz->name }}" class="w-full h-full object-cover" loading="lazy">
+                    @else
+                        <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50">
+                            <span class="text-4xl">📍</span>
+                        </div>
+                    @endif
+                    @if($biz->claim_status === 'claimed')
+                        <span class="absolute top-3 left-3 px-2 py-0.5 rounded-full bg-emerald-400 text-white text-xs font-semibold">Verified</span>
+                    @endif
+                </div>
+                <div class="p-4">
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <h3 class="text-sm font-semibold text-slate-900 truncate">{{ $biz->name }}</h3>
+                        @if($biz->average_rating > 0)
+                            <span class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold whitespace-nowrap">
+                                ★ {{ number_format($biz->average_rating, 1) }}
+                            </span>
+                        @endif
+                    </div>
+                    <p class="text-xs text-slate-400 truncate mt-2">📍 {{ $biz->address ?: 'Churachandpur' }}</p>
+                    @if($biz->phone)
+                        <p class="text-xs text-slate-400 truncate mt-0.5">📞 {{ $biz->phone }}</p>
+                    @endif
+                </div>
+            </a>
+        @empty
+            <div class="col-span-full text-center py-16">
+                <p class="text-4xl mb-3">📍</p>
+                <p class="text-slate-500 text-lg font-medium">No businesses in this category yet</p>
+                <a href="/categories" class="inline-block mt-4 px-4 py-2 rounded-lg bg-primary-50 text-primary-600 text-sm font-medium hover:bg-primary-100">Browse Categories</a>
+            </div>
+        @endforelse
+    </div>
+
+    <div class="mt-8">
+        {{ $businesses->links() }}
+    </div>
 </div>
 @endsection
