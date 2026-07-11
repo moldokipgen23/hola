@@ -1,24 +1,53 @@
 @extends('layouts.public')
 
-@section('title', 'Categories | ' . config('app.name', 'Hola'))
-@section('description', 'Browse all business categories in Lamka, Churachandpur, Manipur, India')
+@section('title', 'All Categories | Hola - Churachandpur Directory')
+@section('description', 'Browse all business categories in Churachandpur, Manipur')
 
 @section('content')
-<h1 class="text-3xl font-bold text-white mb-6">Categories</h1>
+<div class="bg-white border-b border-slate-100">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mb-2">All Categories</h1>
+        <p class="text-slate-500 text-sm">Browse businesses by category</p>
+    </div>
+</div>
 
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    @foreach(\App\Models\Category::withCount('businesses')->orderBy('name')->get() as $category)
-        <a href="/category/{{ $category->slug }}" class="glass-card p-6 text-center hover:border-blue-500/30 transition">
-            <div class="text-4xl mb-3">
-                @if($category->image)
-                    <img src="{{ asset($category->image) }}" alt="{{ $category->name }}" class="w-10 h-10 mx-auto object-contain">
-                @else
-                    {{ $category->icon ?? '📂' }}
-                @endif
-            </div>
-            <h3 class="text-white font-semibold mb-1">{{ $category->name }}</h3>
-            <p class="text-slate-500 text-sm">{{ $category->businesses_count }} businesses</p>
-        </a>
-    @endforeach
+<div class="max-w-6xl mx-auto px-4 py-8">
+    @php
+        $categories = \App\Models\Category::active()->withCount('businesses')->orderByDesc('businesses_count')->get();
+        $categoryIcons = [
+            'food' => '🍽️', 'restaurant' => '🍽️', 'restaurants' => '🍽️',
+            'healthcare' => '🏥', 'hospital' => '🏥', 'clinic' => '🏥', 'pharmacy' => '💊',
+            'shopping' => '🛍️', 'store' => '🛍️', 'shops' => '🛍️',
+            'hotel' => '🏨', 'hotels' => '🏨', 'lodge' => '🏨',
+            'electronics' => '📱', 'mobile' => '📱',
+            'beauty' => '💇', 'salon' => '💇', 'spa' => '💇',
+            'bank' => '🏦', 'banks' => '🏦', 'finance' => '🏦',
+            'education' => '🏫', 'school' => '🏫', 'college' => '🏫',
+            'automotive' => '🚗', 'garage' => '🚗',
+            'sports' => '⚽', 'gym' => '💪', 'fitness' => '💪',
+            'professional' => '💼', 'office' => '💼',
+            'church' => '⛪', 'churches' => '⛪', 'worship' => '⛪',
+            'preschool' => '🧒', 'nursery' => '🧒',
+            'services' => '🔧', 'repair' => '🔧',
+            'general' => '📦',
+        ];
+        $defaultIcon = '📍';
+    @endphp
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        @foreach($categories as $cat)
+            @php
+                $icon = $defaultIcon;
+                foreach($categoryIcons as $key => $emoji) {
+                    if(stripos($cat->name, $key) !== false) { $icon = $emoji; break; }
+                }
+            @endphp
+            <a href="/category/{{ $cat->slug }}" class="category-card bg-white rounded-xl border border-slate-100 p-6 text-center hover:border-primary-200">
+                <div class="text-4xl mb-3">{{ $icon }}</div>
+                <h2 class="text-sm font-semibold text-slate-900">{{ $cat->name }}</h2>
+                <p class="text-xs text-slate-400 mt-1">{{ $cat->businesses_count }} {{ Str::plural('business', $cat->businesses_count) }}</p>
+            </a>
+        @endforeach
+    </div>
 </div>
 @endsection

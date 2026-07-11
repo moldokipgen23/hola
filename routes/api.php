@@ -57,6 +57,48 @@ Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/popular', [ProductController::class, 'popular']);
 Route::get('/products/{slug}', [ProductController::class, 'show']);
 
+// Public instant search
+Route::get('/search', function (\Illuminate\Http\Request $request) {
+    $q = $request->input('q', '');
+    $limit = min($request->input('limit', 8), 20);
+
+    if (strlen($q) < 2) {
+        return response()->json(['results' => []]);
+    }
+
+    $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $q) . '%';
+
+    $businesses = \App\Models\Business::active()
+        ->with('category:id,name,slug', 'area:id,name,slug')
+        ->where(function ($query) use ($safe) {
+            $query->where('name', 'like', $safe)
+                  ->orWhere('address', 'like', $safe)
+                  ->orWhere('description', 'like', $safe);
+        })
+        ->orderByDesc('average_rating')
+        ->limit($limit)
+        ->get()
+        ->map(function ($b) {
+            $photo = null;
+            if (!empty($b->photos) && is_array($b->photos) && count($b->photos) > 0) {
+                $p = $b->photos[0];
+                $photo = str_starts_with($p, 'http') ? $p : asset($p);
+            }
+            return [
+                'id' => $b->id,
+                'name' => $b->name,
+                'slug' => $b->slug,
+                'address' => $b->address,
+                'rating' => $b->average_rating > 0 ? number_format($b->average_rating, 1) : null,
+                'category' => $b->category->name ?? null,
+                'area' => $b->area->name ?? null,
+                'photo' => $photo,
+            ];
+        });
+
+    return response()->json(['results' => $businesses]);
+});
+
 Route::get('/search', [SearchController::class, 'search']);
 Route::get('/search/suggestions', [SearchController::class, 'suggestions']);
 

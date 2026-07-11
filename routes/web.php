@@ -19,9 +19,9 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/businesses', function () {
-    $query = \App\Models\Business::where('is_active', true)->with('category');
+    $query = \App\Models\Business::where('is_active', true)->with('category', 'area');
 
-    if ($search = request('search')) {
+    if ($search = request('q') ?: request('search')) {
         $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
         $query->where(function ($q) use ($safe) {
             $q->where('name', 'like', $safe)
@@ -34,13 +34,41 @@ Route::get('/businesses', function () {
         $query->whereHas('category', fn($q) => $q->where('slug', $category));
     }
 
-    $businesses = $query->latest()->paginate(12)->withQueryString();
+    if ($area = request('area')) {
+        $query->whereHas('area', fn($q) => $q->where('slug', $area));
+    }
+
+    $sort = request('sort', 'latest');
+    $query = match($sort) {
+        'rating' => $query->orderByDesc('average_rating'),
+        'name' => $query->orderBy('name'),
+        default => $query->latest(),
+    };
+
+    $businesses = $query->paginate(12)->withQueryString();
     return view('public.businesses', compact('businesses'));
 })->name('public.businesses');
 
 Route::get('/categories', function () {
     return view('public.categories');
 })->name('public.categories');
+
+Route::get('/areas', function () {
+    $areas = \App\Models\Area::active()->where('slug', '!=', 'other')->orderBy('business_count', 'desc')->get();
+    return view('public.areas', compact('areas'));
+})->name('public.areas');
+
+Route::get('/area/{slug}', function ($slug) {
+    $area = \App\Models\Area::where('slug', $slug)->firstOrFail();
+    $query = $area->businesses()->active()->with('category');
+
+    if ($category = request('category')) {
+        $query->whereHas('category', fn($q) => $q->where('slug', $category));
+    }
+
+    $businesses = $query->latest()->paginate(12)->withQueryString();
+    return view('public.area', compact('area', 'businesses'));
+})->name('public.area');
 
 Route::get('/map', function () {
     $businesses = \Illuminate\Support\Facades\Cache::remember('map_businesses', 300, function () {
