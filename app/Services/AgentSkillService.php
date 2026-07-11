@@ -239,6 +239,8 @@ class AgentSkillService
         // Pre-load existing ACTIVE businesses for duplicate detection (exclude soft-deleted)
         $existingPlaceIds = Business::withoutTrashed()->whereNotNull('external_id')->pluck('external_id')->toArray();
         $existingNames = Business::withoutTrashed()->pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+        // Also pre-load cleaned names (without city suffix) for faster matching
+        $existingCleanedNames = array_map(fn($n) => preg_replace('/\s*[-–,]\s*(churachandpur|lamka|manipur|india).*$/i', '', $n), $existingNames);
 
         foreach ($places as $place) {
             $placeId = $place['place_id'] ?? null;
@@ -272,24 +274,31 @@ class AgentSkillService
                 $duplicateReason = "You already imported this business" . ($importedRecord ? " on {$importedRecord->imported_at->format('M d, Y')}" : '');
             }
 
-            // DUPLICATE CHECK 2: Same name+address combination
+            // DUPLICATE CHECK 2: Same name (exact or close match) — fast in-memory check first
             $normalizedName = Str::lower(trim($name));
             $normalizedAddress = Str::lower(trim($address));
-            if (!$isDuplicate && in_array($normalizedName, $existingNames)) {
-                $existingWithSameName = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [$normalizedName])->first();
-                if ($existingWithSameName && Str::contains(Str::lower($existingWithSameName->address), substr($normalizedAddress, 0, 10))) {
-                    $isDuplicate = true;
-                    $duplicateReason = "Name matches existing business: {$existingWithSameName->name}";
-                }
+            // Strip common suffixes like city names for comparison
+            $cleanName = preg_replace('/\s*[-–,]\s*(churachandpur|lamka|manipur|india).*$/i', '', $normalizedName);
+            
+            if (!$isDuplicate && (in_array($normalizedName, $existingNames) || in_array($cleanName, $existingCleanedNames))) {
+                $isDuplicate = true;
+                $duplicateReason = "Name matches existing business";
             }
 
             // DUPLICATE CHECK 2b: This agent imported a business with this name (census memory)
-            if (!$isDuplicate && in_array($normalizedName, $agentImportedNames)) {
-                $importedByName = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
-                    ->whereRaw('LOWER(business_name) = ?', [$normalizedName])->first();
-                if ($importedByName) {
-                    $isDuplicate = true;
-                    $duplicateReason = "You already imported \"{$importedByName->business_name}\"" . ($importedByName->imported_at ? " on {$importedByName->imported_at->format('M d, Y')}" : '');
+            if (!$isDuplicate && (in_array($normalizedName, $agentImportedNames) || in_array($cleanName, $agentImportedNames))) {
+                $isDuplicate = true;
+                $duplicateReason = "You already imported this business";
+            }
+
+            // DUPLICATE CHECK 2c: Fuzzy match — name contains or is contained in existing name (min 5 chars)
+            if (!$isDuplicate && strlen($cleanName) >= 5) {
+                foreach ($existingCleanedNames as $existingName) {
+                    if (strlen($existingName) >= 5 && ($existingName === $cleanName || Str::contains($existingName, $cleanName) || Str::contains($cleanName, $existingName))) {
+                        $isDuplicate = true;
+                        $duplicateReason = "Similar name matches existing business";
+                        break;
+                    }
                 }
             }
 
