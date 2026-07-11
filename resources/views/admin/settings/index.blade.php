@@ -625,19 +625,13 @@
                         <div class="space-y-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                <input type="text" name="settings[template_approved_subject]" value="{{ $settings['template_approved_subject'] ?? 'Your business claim has been approved!' }}" class="input-dark">
+                                @php $approvedSubject = $settings['template_approved_subject'] ?? "Your business claim has been approved!"; @endphp
+                                <input type="text" name="settings[template_approved_subject]" value="{{ $approvedSubject }}" class="input-dark">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                <textarea name="settings[template_approved_body]" rows="4" class="input-dark font-mono text-xs">{{ $settings['template_approved_body'] ?? 'Great news! Your claim for "{business_name}" has been approved.
-
-You can now:
-- Edit your business details
-- Upload photos
-- Add products for sale
-- Respond to reviews
-
-Log in to get started: {claim_url}' }}</textarea>
+                                @php $approvedBody = $settings['template_approved_body'] ?? "Great news! Your claim for \"{business_name}\" has been approved.\n\nYou can now:\n- Edit your business details\n- Upload photos\n- Add products for sale\n- Respond to reviews\n\nLog in to get started: {claim_url}"; @endphp
+                                <textarea name="settings[template_approved_body]" rows="4" class="input-dark font-mono text-xs">{{ $approvedBody }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -651,15 +645,13 @@ Log in to get started: {claim_url}' }}</textarea>
                         <div class="space-y-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                <input type="text" name="settings[template_rejected_subject]" value="{{ $settings['template_rejected_subject'] ?? 'Update on your business claim' }}" class="input-dark">
+                                @php $rejectedSubject = $settings['template_rejected_subject'] ?? "Update on your business claim"; @endphp
+                                <input type="text" name="settings[template_rejected_subject]" value="{{ $rejectedSubject }}" class="input-dark">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                <textarea name="settings[template_rejected_body]" rows="4" class="input-dark font-mono text-xs">{{ $settings['template_rejected_body'] ?? 'Unfortunately, your claim for "{business_name}" could not be verified at this time.
-
-If you believe this is an error, please contact us or try again with valid proof of ownership.
-
-Thank you for your interest in {site_name}.' }}</textarea>
+                                @php $rejectedBody = $settings['template_rejected_body'] ?? "Unfortunately, your claim for \"{business_name}\" could not be verified at this time.\n\nIf you believe this is an error, please contact us or try again with valid proof of ownership.\n\nThank you for your interest in {site_name}."; @endphp
+                                <textarea name="settings[template_rejected_body]" rows="4" class="input-dark font-mono text-xs">{{ $rejectedBody }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -673,15 +665,13 @@ Thank you for your interest in {site_name}.' }}</textarea>
                         <div class="space-y-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                <input type="text" name="settings[template_review_subject]" value="{{ $settings['template_review_subject'] ?? 'How is your experience with {site_name}?' }}" class="input-dark">
+                                @php $reviewSubject = $settings['template_review_subject'] ?? "How is your experience with {site_name}?"; @endphp
+                                <input type="text" name="settings[template_review_subject]" value="{{ $reviewSubject }}" class="input-dark">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                <textarea name="settings[template_review_body]" rows="3" class="input-dark font-mono text-xs">{{ $settings['template_review_body'] ?? 'Hi! You claimed "{business_name}" on {site_name} 7 days ago.
-
-How has it been? We'd love to hear your feedback to improve the platform.
-
-Your feedback helps us serve Churachandpur better!' }}</textarea>
+                                @php $reviewBody = $settings['template_review_body'] ?? "Hi! You claimed \"{business_name}\" on {site_name} 7 days ago.\n\nHow has it been? We would love to hear your feedback to improve the platform.\n\nYour feedback helps us serve Churachandpur better!"; @endphp
+                                <textarea name="settings[template_review_body]" rows="3" class="input-dark font-mono text-xs">{{ $reviewBody }}</textarea>
                             </div>
                         </div>
                     </div>
