@@ -21,12 +21,20 @@ class AgentAutonomousRun extends Command
         $zipcodes = array_map('trim', explode(',', \App\Models\Setting::get('search_zipcodes', '795128')));
         $areas = array_map('trim', explode(',', \App\Models\Setting::get('search_areas', 'Lamka')));
 
-        $queries = [
-            'restaurants', 'schools', 'pharmacies', 'hotels', 'shops',
-            'clinics', 'banks', 'beauty salons', 'grocery stores',
-            'mobile shops', 'churches', 'tuition centers', 'hardware stores',
-            'tailoring shops', 'photography studios', 'stationery shops',
+        // Priority 1: Core businesses (rotated frequently)
+        $priority1 = [
+            'restaurants', 'schools', 'pharmacies', 'hotels',
+            'computer shops', 'electronics shops', 'shopping malls',
+            'football turf', 'swimming pool', 'resorts',
+            'hospitals', 'clinics', 'picnic spots',
         ];
+        // Priority 2: Supporting businesses (less frequent)
+        $priority2 = [
+            'grocery stores', 'mobile shops', 'beauty salons',
+            'hardware stores', 'stationery shops', 'tailoring shops',
+            'photography studios', 'banks', 'tuition centers',
+        ];
+        $queries = array_merge($priority1, $priority2);
 
         $searchQueries = [];
         foreach ($queries as $query) {
