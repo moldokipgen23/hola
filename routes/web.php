@@ -1181,11 +1181,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     Route::get('/import/review', function () {
         $status = request('status', 'pending');
-        $query = \App\Models\ImportItem::whereIn('status', [$status, 'duplicate'])->with('batch:id,name,source');
-        if (request('batch_id')) $query->where('batch_id', request('batch_id'));
-        if ($status === 'all') {
-            $query->whereIn('status', ['pending', 'duplicate']);
+        if ($status === 'duplicates') {
+            $query = \App\Models\ImportItem::where('status', 'duplicate')->with('batch:id,name,source');
+        } elseif ($status === 'all') {
+            $query = \App\Models\ImportItem::whereIn('status', ['pending', 'duplicate'])->with('batch:id,name,source');
+        } else {
+            $query = \App\Models\ImportItem::where('status', 'pending')->with('batch:id,name,source');
         }
+        if (request('batch_id')) $query->where('batch_id', request('batch_id'));
         $items = $query->latest()->paginate(20);
         return view('admin.import.review', compact('items', 'status'));
     })->name('import.review');
@@ -1448,6 +1451,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         }
         return back()->with('success', count($ids) . ' items rejected.');
     })->name('import.bulk-reject');
+
+    Route::post('/import/bulk-delete-duplicates', function () {
+        $deleted = \App\Models\ImportItem::where('status', 'duplicate')->delete();
+        return back()->with('success', "Deleted {$deleted} duplicate items.");
+    })->name('import.bulk-delete-duplicates');
 
     Route::post('/import/approve-all', function () {
         set_time_limit(90);

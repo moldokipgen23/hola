@@ -440,24 +440,27 @@ class AgentSkillService
             if (count($photoUrls) > 0) $confidence += 0.1;
             $confidence = min($confidence, 1.0);
 
+            // Skip duplicates entirely — don't add to queue
+            if ($isDuplicate) {
+                $duplicates++;
+                // Track for future duplicate detection
+                if ($placeId) $existingPlaceIds[] = $placeId;
+                $existingNames[] = $normalizedName;
+                continue;
+            }
+
             ImportItem::create([
                 'batch_id' => $batch->id,
                 'data' => $placeData,
                 'external_id' => $placeId,
                 'confidence' => $confidence,
-                'status' => $isDuplicate ? 'duplicate' : 'pending',
-                'notes' => $isDuplicate ? $duplicateReason : null,
+                'status' => 'pending',
             ]);
 
             // Track for future duplicate detection
             if ($placeId) $existingPlaceIds[] = $placeId;
             $existingNames[] = $normalizedName;
-
-            if ($isDuplicate) {
-                $duplicates++;
-            } else {
-                $imported++;
-            }
+            $imported++;
         }
 
         $batch->update([

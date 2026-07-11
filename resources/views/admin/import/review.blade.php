@@ -11,19 +11,46 @@
 @endphp
 
 @section('content')
-<div class="mb-6 flex items-center justify-between">
-    <p class="text-slate-400">{{ $items->total() }} items {{ $status === 'duplicate' ? 'flagged as duplicates' : 'pending review' }}</p>
-    @if($items->count() > 0)
+<div class="mb-6">
+    {{-- Tabs --}}
+    <div class="flex items-center gap-1 mb-4 border-b border-white/10">
+        <a href="{{ route('admin.import.review', ['status' => 'pending']) }}"
+            class="px-4 py-2 text-sm font-medium border-b-2 transition {{ $status === 'pending' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-white' }}">
+            Pending
+            @php $pendingCount = \App\Models\ImportItem::where('status', 'pending')->count(); @endphp
+            @if($pendingCount > 0)<span class="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-xs">{{ $pendingCount }}</span>@endif
+        </a>
+        <a href="{{ route('admin.import.review', ['status' => 'duplicates']) }}"
+            class="px-4 py-2 text-sm font-medium border-b-2 transition {{ $status === 'duplicates' ? 'border-red-500 text-red-400' : 'border-transparent text-slate-400 hover:text-white' }}">
+            Duplicates
+            @php $dupCount = \App\Models\ImportItem::where('status', 'duplicate')->count(); @endphp
+            @if($dupCount > 0)<span class="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-xs">{{ $dupCount }}</span>@endif
+        </a>
+    </div>
+
+    <div class="flex items-center justify-between">
+        <p class="text-slate-400">{{ $items->total() }} items {{ $status === 'duplicates' ? 'flagged as duplicates' : 'pending review' }}</p>
         <div class="flex gap-2">
-            <form method="POST" action="{{ route('admin.import.approve-all') }}">
-                @csrf
-                <button type="submit" class="btn-primary text-sm"
-                    onclick="return confirm('Approve all {{ $items->total() }} pending items?')">
-                    Approve All
-                </button>
-            </form>
+            @if($status === 'duplicates' && $items->total() > 0)
+                <form method="POST" action="{{ route('admin.import.bulk-delete-duplicates') }}" class="inline">
+                    @csrf
+                    <button type="submit" class="px-3 py-1.5 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition"
+                        onclick="return confirm('Delete ALL {{ $items->total() }} duplicate items? This cannot be undone.')">
+                        Delete All Duplicates
+                    </button>
+                </form>
+            @endif
+            @if($status === 'pending' && $items->count() > 0)
+                <form method="POST" action="{{ route('admin.import.approve-all') }}" class="inline">
+                    @csrf
+                    <button type="submit" class="btn-primary text-sm"
+                        onclick="return confirm('Approve all {{ $items->total() }} pending items?')">
+                        Approve All
+                    </button>
+                </form>
+            @endif
         </div>
-    @endif
+    </div>
 </div>
 
 <!-- Post-Processing Tools -->
