@@ -155,7 +155,7 @@ class GoogleSyncBusinesses extends Command
                     $googlePhotoCount = count($data['photos']);
                     if ($googlePhotoCount > $currentPhotoCount) {
                         $newPhotos = [];
-                        foreach (array_slice($data['photos'], 0, 3) as $photo) {
+                        foreach (array_slice($data['photos'], 0, 10) as $photo) {
                             if (!empty($photo['photo_reference'])) {
                                 $newPhotos[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
                             }

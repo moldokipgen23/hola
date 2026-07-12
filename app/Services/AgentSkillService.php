@@ -346,7 +346,7 @@ class AgentSkillService
                         }
 
                         if (!empty($detailData['photos'])) {
-                            foreach (array_slice($detailData['photos'], 0, 3) as $photo) {
+                            foreach (array_slice($detailData['photos'], 0, 10) as $photo) {
                                 if (!empty($photo['photo_reference'])) {
                                     $photoUrls[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
                                 }
