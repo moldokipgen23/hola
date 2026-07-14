@@ -167,6 +167,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/owner/businesses/{businessId}/products/{productId}', [OwnerDashboardController::class, 'updateProduct']);
     Route::delete('/owner/businesses/{businessId}/products/{productId}', [OwnerDashboardController::class, 'destroyProduct']);
 
+    // Owner Services
+    Route::get('/owner/businesses/{businessId}/services', [OwnerDashboardController::class, 'services']);
+    Route::post('/owner/businesses/{businessId}/services', [OwnerDashboardController::class, 'storeService']);
+    Route::put('/owner/businesses/{businessId}/services/{serviceId}', [OwnerDashboardController::class, 'updateService']);
+    Route::delete('/owner/businesses/{businessId}/services/{serviceId}', [OwnerDashboardController::class, 'destroyService']);
+
     // Owner Reviews
     Route::post('/owner/reviews/{reviewId}/respond', [OwnerDashboardController::class, 'respondToReview']);
 });

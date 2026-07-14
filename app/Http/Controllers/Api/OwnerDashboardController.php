@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\Category;
+use App\Models\Service;
 use App\Models\Booking;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -422,5 +423,85 @@ class OwnerDashboardController extends Controller
                 'claim_auto_approve' => (bool) $business->claim_auto_approve,
             ],
         ]);
+    }
+
+    // Services
+    public function services(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $services = $business->services()->orderBy('sort_order')->get();
+
+        return response()->json(compact('services'));
+    }
+
+    public function storeService(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:0',
+            'duration' => 'required|integer|min:15|max:1440',
+            'capacity' => 'nullable|integer|min:1',
+            'advance_booking_days' => 'nullable|integer|min:1|max:365',
+            'cancellation_hours' => 'nullable|integer|min:0|max:72',
+            'is_active' => 'boolean',
+            'sort_order' => 'nullable|integer',
+        ]);
+
+        $validated['business_id'] = $business->id;
+        $validated['slug'] = Str::slug($validated['name']) . '-' . Str::random(5);
+
+        $service = Service::create($validated);
+
+        return response()->json([
+            'message' => 'Service added.',
+            'service' => $service,
+        ]);
+    }
+
+    public function updateService(Request $request, $businessId, $serviceId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'sometimes|numeric|min:0',
+            'duration' => 'sometimes|integer|min:15|max:1440',
+            'capacity' => 'nullable|integer|min:1',
+            'advance_booking_days' => 'nullable|integer|min:1|max:365',
+            'cancellation_hours' => 'nullable|integer|min:0|max:72',
+            'is_active' => 'boolean',
+            'sort_order' => 'nullable|integer',
+        ]);
+
+        $service->update($validated);
+
+        return response()->json([
+            'message' => 'Service updated.',
+            'service' => $service,
+        ]);
+    }
+
+    public function destroyService(Request $request, $businessId, $serviceId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+
+        // Check if service has active bookings
+        $activeBookings = $service->bookings()->whereIn('status', ['pending', 'confirmed'])->count();
+        if ($activeBookings > 0) {
+            return response()->json([
+                'message' => 'Cannot delete service with active bookings.',
+            ], 422);
+        }
+
+        $service->delete();
+
+        return response()->json(['message' => 'Service deleted.']);
     }
 }
