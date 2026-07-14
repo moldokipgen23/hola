@@ -7,30 +7,36 @@ use App\Models\Setting;
 use App\Models\NotificationLog;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 
 class NotifyUnclaimedBusinesses extends Command
 {
-    protected $signature = 'business:notify-unclaimed {--days=3} {--limit=50} {--dry-run}';
+    protected $signature = 'business:notify-unclaimed {--limit=50} {--dry-run}';
     protected $description = 'Notify unclaimed businesses via free channels (Email + Telegram + WhatsApp CallMeBot)';
 
     public function handle(): int
     {
-        $days = $this->option('days');
         $dryRun = $this->option('dry-run');
         $limit = $this->option('limit');
 
-        $channel = Setting::get('notify_preferred_channel', 'email');
-        $notEmail = Setting::get('notify_email', '1') === '1';
-        $notTelegram = Setting::get('notify_telegram', '0') === '1';
-        $notWhatsApp = Setting::get('notify_whatsapp', '0') === '1';
+        // Global fallback settings
+        $globalChannel = Setting::get('notify_preferred_channel', 'email');
+        $globalEmail = Setting::get('notify_email', '1') === '1';
+        $globalTelegram = Setting::get('notify_telegram', '0') === '1';
+        $globalWhatsApp = Setting::get('notify_whatsapp', '0') === '1';
 
-        // Find businesses that were imported X+ days ago and haven't been claimed
+        // Find businesses that were imported and haven't been claimed
+        // Filter by per-business settings
         $businesses = Business::where('claim_status', 'unclaimed')
             ->where('source', 'import')
             ->where('is_active', true)
-            ->where('created_at', '<=', now()->subDays($days))
+            ->where('claim_notifications_enabled', true)
             ->whereDoesntHave('notificationLogs', function ($q) {
                 $q->where('type', 'claim_invitation');
+            })
+            ->where(function ($q) {
+                // Business-specific delay (fallback to 3 days)
+                $q->whereRaw('created_at <= DATE_SUB(NOW(), INTERVAL COALESCE(claim_notification_delay_days, 3) DAY)');
             })
             ->limit($limit)
             ->get();
@@ -40,17 +46,16 @@ class NotifyUnclaimedBusinesses extends Command
             return 0;
         }
 
-        $this->info("📧 Found {$businesses->count()} unclaimed businesses ({$days}+ days old)");
-        $this->info("   Channel: {$channel} | Email: " . ($notEmail ? 'ON' : 'OFF') . " | Telegram: " . ($notTelegram ? 'ON' : 'OFF') . " | WhatsApp: " . ($notWhatsApp ? 'ON' : 'OFF'));
+        $this->info("📧 Found {$businesses->count()} unclaimed businesses ready for notification");
 
         $notified = 0;
         $failed = 0;
 
         foreach ($businesses as $business) {
-            $this->info("  → {$business->name}");
+            $this->info("  → {$business->name} (delay: {$business->claim_notification_delay_days}d, channel: {$business->claim_preferred_channel})");
 
             if ($dryRun) {
-                $this->info("    [DRY RUN] Would notify via {$channel}");
+                $this->info("    [DRY RUN] Would notify via {$business->claim_preferred_channel}");
                 $notified++;
                 continue;
             }
@@ -58,33 +63,57 @@ class NotifyUnclaimedBusinesses extends Command
             $claimUrl = "https://hola.ehlom.com/claim/{$business->slug}";
             $message = $this->buildClaimMessage($business, $claimUrl);
             $sent = false;
+            $usedChannel = 'none';
 
-            // Try channels in order of preference
-            if ($channel === 'all' || $channel === 'email') {
-                if ($notEmail && $business->email) {
-                    $subject = $this->buildEmailSubject($business);
-                    $sent = $this->sendEmail($business->email, $subject, $message);
+            // Determine effective channel per business
+            $effectiveChannel = $business->claim_preferred_channel;
+            if ($effectiveChannel === 'all') {
+                $effectiveChannel = $globalChannel; // fallback to global
+            }
+
+            // Try channels in order of business preference
+            $channels = $this->getChannelOrder($effectiveChannel);
+
+            foreach ($channels as $channel) {
+                if ($sent) break;
+
+                // Check if channel is enabled globally
+                $enabled = match ($channel) {
+                    'email' => $globalEmail,
+                    'telegram' => $globalTelegram,
+                    'whatsapp' => $globalWhatsApp,
+                    default => false,
+                };
+
+                if (!$enabled) continue;
+
+                switch ($channel) {
+                    case 'email':
+                        if ($business->email) {
+                            $subject = $this->buildEmailSubject($business);
+                            $sent = $this->sendEmail($business->email, $subject, $message);
+                            if ($sent) $usedChannel = 'email';
+                        }
+                        break;
+                    case 'telegram':
+                        $sent = $this->sendTelegram($message);
+                        if ($sent) $usedChannel = 'telegram';
+                        break;
+                    case 'whatsapp':
+                        if ($business->phone) {
+                            $sent = $this->sendWhatsAppCallMeBot($business->phone, $message);
+                            if ($sent) $usedChannel = 'whatsapp';
+                        }
+                        break;
                 }
             }
 
-            if (!$sent && ($channel === 'all' || $channel === 'telegram')) {
-                if ($notTelegram) {
-                    $sent = $this->sendTelegram($message);
-                }
-            }
-
-            if (!$sent && ($channel === 'all' || $channel === 'whatsapp')) {
-                if ($notWhatsApp && $business->phone) {
-                    $sent = $this->sendWhatsAppCallMeBot($business->phone, $message);
-                }
-            }
-
-            // Log the attempt (even if failed, to avoid re-notifying)
+            // Log the attempt
             try {
                 NotificationLog::create([
                     'business_id' => $business->id,
                     'type' => 'claim_invitation',
-                    'channel' => $sent ? $channel : 'none',
+                    'channel' => $usedChannel,
                     'recipient' => $business->email ?? $business->phone ?? 'unknown',
                     'message' => $message,
                     'status' => $sent ? 'sent' : 'failed',
@@ -94,10 +123,10 @@ class NotifyUnclaimedBusinesses extends Command
 
             if ($sent) {
                 $notified++;
-                $this->info("    ✅ Sent via {$channel}");
+                $this->info("    ✅ Sent via {$usedChannel}");
             } else {
                 $failed++;
-                $this->warn("    ❌ Failed (no channel configured or no contact info)");
+                $this->warn("    ❌ Failed (no channel enabled or no contact info)");
             }
 
             usleep(500000);
@@ -109,6 +138,16 @@ class NotifyUnclaimedBusinesses extends Command
         $this->info("  Failed: {$failed}");
 
         return 0;
+    }
+
+    private function getChannelOrder(string $preferred): array
+    {
+        // If preferred is specific channel, try that first, then fall back to others
+        if (in_array($preferred, ['email', 'telegram', 'whatsapp'])) {
+            return array_merge([$preferred], array_diff(['email', 'telegram', 'whatsapp'], [$preferred]));
+        }
+        // 'all' or unknown -> use global preference order
+        return ['email', 'telegram', 'whatsapp'];
     }
 
     private function buildClaimMessage(Business $business, string $claimUrl): string
@@ -160,7 +199,7 @@ class NotifyUnclaimedBusinesses extends Command
 
             if (!$fromAddress) return false;
 
-            \Illuminate\Support\Facades\Mail::raw(
+            Mail::raw(
                 $body,
                 function ($message) use ($to, $subject, $fromAddress, $fromName) {
                     $message->to($to)

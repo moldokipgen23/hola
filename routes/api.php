@@ -153,6 +153,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/owner/businesses/{id}/photos', [OwnerDashboardController::class, 'deletePhoto']);
     Route::get('/owner/businesses/{id}/analytics', [OwnerDashboardController::class, 'businessAnalytics']);
 
+    // Claim Settings (per business)
+    Route::get('/owner/businesses/{id}/claim-settings', [OwnerDashboardController::class, 'getClaimSettings']);
+    Route::put('/owner/businesses/{id}/claim-settings', [OwnerDashboardController::class, 'updateClaimSettings']);
+
     // Owner Products
     Route::post('/owner/businesses/{businessId}/products', [OwnerDashboardController::class, 'storeProduct']);
     Route::put('/owner/businesses/{businessId}/products/{productId}', [OwnerDashboardController::class, 'updateProduct']);

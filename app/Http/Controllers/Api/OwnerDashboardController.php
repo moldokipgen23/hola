@@ -236,4 +236,41 @@ class OwnerDashboardController extends Controller
             'products_count' => $business->products()->count(),
         ]);
     }
+
+    // Claim Settings
+    public function getClaimSettings(Request $request, $id)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($id);
+
+        return response()->json([
+            'claim_notifications_enabled' => (bool) $business->claim_notifications_enabled,
+            'claim_notification_delay_days' => (int) $business->claim_notification_delay_days,
+            'claim_preferred_channel' => $business->claim_preferred_channel,
+            'claim_auto_approve' => (bool) $business->claim_auto_approve,
+        ]);
+    }
+
+    public function updateClaimSettings(Request $request, $id)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($id);
+
+        $validated = $request->validate([
+            'claim_notifications_enabled' => 'sometimes|boolean',
+            'claim_notification_delay_days' => 'sometimes|integer|min:1|max:30',
+            'claim_preferred_channel' => 'sometimes|in:all,email,telegram,whatsapp',
+            'claim_auto_approve' => 'sometimes|boolean',
+        ]);
+
+        $business->update($validated);
+
+        return response()->json([
+            'message' => 'Claim settings updated.',
+            'settings' => [
+                'claim_notifications_enabled' => (bool) $business->claim_notifications_enabled,
+                'claim_notification_delay_days' => (int) $business->claim_notification_delay_days,
+                'claim_preferred_channel' => $business->claim_preferred_channel,
+                'claim_auto_approve' => (bool) $business->claim_auto_approve,
+            ],
+        ]);
+    }
 }
