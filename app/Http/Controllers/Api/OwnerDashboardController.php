@@ -504,4 +504,139 @@ class OwnerDashboardController extends Controller
 
         return response()->json(['message' => 'Service deleted.']);
     }
+
+    // Bookings
+    public function bookings(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $query = $business->bookings()->with('service')->orderByDesc('booking_date');
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->has('date')) {
+            $query->where('booking_date', $request->date);
+        }
+        if ($request->has('upcoming')) {
+            $query->where('booking_date', '>=', now()->toDateString())
+                ->whereIn('status', ['pending', 'confirmed']);
+        }
+
+        $bookings = $query->paginate($request->get('per_page', 20));
+
+        return response()->json($bookings);
+    }
+
+    public function storeBooking(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        // Verify service belongs to business
+        $service = Service::where('business_id', $business->id)->findOrFail($request->service_id);
+
+        $validated = $request->validate([
+            'service_id' => 'required|exists:services,id',
+            'customer_name' => 'required|string|max:255',
+            'customer_phone' => 'required|string|max:20',
+            'customer_email' => 'nullable|email|max:255',
+            'booking_date' => 'required|date',
+            'start_time' => 'required',
+            'end_time' => 'required',
+            'duration_minutes' => 'required|integer|min:15',
+            'total_price' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        $validated['business_id'] = $business->id;
+        $validated['status'] = 'pending';
+
+        $booking = Booking::create($validated);
+
+        // Load service relationship
+        $booking->load('service');
+
+        return response()->json([
+            'message' => 'Booking created.',
+            'booking' => $booking,
+        ], 201);
+    }
+
+    public function showBooking(Request $request, $businessId, $bookingId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $booking = $business->bookings()->with('service')->findOrFail($bookingId);
+
+        return response()->json(compact('booking'));
+    }
+
+    public function updateBooking(Request $request, $businessId, $bookingId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $booking = $business->bookings()->findOrFail($bookingId);
+
+        $validated = $request->validate([
+            'customer_name' => 'sometimes|string|max:255',
+            'customer_phone' => 'sometimes|string|max:20',
+            'customer_email' => 'nullable|email|max:255',
+            'booking_date' => 'sometimes|date',
+            'start_time' => 'sometimes',
+            'end_time' => 'sometimes',
+            'duration_minutes' => 'sometimes|integer|min:15',
+            'total_price' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        $booking->update($validated);
+        $booking->load('service');
+
+        return response()->json([
+            'message' => 'Booking updated.',
+            'booking' => $booking,
+        ]);
+    }
+
+    public function updateBookingStatus(Request $request, $businessId, $bookingId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $booking = $business->bookings()->findOrFail($bookingId);
+
+        $validated = $request->validate([
+            'status' => 'required|in:pending,confirmed,cancelled,completed,no_show',
+            'cancellation_reason' => 'nullable|string',
+        ]);
+
+        $oldStatus = $booking->status;
+        $booking->update($validated);
+
+        // Set timestamps based on status
+        if ($validated['status'] === 'confirmed' && $oldStatus !== 'confirmed') {
+            $booking->update(['confirmed_at' => now()]);
+        } elseif ($validated['status'] === 'completed' && $oldStatus !== 'completed') {
+            $booking->update(['completed_at' => now()]);
+        } elseif ($validated['status'] === 'cancelled' && $oldStatus !== 'cancelled') {
+            $booking->update(['cancelled_at' => now()]);
+        }
+
+        return response()->json([
+            'message' => 'Status updated.',
+            'booking' => $booking->fresh(),
+        ]);
+    }
+
+    public function destroyBooking(Request $request, $businessId, $bookingId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $booking = $business->bookings()->findOrFail($bookingId);
+
+        if (in_array($booking->status, ['confirmed', 'completed'])) {
+            return response()->json([
+                'message' => 'Cannot delete confirmed or completed booking.',
+            ], 422);
+        }
+
+        $booking->delete();
+
+        return response()->json(['message' => 'Booking deleted.']);
+    }
 }

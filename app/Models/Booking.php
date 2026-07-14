@@ -34,8 +34,8 @@ class Booking extends Model
 
     protected $casts = [
         'booking_date' => 'date',
-        'start_time' => 'time',
-        'end_time' => 'time',
+        'start_time' => 'datetime:H:i',
+        'end_time' => 'datetime:H:i',
         'duration_minutes' => 'integer',
         'total_price' => 'decimal:2',
         'cancelled_at' => 'datetime',

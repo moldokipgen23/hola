@@ -173,6 +173,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/owner/businesses/{businessId}/services/{serviceId}', [OwnerDashboardController::class, 'updateService']);
     Route::delete('/owner/businesses/{businessId}/services/{serviceId}', [OwnerDashboardController::class, 'destroyService']);
 
+    // Owner Bookings
+    Route::get('/owner/businesses/{businessId}/bookings', [OwnerDashboardController::class, 'bookings']);
+    Route::post('/owner/businesses/{businessId}/bookings', [OwnerDashboardController::class, 'storeBooking']);
+    Route::get('/owner/businesses/{businessId}/bookings/{bookingId}', [OwnerDashboardController::class, 'showBooking']);
+    Route::put('/owner/businesses/{businessId}/bookings/{bookingId}', [OwnerDashboardController::class, 'updateBooking']);
+    Route::put('/owner/businesses/{businessId}/bookings/{bookingId}/status', [OwnerDashboardController::class, 'updateBookingStatus']);
+    Route::delete('/owner/businesses/{businessId}/bookings/{bookingId}', [OwnerDashboardController::class, 'destroyBooking']);
+
     // Owner Reviews
     Route::post('/owner/reviews/{reviewId}/respond', [OwnerDashboardController::class, 'respondToReview']);
 });
