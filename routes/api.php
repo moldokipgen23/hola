@@ -153,6 +153,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/owner/businesses/{id}/photos', [OwnerDashboardController::class, 'deletePhoto']);
     Route::get('/owner/businesses/{id}/analytics', [OwnerDashboardController::class, 'businessAnalytics']);
 
+    // Unified business dashboard with modules
+    Route::get('/owner/businesses/{id}/dashboard', [OwnerDashboardController::class, 'businessDashboard']);
+    // Module management
+    Route::put('/owner/businesses/{id}/modules', [OwnerDashboardController::class, 'updateModules']);
+
     // Claim Settings (per business)
     Route::get('/owner/businesses/{id}/claim-settings', [OwnerDashboardController::class, 'getClaimSettings']);
     Route::put('/owner/businesses/{id}/claim-settings', [OwnerDashboardController::class, 'updateClaimSettings']);

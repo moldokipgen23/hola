@@ -52,6 +52,8 @@ class Business extends Model
         'price_range',
         'last_synced_at',
         'created_by',
+        'enabled_modules',
+        'module_config',
     ];
 
     protected $casts = [
@@ -72,6 +74,8 @@ class Business extends Model
         'price_range' => 'integer',
         'average_rating' => 'float',
         'review_count' => 'integer',
+        'enabled_modules' => 'array',
+        'module_config' => 'array',
     ];
 
     protected $appends = ['quality_score'];
@@ -156,6 +160,17 @@ class Business extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    // Module relationships
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class)->orderByDesc('booking_date');
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class)->orderByDesc('created_at');
     }
 
     public function scopeActive($query)
