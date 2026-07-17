@@ -2418,9 +2418,21 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $recentOrders = Order::whereIn('business_id', $businesses->pluck('id'))
                 ->with('business:id,name')->latest()->take(5)->get();
 
+            $defaultBusinessId = $businesses->first()->id ?? null;
+            $hasOrders = $businesses->contains(fn ($b) => ($b->enabled_modules->orders ?? false));
+            $hasBookings = $businesses->contains(fn ($b) => ($b->enabled_modules->bookings ?? false));
+            $hasProducts = $businesses->contains(fn ($b) => ($b->enabled_modules->products ?? $b->enabled_modules->orders ?? false));
+            $stats = [
+                'businesses' => $businesses->count(),
+                'active_bookings' => Booking::whereIn('business_id', $businesses->pluck('id'))->whereIn('status', ['pending', 'confirmed'])->count(),
+                'pending_orders' => Order::whereIn('business_id', $businesses->pluck('id'))->where('status', 'pending')->count(),
+                'products' => $totalProducts,
+            ];
+
             return view('vendor.dashboard.index', compact(
                 'user', 'businesses', 'totalBookings', 'totalOrders', 'totalProducts',
-                'recentBookings', 'recentOrders'
+                'recentBookings', 'recentOrders', 'stats', 'defaultBusinessId',
+                'hasOrders', 'hasBookings', 'hasProducts'
             ));
         })->name('dashboard');
 
@@ -2542,6 +2554,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/services/create', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            $businesses = Business::where('created_by', $user->id)->get();
 
             return view('vendor.services.form', compact('business'));
         })->name('services.create');
@@ -2687,5 +2700,30 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
 
             return back()->with('success', 'Order '.$validated['status'].'.');
         })->name('orders.status');
+
+        // Settings
+        Route::get('/settings', function () {
+            $user = Auth::user();
+            return view('vendor.settings.index', compact('user'));
+        })->name('settings');
+
+        Route::put('/settings', function (Request $request) {
+            $user = Auth::user();
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'phone' => 'nullable|string|max:20',
+            ]);
+            $user->update($validated);
+            return redirect()->route('vendor.settings')->with('success', 'Profile updated.');
+        })->name('settings.update');
+
+        Route::put('/settings/password', function (Request $request) {
+            $validated = $request->validate([
+                'current_password' => 'required|current_password',
+                'password' => 'required|string|min:6|confirmed',
+            ]);
+            Auth::user()->update(['password' => bcrypt($validated['password'])]);
+            return redirect()->route('vendor.settings')->with('success', 'Password changed.');
+        })->name('settings.password');
     });
 });

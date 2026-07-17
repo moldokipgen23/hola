@@ -28,7 +28,7 @@
         </div>
         <div class="flex gap-2">
             <button type="submit" class="btn-primary px-6">Filter</button>
-            <a href="{{ route('vendor.bookings') }}" class="btn-ghost">Clear</a>
+            <a href="{{ route('vendor.bookings', $business->id) }}" class="btn-ghost">Clear</a>
         </div>
     </div>
 </form>
@@ -73,22 +73,26 @@
                     <td>
                         <div class="flex gap-1 flex-wrap">
                             @if($booking->status === 'pending')
-                                <form method="POST" action="{{ route('vendor.bookings.confirm', $booking->id) }}" class="inline">
-                                    @csrf
+                                <form method="POST" action="{{ route('vendor.bookings.status', $booking->id) }}" class="inline">
+                                    @csrf @method('PUT')
+                                    <input type="hidden" name="status" value="confirmed">
                                     <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20">Confirm</button>
                                 </form>
-                                <form method="POST" action="{{ route('vendor.bookings.cancel', $booking->id) }}" class="inline">
-                                    @csrf
+                                <form method="POST" action="{{ route('vendor.bookings.status', $booking->id) }}" class="inline">
+                                    @csrf @method('PUT')
+                                    <input type="hidden" name="status" value="cancelled">
                                     <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20">Cancel</button>
                                 </form>
                             @endif
                             @if($booking->status === 'confirmed')
-                                <form method="POST" action="{{ route('vendor.bookings.complete', $booking->id) }}" class="inline">
-                                    @csrf
+                                <form method="POST" action="{{ route('vendor.bookings.status', $booking->id) }}" class="inline">
+                                    @csrf @method('PUT')
+                                    <input type="hidden" name="status" value="completed">
                                     <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20">Complete</button>
                                 </form>
-                                <form method="POST" action="{{ route('vendor.bookings.cancel', $booking->id) }}" class="inline">
-                                    @csrf
+                                <form method="POST" action="{{ route('vendor.bookings.status', $booking->id) }}" class="inline">
+                                    @csrf @method('PUT')
+                                    <input type="hidden" name="status" value="cancelled">
                                     <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20">Cancel</button>
                                 </form>
                             @endif

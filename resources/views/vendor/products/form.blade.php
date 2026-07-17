@@ -5,7 +5,7 @@
 
 @section('content')
 <div class="max-w-2xl mx-auto">
-    <form method="POST" action="{{ isset($product) ? route('vendor.products.update', $product->id) : route('vendor.products.store') }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ isset($product) ? route('vendor.products.update', ['businessId' => $business->id, 'id' => $product->id]) : route('vendor.products.store', $business->id) }}" enctype="multipart/form-data">
         @csrf
         @if(isset($product)) @method('PUT') @endif
 
@@ -21,13 +21,9 @@
 
         <div class="glass-card p-6 rounded-lg space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-400 mb-1">Business *</label>
-                <select name="business_id" required class="input-dark">
-                    <option value="">Select...</option>
-                    @foreach($businesses ?? [] as $biz)
-                        <option value="{{ $biz->id }}" {{ old('business_id', $product->business_id ?? '') == $biz->id ? 'selected' : '' }}>{{ $biz->name }}</option>
-                    @endforeach
-                </select>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Business</label>
+                <input type="text" value="{{ $business->name }}" disabled class="input-dark opacity-60">
+                <input type="hidden" name="business_id" value="{{ $business->id }}">
             </div>
 
             <div>
@@ -70,7 +66,7 @@
 
         <div class="mt-6 flex gap-2">
             <button type="submit" class="btn-primary">{{ isset($product) ? 'Update' : 'Create' }}</button>
-            <a href="{{ route('vendor.products') }}" class="btn-ghost">Cancel</a>
+            <a href="{{ route('vendor.products', $business->id) }}" class="btn-ghost">Cancel</a>
         </div>
     </form>
 </div>

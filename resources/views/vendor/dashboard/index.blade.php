@@ -20,6 +20,7 @@
         <p class="text-3xl font-bold text-white mt-1">{{ $stats['businesses'] ?? 0 }}</p>
     </div>
 
+    @if($hasBookings ?? false)
     <div class="stat-card">
         <div class="stat-icon bg-blue-500/10">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6 text-blue-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -27,7 +28,8 @@
         <p class="text-slate-400 text-sm font-medium">Active Bookings</p>
         <p class="text-3xl font-bold text-white mt-1">{{ $stats['active_bookings'] ?? 0 }}</p>
     </div>
-
+    @endif
+    @if($hasOrders ?? false)
     <div class="stat-card">
         <div class="stat-icon bg-amber-500/10">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6 text-amber-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
@@ -35,7 +37,8 @@
         <p class="text-slate-400 text-sm font-medium">Pending Orders</p>
         <p class="text-3xl font-bold text-white mt-1">{{ $stats['pending_orders'] ?? 0 }}</p>
     </div>
-
+    @endif
+    @if($hasProducts ?? false)
     <div class="stat-card">
         <div class="stat-icon bg-green-500/10">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6 text-green-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -43,15 +46,17 @@
         <p class="text-slate-400 text-sm font-medium">Total Products</p>
         <p class="text-3xl font-bold text-white mt-1">{{ $stats['products'] ?? 0 }}</p>
     </div>
+    @endif
 </div>
 
 <!-- Tables -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+    @if($hasBookings ?? false)
     <!-- Recent Bookings -->
     <div class="glass-card p-5">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-white font-semibold">Recent Bookings</h3>
-            <a href="{{ route('vendor.bookings') }}" class="text-purple-400 text-sm font-medium hover:text-purple-300 transition">View all</a>
+            @if($defaultBusinessId)<a href="{{ route('vendor.bookings', $defaultBusinessId) }}" class="text-purple-400 text-sm font-medium hover:text-purple-300 transition">View all</a>@endif
         </div>
         <table class="data-table">
             <thead>
@@ -81,12 +86,14 @@
             </tbody>
         </table>
     </div>
+    @endif
 
+    @if($hasOrders ?? false)
     <!-- Recent Orders -->
     <div class="glass-card p-5">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-white font-semibold">Recent Orders</h3>
-            <a href="{{ route('vendor.orders') }}" class="text-purple-400 text-sm font-medium hover:text-purple-300 transition">View all</a>
+            @if($defaultBusinessId)<a href="{{ route('vendor.orders', $defaultBusinessId) }}" class="text-purple-400 text-sm font-medium hover:text-purple-300 transition">View all</a>@endif
         </div>
         <table class="data-table">
             <thead>
@@ -117,21 +124,22 @@
             </tbody>
         </table>
     </div>
+    @endif
 </div>
 
 <!-- Quick Actions -->
 <div class="glass-card p-5">
     <h3 class="text-white font-semibold mb-4">Quick Actions</h3>
     <div class="flex flex-wrap gap-3">
-        <a href="{{ route('vendor.products.create') }}" class="btn-primary">
+        @if($defaultBusinessId)<a href="{{ route('vendor.products.create', $defaultBusinessId) }}" class="btn-primary">@else<a href="#" class="btn-primary disabled">@endif
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 inline mr-1.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Add Product
         </a>
-        <a href="{{ route('vendor.bookings') }}" class="btn-ghost">
+        @if($hasBookings && $defaultBusinessId)<a href="{{ route('vendor.bookings', $defaultBusinessId) }}" class="btn-ghost">@else<a href="#" class="btn-ghost disabled">@endif
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 inline mr-1.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
             View Bookings
         </a>
-        <a href="{{ route('vendor.orders') }}" class="btn-ghost">
+        @if($hasOrders && $defaultBusinessId)<a href="{{ route('vendor.orders', $defaultBusinessId) }}" class="btn-ghost">@else<a href="#" class="btn-ghost disabled">@endif
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 inline mr-1.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             Manage Orders
         </a>

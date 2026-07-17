@@ -6,19 +6,15 @@
 @section('content')
 <div class="flex justify-between items-center mb-6">
     <h3 class="text-white font-semibold text-lg">All Products</h3>
-    <a href="{{ route('vendor.products.create') }}" class="btn-primary">+ Add Product</a>
+    <a href="{{ route('vendor.products.create', $business->id) }}" class="btn-primary">+ Add Product</a>
+</div>
+
+<div class="flex items-center justify-between mb-4">
+    <p class="text-slate-400 text-sm">Business: <span class="text-white font-medium">{{ $business->name }}</span></p>
 </div>
 
 <form method="GET" class="glass-card p-4 rounded-xl mb-4">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-            <select name="business_id" class="input-dark w-full">
-                <option value="">All Businesses</option>
-                @foreach($businesses ?? [] as $biz)
-                    <option value="{{ $biz->id }}" {{ request('business_id') == $biz->id ? 'selected' : '' }}>{{ $biz->name }}</option>
-                @endforeach
-            </select>
-        </div>
         <div>
             <select name="status" class="input-dark w-full">
                 <option value="">All Status</option>
@@ -28,7 +24,7 @@
         </div>
         <div class="flex gap-2">
             <button type="submit" class="btn-primary px-6">Filter</button>
-            <a href="{{ route('vendor.products') }}" class="btn-ghost">Clear</a>
+            <a href="{{ route('vendor.products', $business->id) }}" class="btn-ghost">Clear</a>
         </div>
     </div>
 </form>
@@ -60,8 +56,8 @@
                         @endif
                     </td>
                     <td class="text-sm space-x-2">
-                        <a href="{{ route('vendor.products.edit', $product->id) }}" class="text-purple-400 hover:text-purple-300">Edit</a>
-                        <form method="POST" action="{{ route('vendor.products.destroy', $product->id) }}" data-confirm="Delete this product?" class="inline">
+                        <a href="{{ route('vendor.products.edit', ['businessId' => $business->id, 'id' => $product->id]) }}" class="text-purple-400 hover:text-purple-300">Edit</a>
+                        <form method="POST" action="{{ route('vendor.products.destroy', ['businessId' => $business->id, 'id' => $product->id]) }}" data-confirm="Delete this product?" class="inline">
                             @csrf @method('DELETE')
                             <button type="submit" class="text-red-400 hover:text-red-300">Delete</button>
                         </form>

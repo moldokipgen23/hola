@@ -6,7 +6,7 @@
 @section('content')
 <div class="flex justify-between items-center mb-6">
     <h3 class="text-white font-semibold text-lg">All Services</h3>
-    <a href="{{ route('vendor.services.create') }}" class="btn-primary">+ Add Service</a>
+    <a href="{{ route('vendor.services.create', $business->id) }}" class="btn-primary">+ Add Service</a>
 </div>
 
 <div class="glass-card rounded-lg overflow-hidden">
@@ -36,8 +36,8 @@
                     </td>
                     <td class="text-sm">{{ $service->bookings_count ?? $service->bookings()->count() }}</td>
                     <td class="text-sm space-x-2">
-                        <a href="{{ route('vendor.services.edit', $service->id) }}" class="text-purple-400 hover:text-purple-300">Edit</a>
-                        <form method="POST" action="{{ route('vendor.services.destroy', $service->id) }}" data-confirm="Delete this service?" class="inline">
+                        <a href="{{ route('vendor.services.edit', ['businessId' => $business->id, 'id' => $service->id]) }}" class="text-purple-400 hover:text-purple-300">Edit</a>
+                        <form method="POST" action="{{ route('vendor.services.destroy', ['businessId' => $business->id, 'id' => $service->id]) }}" data-confirm="Delete this service?" class="inline">
                             @csrf @method('DELETE')
                             <button type="submit" class="text-red-400 hover:text-red-300">Delete</button>
                         </form>

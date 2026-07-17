@@ -36,7 +36,7 @@
         </div>
         <div class="flex gap-2">
             <button type="submit" class="btn-primary px-6">Filter</button>
-            <a href="{{ route('vendor.orders') }}" class="btn-ghost">Clear</a>
+            <a href="{{ route('vendor.orders', $business->id) }}" class="btn-ghost">Clear</a>
         </div>
     </div>
 </form>
@@ -113,8 +113,8 @@
                 <td>
                     <div class="flex gap-1 flex-wrap">
                         @if(in_array($order->status, ['pending', 'confirmed']))
-                            <form method="POST" action="{{ route('vendor.orders.update-status', $order->id) }}" class="inline">
-                                @csrf
+                            <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
                                 @if($order->status === 'pending')
                                     <input type="hidden" name="status" value="confirmed">
                                     <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20">Confirm</button>
@@ -126,29 +126,29 @@
                             </form>
                         @endif
                         @if($order->status === 'preparing')
-                            <form method="POST" action="{{ route('vendor.orders.update-status', $order->id) }}" class="inline">
-                                @csrf
+                            <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
                                 <input type="hidden" name="status" value="ready">
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20">Ready</button>
                             </form>
                         @endif
                         @if($order->status === 'ready')
-                            <form method="POST" action="{{ route('vendor.orders.update-status', $order->id) }}" class="inline">
-                                @csrf
+                            <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
                                 <input type="hidden" name="status" value="out_for_delivery">
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20">Deliver</button>
                             </form>
                         @endif
                         @if($order->status === 'out_for_delivery')
-                            <form method="POST" action="{{ route('vendor.orders.update-status', $order->id) }}" class="inline">
-                                @csrf
+                            <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
                                 <input type="hidden" name="status" value="delivered">
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20">Delivered</button>
                             </form>
                         @endif
                         @if(!in_array($order->status, ['delivered', 'cancelled']))
-                            <form method="POST" action="{{ route('vendor.orders.update-status', $order->id) }}" class="inline">
-                                @csrf
+                            <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
                                 <input type="hidden" name="status" value="cancelled">
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20">Cancel</button>
                             </form>
