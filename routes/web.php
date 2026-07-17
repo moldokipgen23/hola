@@ -2419,9 +2419,9 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 ->with('business:id,name')->latest()->take(5)->get();
 
             $defaultBusinessId = $businesses->first()->id ?? null;
-            $hasOrders = $businesses->contains(fn ($b) => ($b->enabled_modules->orders ?? false));
-            $hasBookings = $businesses->contains(fn ($b) => ($b->enabled_modules->bookings ?? false));
-            $hasProducts = $businesses->contains(fn ($b) => ($b->enabled_modules->products ?? $b->enabled_modules->orders ?? false));
+            $hasOrders = $businesses->contains(fn ($b) => ($b->enabled_modules['orders'] ?? false));
+            $hasBookings = $businesses->contains(fn ($b) => ($b->enabled_modules['bookings'] ?? false));
+            $hasProducts = $businesses->contains(fn ($b) => ($b->enabled_modules['products'] ?? $b->enabled_modules['orders'] ?? false));
             $stats = [
                 'businesses' => $businesses->count(),
                 'active_bookings' => Booking::whereIn('business_id', $businesses->pluck('id'))->whereIn('status', ['pending', 'confirmed'])->count(),
