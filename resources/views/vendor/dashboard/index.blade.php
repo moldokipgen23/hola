@@ -131,10 +131,12 @@
 <div class="glass-card p-5">
     <h3 class="text-white font-semibold mb-4">Quick Actions</h3>
     <div class="flex flex-wrap gap-3">
-        @if($hasOrders && $defaultBusinessId)<a href="{{ route('vendor.products.create', $defaultBusinessId) }}" class="btn-primary">@else<a href="#" class="btn-primary disabled">@endif
+        @if($hasOrders && $defaultBusinessId)
+        <a href="{{ route('vendor.products.create', $defaultBusinessId) }}" class="btn-primary">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 inline mr-1.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Add Product
         </a>
+        @endif
         @if($hasBookings ?? false)
         <a href="{{ route('vendor.bookings', $defaultBusinessId) }}" class="btn-ghost">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 inline mr-1.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
