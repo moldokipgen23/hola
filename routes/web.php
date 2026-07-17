@@ -380,7 +380,7 @@ Route::post('/claim/{id}/resend-otp', function ($id) {
 })->name('public.claim.resend-otp');
 
 // Login redirect (for auth middleware)
-Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
+Route::get('/login', fn () => redirect()->route('admin.login'))->name('public.login');
 
 // robots.txt
 Route::get('/robots.txt', function () {
