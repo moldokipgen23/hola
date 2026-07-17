@@ -2421,7 +2421,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $defaultBusinessId = $businesses->first()->id ?? null;
             $hasOrders = $businesses->contains(fn ($b) => ($b->enabled_modules['orders'] ?? false));
             $hasBookings = $businesses->contains(fn ($b) => ($b->enabled_modules['bookings'] ?? false));
-            $hasProducts = $businesses->contains(fn ($b) => ($b->enabled_modules['products'] ?? $b->enabled_modules['orders'] ?? false));
+            $hasProducts = $hasOrders;
             $stats = [
                 'businesses' => $businesses->count(),
                 'active_bookings' => Booking::whereIn('business_id', $businesses->pluck('id'))->whereIn('status', ['pending', 'confirmed'])->count(),
@@ -2645,6 +2645,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/bookings/{id}/status', function (Request $request, $id) {
             $booking = Booking::with('business')->findOrFail($id);
             $user = Auth::user();
+            abort_unless($booking->business->enabled_modules['bookings'] ?? false, 404);
             if ($booking->business->created_by !== $user->id) {
                 abort(403);
             }
@@ -2690,6 +2691,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/orders/{id}/status', function (Request $request, $id) {
             $order = Order::with('business')->findOrFail($id);
             $user = Auth::user();
+            abort_unless($order->business->enabled_modules['orders'] ?? false, 404);
             if ($order->business->created_by !== $user->id) {
                 abort(403);
             }
