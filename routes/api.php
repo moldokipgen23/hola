@@ -5,15 +5,22 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ClaimController;
+use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DeliveryZoneController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OwnerDashboardController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\PublicBookingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SavedListingController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\SettingController;
-use App\Http\Controllers\Api\ClaimController;
+use App\Http\Controllers\Api\TimeSlotController;
+use App\Http\Controllers\Api\TransportController;
+use App\Models\Business;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // ─── Public Auth (rate limited) ───
@@ -46,6 +53,38 @@ Route::get('/businesses/{slug}', [BusinessController::class, 'show']);
 Route::post('/businesses/{slug}/track', [BusinessController::class, 'trackAction'])
     ->middleware('throttle:30,1');
 Route::get('/businesses/{slug}/related', [BusinessController::class, 'related']);
+Route::get('/businesses/{slug}/services', [BusinessController::class, 'services']);
+Route::get('/businesses/by-id/{id}/services', [BusinessController::class, 'publicServices']);
+
+// Public booking & order
+Route::post('/businesses/{slug}/bookings', [PublicBookingController::class, 'storeBooking']);
+Route::post('/businesses/{slug}/orders', [PublicBookingController::class, 'storeOrder']);
+
+// Transport (taxi/vehicle booking)
+Route::get('/businesses/{slug}/vehicles', [TransportController::class, 'vehicles']);
+Route::post('/businesses/{slug}/trips/estimate', [TransportController::class, 'estimateFare']);
+Route::post('/businesses/{slug}/trips', [TransportController::class, 'bookTrip']);
+
+// Delivery Zones
+Route::get('/businesses/{slug}/delivery-zones', [DeliveryZoneController::class, 'index']);
+Route::post('/businesses/{slug}/delivery-check', [DeliveryZoneController::class, 'checkEligibility']);
+Route::get('/delivery-zones/check-eligibility', [DeliveryZoneController::class, 'checkEligibility']);
+
+// Time Slots (turf/slot booking)
+Route::get('/services/{serviceId}/slots', [TimeSlotController::class, 'slotsByService']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    // My Bookings & Orders (customer view)
+    Route::get('/my-bookings', [CustomerController::class, 'myBookings']);
+    Route::get('/my-orders', [CustomerController::class, 'myOrders']);
+    Route::put('/my-orders/{id}/cancel', [CustomerController::class, 'cancelOrder']);
+    Route::put('/my-bookings/{id}/cancel', [CustomerController::class, 'cancelBooking']);
+    Route::post('/my-orders/{id}/reorder', [CustomerController::class, 'reorder']);
+
+    // My Trips (customer view)
+    Route::get('/my-trips', [TransportController::class, 'myTrips']);
+    Route::put('/my-trips/{id}/cancel', [TransportController::class, 'cancelTrip']);
+});
 
 Route::get('/businesses/{business}/reviews', [ReviewController::class, 'index']);
 
@@ -58,7 +97,7 @@ Route::get('/products/popular', [ProductController::class, 'popular']);
 Route::get('/products/{slug}', [ProductController::class, 'show']);
 
 // Public instant search (quick results for search dropdown)
-Route::get('/instant-search', function (\Illuminate\Http\Request $request) {
+Route::get('/instant-search', function (Request $request) {
     $q = $request->input('q', '');
     $limit = min($request->input('limit', 8), 20);
 
@@ -66,24 +105,26 @@ Route::get('/instant-search', function (\Illuminate\Http\Request $request) {
         return response()->json(['results' => []]);
     }
 
-    $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $q) . '%';
+    $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $q).'%';
 
-    $businesses = \App\Models\Business::active()
+    $businesses = Business::active()
+        ->inServiceableArea()
         ->with('category:id,name,slug', 'area:id,name,slug')
         ->where(function ($query) use ($safe) {
             $query->where('name', 'like', $safe)
-                  ->orWhere('address', 'like', $safe)
-                  ->orWhere('description', 'like', $safe);
+                ->orWhere('address', 'like', $safe)
+                ->orWhere('description', 'like', $safe);
         })
         ->orderByDesc('average_rating')
         ->limit($limit)
         ->get()
         ->map(function ($b) {
             $photo = null;
-            if (!empty($b->photos) && is_array($b->photos) && count($b->photos) > 0) {
+            if (! empty($b->photos) && is_array($b->photos) && count($b->photos) > 0) {
                 $p = $b->photos[0];
                 $photo = str_starts_with($p, 'http') ? $p : asset($p);
             }
+
             return [
                 'id' => $b->id,
                 'name' => $b->name,
@@ -181,6 +222,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/owner/businesses/{businessId}/bookings/{bookingId}/status', [OwnerDashboardController::class, 'updateBookingStatus']);
     Route::delete('/owner/businesses/{businessId}/bookings/{bookingId}', [OwnerDashboardController::class, 'destroyBooking']);
 
+    // Owner Orders
+    Route::get('/owner/businesses/{businessId}/orders', [OwnerDashboardController::class, 'orders']);
+    Route::post('/owner/businesses/{businessId}/orders', [OwnerDashboardController::class, 'storeOrder']);
+    Route::get('/owner/businesses/{businessId}/orders/{orderId}', [OwnerDashboardController::class, 'showOrder']);
+    Route::put('/owner/businesses/{businessId}/orders/{orderId}/status', [OwnerDashboardController::class, 'updateOrderStatus']);
+    Route::delete('/owner/businesses/{businessId}/orders/{orderId}', [OwnerDashboardController::class, 'destroyOrder']);
+
+    // Owner Vehicles
+    Route::get('/owner/businesses/{businessId}/vehicles', [OwnerDashboardController::class, 'vehicles']);
+    Route::post('/owner/businesses/{businessId}/vehicles', [OwnerDashboardController::class, 'storeVehicle']);
+    Route::put('/owner/businesses/{businessId}/vehicles/{vehicleId}', [OwnerDashboardController::class, 'updateVehicle']);
+    Route::delete('/owner/businesses/{businessId}/vehicles/{vehicleId}', [OwnerDashboardController::class, 'destroyVehicle']);
+
+    // Owner Trips
+    Route::get('/owner/businesses/{businessId}/trips', [OwnerDashboardController::class, 'trips']);
+    Route::get('/owner/businesses/{businessId}/trips/{tripId}', [OwnerDashboardController::class, 'showTrip']);
+    Route::put('/owner/businesses/{businessId}/trips/{tripId}/status', [OwnerDashboardController::class, 'updateTripStatus']);
+
+    // Owner Time Slots
+    Route::get('/owner/businesses/{businessId}/services/{serviceId}/slots', [OwnerDashboardController::class, 'timeSlots']);
+    Route::post('/owner/businesses/{businessId}/services/{serviceId}/slots', [OwnerDashboardController::class, 'storeTimeSlot']);
+    Route::put('/owner/businesses/{businessId}/services/{serviceId}/slots/{slotId}', [OwnerDashboardController::class, 'updateTimeSlot']);
+    Route::delete('/owner/businesses/{businessId}/services/{serviceId}/slots/{slotId}', [OwnerDashboardController::class, 'destroyTimeSlot']);
+
+    // Owner Delivery Zones
+    Route::get('/owner/businesses/{businessId}/delivery-zones', [OwnerDashboardController::class, 'deliveryZones']);
+    Route::post('/owner/businesses/{businessId}/delivery-zones', [OwnerDashboardController::class, 'storeDeliveryZone']);
+    Route::put('/owner/businesses/{businessId}/delivery-zones/{zoneId}', [OwnerDashboardController::class, 'updateDeliveryZone']);
+    Route::delete('/owner/businesses/{businessId}/delivery-zones/{zoneId}', [OwnerDashboardController::class, 'destroyDeliveryZone']);
+
     // Owner Reviews
     Route::post('/owner/reviews/{reviewId}/respond', [OwnerDashboardController::class, 'respondToReview']);
 });
@@ -219,3 +290,39 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Admin reviews management
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 });
+
+// ─── Pincode Master Data ───
+Route::get('/pincodes/lookup', [\App\Http\Controllers\Api\PincodeController::class, 'lookup']);
+Route::get('/pincodes/search', [\App\Http\Controllers\Api\PincodeController::class, 'search']);
+Route::get('/pincodes/nearby', [\App\Http\Controllers\Api\PincodeController::class, 'nearby']);
+
+// ─── Area Interest / Coming Soon ───
+Route::post('/area-interest', function (\Illuminate\Http\Request $request) {
+    $request->validate([
+        'pincode' => 'required|string|size:6',
+        'phone' => 'nullable|string|max:20',
+        'email' => 'nullable|email|max:255',
+    ]);
+
+    $pincode = \App\Models\Pincode::lookup($request->pincode);
+
+    \App\Models\AreaInterest::create([
+        'pincode' => $request->pincode,
+        'locality' => $pincode?->locality,
+        'district' => $pincode?->district,
+        'state' => $pincode?->state,
+        'phone' => $request->phone,
+        'email' => $request->email,
+    ]);
+
+    $areaName = $pincode ? "{$pincode->district}, {$pincode->state}" : 'your area';
+
+    return response()->json([
+        'message' => "Thanks! We'll notify you when we launch in {$areaName}.",
+    ]);
+});
+
+// ─── Payments (public — uses JWT) ───
+Route::get('/payments/config', [\App\Http\Controllers\Api\PaymentController::class, 'config']);
+Route::post('/payments/create-order', [\App\Http\Controllers\Api\PaymentController::class, 'createOrder']);
+Route::post('/payments/verify', [\App\Http\Controllers\Api\PaymentController::class, 'verifyPayment']);

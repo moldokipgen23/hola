@@ -16,7 +16,7 @@ return new class extends Migration
 
         foreach ($settings as $s) {
             $exists = DB::table('settings')->where('key', $s['key'])->exists();
-            if (!$exists) {
+            if (! $exists) {
                 DB::table('settings')->insert($s);
             }
         }

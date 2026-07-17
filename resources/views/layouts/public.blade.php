@@ -90,6 +90,7 @@
                     <a href="/businesses" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-primary-600 hover:bg-primary-50 transition-colors {{ request()->is('businesses*') ? 'text-primary-600 bg-primary-50' : '' }}">Businesses</a>
                     <a href="/areas" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-primary-600 hover:bg-primary-50 transition-colors {{ request()->is('area*') ? 'text-primary-600 bg-primary-50' : '' }}">Areas</a>
                     <a href="/categories" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-primary-600 hover:bg-primary-50 transition-colors {{ request()->is('categor*') ? 'text-primary-600 bg-primary-50' : '' }}">Categories</a>
+                    <a href="/explore" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-primary-600 hover:bg-primary-50 transition-colors {{ request()->is('explore') ? 'text-primary-600 bg-primary-50' : '' }}">Explore</a>
                     <a href="/map" class="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-primary-600 hover:bg-primary-50 transition-colors {{ request()->is('map') ? 'text-primary-600 bg-primary-50' : '' }}">Map</a>
                 </nav>
 
@@ -107,6 +108,7 @@
                 <a href="/businesses" class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Businesses</a>
                 <a href="/areas" class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Areas</a>
                 <a href="/categories" class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Categories</a>
+                <a href="/explore" class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Explore</a>
                 <a href="/map" class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Map</a>
             </div>
         </div>

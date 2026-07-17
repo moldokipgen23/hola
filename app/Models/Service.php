@@ -19,6 +19,7 @@ class Service extends Model
         'cancellation_hours',
         'is_active',
         'sort_order',
+        'has_fixed_slots',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Service extends Model
         'cancellation_hours' => 'integer',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'has_fixed_slots' => 'boolean',
     ];
 
     public function business(): BelongsTo
@@ -39,5 +41,10 @@ class Service extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function timeSlots(): HasMany
+    {
+        return $this->hasMany(TimeSlot::class);
     }
 }

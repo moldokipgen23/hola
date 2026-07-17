@@ -15,6 +15,7 @@
             <tr>
                 <th>Name</th>
                 <th>Slug</th>
+                <th>Module</th>
                 <th>Businesses</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -25,6 +26,12 @@
                 <tr>
                     <td class="font-medium">{{ $category->name }}</td>
                     <td class="text-sm text-slate-400">{{ $category->slug }}</td>
+                    <td>
+                        @php $modes = ['directory' => 'Directory', 'ordering' => 'Shopping', 'booking' => 'Booking', 'both' => 'Both']; @endphp
+                        <span class="badge {{ $category->module_type === 'directory' ? 'badge-gray' : ($category->module_type === 'ordering' ? 'badge-green' : ($category->module_type === 'booking' ? 'badge-yellow' : 'badge-blue')) }}">
+                            {{ $modes[$category->module_type] ?? 'Directory' }}
+                        </span>
+                    </td>
                     <td class="text-sm">{{ $category->businesses_count ?? $category->businesses->count() }}</td>
                     <td>
                         @if($category->is_active)
@@ -42,7 +49,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="text-center text-slate-400">No categories yet.</td></tr>
+                <tr><td colspan="6" class="text-center text-slate-400">No categories yet.</td></tr>
             @endforelse
         </tbody>
     </table>

@@ -24,7 +24,7 @@ return new class extends Migration
             $isEncrypted = true;
             try {
                 Crypt::decryptString($value);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $isEncrypted = false;
             }
 

@@ -2,25 +2,26 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Business;
 use App\Models\AiAgent;
 use App\Models\AiAgentTask;
+use App\Models\Business;
 use App\Models\Setting;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class GoogleSyncBusinesses extends Command
 {
     protected $signature = 'google:sync {--limit=10} {--business-id=}';
+
     protected $description = 'Sync imported businesses with Google Places — detect changes, update info, track closures';
 
     public function handle(): int
     {
         $apiKey = Setting::get('api_key_google_places') ?? config('services.google.places_api_key');
-        if (!$apiKey) {
+        if (! $apiKey) {
             $this->error('Google Places API key not configured.');
+
             return 1;
         }
 
@@ -36,10 +37,11 @@ class GoogleSyncBusinesses extends Command
 
         if ($businesses->isEmpty()) {
             $this->info('No imported businesses to sync.');
+
             return 0;
         }
 
-        $this->info("🔄 Syncing " . $businesses->count() . " businesses with Google...");
+        $this->info('🔄 Syncing '.$businesses->count().' businesses with Google...');
 
         $agent = AiAgent::where('status', 'active')->first();
         $updated = 0;
@@ -58,12 +60,14 @@ class GoogleSyncBusinesses extends Command
 
                 if ($response->failed()) {
                     $errors++;
+
                     continue;
                 }
 
                 $data = $response->json('result', []);
                 if (empty($data)) {
                     $errors++;
+
                     continue;
                 }
 
@@ -75,6 +79,7 @@ class GoogleSyncBusinesses extends Command
                     $business->update(['is_active' => false]);
                     $closed++;
                     $this->warn("  ❌ CLOSED: {$business->name}");
+
                     continue;
                 }
 
@@ -95,14 +100,14 @@ class GoogleSyncBusinesses extends Command
                 // Check website change
                 $newWebsite = $data['website'] ?? null;
                 if ($newWebsite && $newWebsite !== $business->website) {
-                    $businessChanges[] = "website updated";
+                    $businessChanges[] = 'website updated';
                     $newData['website'] = $newWebsite;
                 }
 
                 // Check address change
                 $newAddress = $data['formatted_address'] ?? null;
                 if ($newAddress && $newAddress !== $business->address) {
-                    $businessChanges[] = "address changed";
+                    $businessChanges[] = 'address changed';
                     $newData['address'] = $newAddress;
                 }
 
@@ -119,14 +124,14 @@ class GoogleSyncBusinesses extends Command
                 $newLat = $data['geometry']['location']['lat'] ?? null;
                 $newLng = $data['geometry']['location']['lng'] ?? null;
                 if ($newLat && $newLng && ($newLat != $business->latitude || $newLng != $business->longitude)) {
-                    $businessChanges[] = "location changed";
+                    $businessChanges[] = 'location changed';
                     $newData['latitude'] = $newLat;
                     $newData['longitude'] = $newLng;
                 }
 
                 // Check working hours change
                 $workingHours = null;
-                if (!empty($data['opening_hours']['weekday_text'])) {
+                if (! empty($data['opening_hours']['weekday_text'])) {
                     $hoursMap = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
                     $workingHours = [];
                     foreach ($data['opening_hours']['weekday_text'] as $index => $text) {
@@ -144,23 +149,23 @@ class GoogleSyncBusinesses extends Command
                         }
                     }
                     if ($workingHours != $business->working_hours) {
-                        $businessChanges[] = "working hours updated";
+                        $businessChanges[] = 'working hours updated';
                         $newData['working_hours'] = $workingHours;
                     }
                 }
 
                 // Check photos (new photos added?)
-                if (!empty($data['photos'])) {
+                if (! empty($data['photos'])) {
                     $currentPhotoCount = count($business->photos ?? []);
                     $googlePhotoCount = count($data['photos']);
                     if ($googlePhotoCount > $currentPhotoCount) {
                         $newPhotos = [];
                         foreach (array_slice($data['photos'], 0, 10) as $photo) {
-                            if (!empty($photo['photo_reference'])) {
+                            if (! empty($photo['photo_reference'])) {
                                 $newPhotos[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
                             }
                         }
-                        if (!empty($newPhotos)) {
+                        if (! empty($newPhotos)) {
                             $businessChanges[] = "photos updated ({$googlePhotoCount} on Google)";
                             $newData['photos'] = $newPhotos;
                         }
@@ -168,7 +173,7 @@ class GoogleSyncBusinesses extends Command
                 }
 
                 // Apply changes
-                if (!empty($businessChanges)) {
+                if (! empty($businessChanges)) {
                     $newData['last_synced_at'] = now();
                     $business->update($newData);
                     $changed++;
@@ -176,7 +181,7 @@ class GoogleSyncBusinesses extends Command
                         'business' => $business->name,
                         'changes' => $businessChanges,
                     ];
-                    $this->info("  ✏️  {$business->name}: " . implode(', ', $businessChanges));
+                    $this->info("  ✏️  {$business->name}: ".implode(', ', $businessChanges));
                 } else {
                     // No changes — just update last_synced_at
                     $business->update(['last_synced_at' => now()]);
@@ -212,8 +217,8 @@ class GoogleSyncBusinesses extends Command
             ]);
         }
 
-        $this->info("");
-        $this->info("📊 Sync complete:");
+        $this->info('');
+        $this->info('📊 Sync complete:');
         $this->info("  Synced: {$updated}");
         $this->info("  Changed: {$changed}");
         $this->info("  Closed: {$closed}");

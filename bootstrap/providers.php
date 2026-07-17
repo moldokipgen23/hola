@@ -1,6 +1,9 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\MailConfigServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\MailConfigServiceProvider::class,
+    AppServiceProvider::class,
+    MailConfigServiceProvider::class,
 ];

@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Business;
+use App\Models\Pincode;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -25,21 +27,21 @@ class AuthController extends Controller
             'id_token' => $request->google_token,
         ]);
 
-        if (!$response->successful() || !$response->json('sub')) {
+        if (! $response->successful() || ! $response->json('sub')) {
             return response()->json(['message' => 'Invalid Google token'], 401);
         }
 
         $payload = $response->json();
 
         $expectedAud = config('services.google.client_id');
-        if (!$expectedAud) {
+        if (! $expectedAud) {
             return response()->json(['message' => 'Google authentication not configured.'], 503);
         }
         if (($payload['aud'] ?? null) !== $expectedAud) {
             return response()->json(['message' => 'Invalid Google token'], 401);
         }
 
-        if (!empty($payload['exp']) && (int) $payload['exp'] < time()) {
+        if (! empty($payload['exp']) && (int) $payload['exp'] < time()) {
             return response()->json(['message' => 'Expired Google token'], 401);
         }
 
@@ -69,7 +71,7 @@ class AuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'No account found with this phone number. Please register first.'], 404);
         }
 
@@ -92,7 +94,7 @@ class AuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (!$user || $user->otp !== $request->otp || now()->greaterThan($user->otp_expires_at)) {
+        if (! $user || $user->otp !== $request->otp || now()->greaterThan($user->otp_expires_at)) {
             return response()->json(['message' => 'Invalid or expired OTP'], 401);
         }
 
@@ -144,7 +146,25 @@ class AuthController extends Controller
             'business_name' => 'required|string|max:255',
             'business_address' => 'nullable|string|max:255',
             'business_category_id' => 'required|exists:categories,id',
+            'pincode' => 'required|string|size:6',
         ]);
+
+        // Validate pincode
+        $pincode = Pincode::lookup($request->pincode);
+        if (! $pincode) {
+            return response()->json(['message' => 'Invalid pincode. Please enter a valid Indian pincode.'], 422);
+        }
+        if (! $pincode->serviceable) {
+            return response()->json([
+                'message' => "We're not in {$pincode->district}, {$pincode->state} yet! Leave your email and we'll notify you when we launch there.",
+                'area' => [
+                    'pincode' => $pincode->pincode,
+                    'locality' => $pincode->locality,
+                    'district' => $pincode->district,
+                    'state' => $pincode->state,
+                ],
+            ], 422);
+        }
 
         $user = User::create([
             'name' => $request->name,
@@ -154,16 +174,19 @@ class AuthController extends Controller
             'role' => 'owner',
         ]);
 
-        $slug = \Illuminate\Support\Str::slug($request->business_name);
-        if (\App\Models\Business::withTrashed()->where('slug', $slug)->exists()) {
-            $slug .= '-' . \Illuminate\Support\Str::random(5);
+        $slug = Str::slug($request->business_name);
+        if (Business::withTrashed()->where('slug', $slug)->exists()) {
+            $slug .= '-'.Str::random(5);
         }
 
-        $business = \App\Models\Business::create([
+        $business = Business::create([
             'name' => $request->business_name,
             'slug' => $slug,
             'address' => $request->business_address ?? '',
             'category_id' => $request->business_category_id,
+            'pincode' => $pincode->pincode,
+            'state' => $pincode->state,
+            'district' => $pincode->district,
             'created_by' => $user->id,
             'claim_status' => 'claimed',
             'is_active' => true,
@@ -189,15 +212,15 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
         if ($user->banned_at) {
-            return response()->json(['message' => 'Your account has been banned.' . ($user->ban_reason ? " Reason: {$user->ban_reason}" : '')], 403);
+            return response()->json(['message' => 'Your account has been banned.'.($user->ban_reason ? " Reason: {$user->ban_reason}" : '')], 403);
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             return response()->json(['message' => 'Your account is inactive. Please contact support.'], 403);
         }
 
@@ -219,7 +242,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !$user->isAdmin() || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! $user->isAdmin() || ! Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
@@ -227,7 +250,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Your account has been banned.'], 403);
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             return response()->json(['message' => 'Your account is inactive.'], 403);
         }
 
@@ -350,7 +373,7 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        if (!Hash::check($request->current_password, $request->user()->password)) {
+        if (! Hash::check($request->current_password, $request->user()->password)) {
             return response()->json(['message' => 'Current password is incorrect.'], 422);
         }
 
@@ -368,7 +391,7 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (!Hash::check($request->password, $request->user()->password)) {
+        if (! Hash::check($request->password, $request->user()->password)) {
             return response()->json(['message' => 'Password is incorrect.'], 422);
         }
 

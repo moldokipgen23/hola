@@ -14,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, \Illuminate\Auth\MustVerifyEmail;
+    use HasApiTokens, HasFactory, \Illuminate\Auth\MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -87,17 +87,17 @@ class User extends Authenticatable
 
     public function notifications(): HasMany
     {
-        return $this->hasMany(\App\Models\Notification::class);
+        return $this->hasMany(Notification::class);
     }
 
     public function conversations(): HasMany
     {
-        return $this->hasMany(\App\Models\Conversation::class, 'user_id');
+        return $this->hasMany(Conversation::class, 'user_id');
     }
 
     public function ownedConversations(): HasMany
     {
-        return $this->hasMany(\App\Models\Conversation::class, 'business_owner_id');
+        return $this->hasMany(Conversation::class, 'business_owner_id');
     }
 
     public function createdBy(): BelongsTo
@@ -132,7 +132,7 @@ class User extends Authenticatable
 
     public function isActive(): bool
     {
-        return $this->is_active && !$this->isBanned();
+        return $this->is_active && ! $this->isBanned();
     }
 
     public function ban(?string $reason = null): void

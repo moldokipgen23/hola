@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Business extends Model
@@ -50,10 +49,18 @@ class Business extends Model
         'service_type',
         'is_bookable',
         'price_range',
+        'delivery_radius_km',
+        'pincode',
+        'state',
         'last_synced_at',
         'created_by',
         'enabled_modules',
         'module_config',
+        'payment_methods',
+        'claim_notifications_enabled',
+        'claim_notification_delay_days',
+        'claim_preferred_channel',
+        'claim_auto_approve',
     ];
 
     protected $casts = [
@@ -72,10 +79,12 @@ class Business extends Model
         'share_count' => 'integer',
         'is_bookable' => 'boolean',
         'price_range' => 'integer',
+        'delivery_radius_km' => 'decimal:2',
         'average_rating' => 'float',
         'review_count' => 'integer',
         'enabled_modules' => 'array',
         'module_config' => 'array',
+        'payment_methods' => 'array',
     ];
 
     protected $appends = ['quality_score'];
@@ -83,15 +92,34 @@ class Business extends Model
     public function getQualityScoreAttribute(): int
     {
         $score = 0;
-        if ($this->name) $score += 15;
-        if ($this->description && strlen($this->description) > 20) $score += 15;
-        if ($this->address) $score += 10;
-        if ($this->phone) $score += 15;
-        if ($this->latitude && $this->longitude) $score += 10;
-        if ($this->working_hours) $score += 10;
-        if ($this->photos && count($this->photos) > 0) $score += 15;
-        if ($this->email) $score += 5;
-        if ($this->whatsapp) $score += 5;
+        if ($this->name) {
+            $score += 15;
+        }
+        if ($this->description && strlen($this->description) > 20) {
+            $score += 15;
+        }
+        if ($this->address) {
+            $score += 10;
+        }
+        if ($this->phone) {
+            $score += 15;
+        }
+        if ($this->latitude && $this->longitude) {
+            $score += 10;
+        }
+        if ($this->working_hours) {
+            $score += 10;
+        }
+        if ($this->photos && count($this->photos) > 0) {
+            $score += 15;
+        }
+        if ($this->email) {
+            $score += 5;
+        }
+        if ($this->whatsapp) {
+            $score += 5;
+        }
+
         return min($score, 100);
     }
 
@@ -173,6 +201,96 @@ class Business extends Model
         return $this->hasMany(Order::class)->orderByDesc('created_at');
     }
 
+    public function deliveryZones(): HasMany
+    {
+        return $this->hasMany(DeliveryZone::class);
+    }
+
+    public function pincodeData(): BelongsTo
+    {
+        return $this->belongsTo(Pincode::class, 'pincode', 'pincode');
+    }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class)->orderBy('sort_order');
+    }
+
+    public function trips(): HasMany
+    {
+        return $this->hasMany(Trip::class)->orderByDesc('created_at');
+    }
+
+    public function hasBookingsModule(): bool
+    {
+        $modules = $this->enabled_modules;
+
+        return $modules && ($modules['bookings'] ?? false);
+    }
+
+    public function hasOrdersModule(): bool
+    {
+        $modules = $this->enabled_modules;
+
+        return $modules && ($modules['orders'] ?? false);
+    }
+
+    public function hasTransportModule(): bool
+    {
+        $modules = $this->enabled_modules;
+
+        return $modules && ($modules['transport'] ?? false);
+    }
+
+    public function hasTurfModule(): bool
+    {
+        $modules = $this->enabled_modules;
+
+        return $modules && ($modules['turf'] ?? false);
+    }
+
+    protected static function booted()
+    {
+        static::creating(function ($business) {
+            if ($business->category_id && empty($business->enabled_modules)) {
+                $category = Category::find($business->category_id);
+                if ($category && $category->module_type !== 'directory') {
+                    static::applyCategoryModules($business, $category);
+                }
+            }
+        });
+
+        static::updating(function ($business) {
+            if ($business->isDirty('category_id') && ! $business->isDirty('enabled_modules')) {
+                $category = Category::find($business->category_id);
+                if ($category) {
+                    static::applyCategoryModules($business, $category);
+                }
+            }
+        });
+    }
+
+    protected static function applyCategoryModules($business, $category): void
+    {
+        $business->enabled_modules = match ($category->module_type) {
+            'ordering' => ['catalog' => true, 'orders' => true, 'bookings' => false, 'inventory' => true],
+            'booking' => ['catalog' => true, 'bookings' => true, 'orders' => false, 'inventory' => false],
+            'both' => ['catalog' => true, 'bookings' => true, 'orders' => true, 'inventory' => true],
+            'transport' => ['catalog' => true, 'transport' => true, 'bookings' => false, 'orders' => false, 'inventory' => false],
+            'turf' => ['catalog' => true, 'turf' => true, 'bookings' => false, 'orders' => false, 'inventory' => false],
+            default => ['catalog' => true, 'bookings' => false, 'orders' => false, 'inventory' => false],
+        };
+        $business->service_type = match ($category->module_type) {
+            'ordering' => 'buyable',
+            'booking' => 'bookable',
+            'both' => 'hybrid',
+            'transport' => 'transport',
+            'turf' => 'turf',
+            default => 'directory',
+        };
+        $business->is_bookable = in_array($category->module_type, ['booking', 'both', 'turf', 'transport']);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -185,11 +303,33 @@ class Business extends Model
 
     public function scopeSearch($query, $term)
     {
-        $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $term) . '%';
+        $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $term).'%';
+
         return $query->where(function ($q) use ($safe) {
             $q->where('name', 'like', $safe)
-              ->orWhere('description', 'like', $safe)
-              ->orWhere('address', 'like', $safe);
+                ->orWhere('description', 'like', $safe)
+                ->orWhere('address', 'like', $safe);
+        });
+    }
+
+    public function scopeInServiceableArea($query)
+    {
+        return $query->whereNotNull('pincode')->whereHas('pincodeData', function ($q) {
+            $q->where('serviceable', true);
+        });
+    }
+
+    public function scopeOfModule($query, string $module)
+    {
+        $modules = array_map('trim', explode(',', $module));
+
+        return $query->whereHas('category', function ($q) use ($modules) {
+            $q->whereIn('module_type', $modules);
+            foreach (['ordering', 'booking'] as $single) {
+                if (in_array($single, $modules)) {
+                    $q->orWhere('module_type', 'both');
+                }
+            }
         });
     }
 }

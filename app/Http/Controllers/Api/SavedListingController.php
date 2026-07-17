@@ -35,6 +35,7 @@ class SavedListingController extends Controller
         if ($existing) {
             $existing->delete();
             Business::where('id', $request->business_id)->decrement('saves_count');
+
             return response()->json([
                 'saved' => false,
                 'message' => 'Removed from saved listings.',

@@ -19,6 +19,8 @@ class Order extends Model
         'customer_phone',
         'customer_email',
         'delivery_address',
+        'delivery_method',
+        'delivery_time_slot',
         'subtotal',
         'tax',
         'delivery_fee',

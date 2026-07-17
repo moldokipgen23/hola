@@ -119,6 +119,80 @@
             </div>
         </div>
 
+        <!-- Enabled Modules -->
+        <div class="glass-card p-6">
+            <h3 class="text-white font-semibold mb-4">Modules & Features</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                @php
+                    $modules = $business->enabled_modules ?? [];
+                    $moduleLabels = ['catalog' => 'Catalog', 'bookings' => 'Bookings', 'orders' => 'Orders', 'inventory' => 'Inventory'];
+                @endphp
+                @foreach($moduleLabels as $key => $label)
+                    <div class="bg-white/5 rounded-xl p-3 text-center">
+                        <p class="text-xs text-slate-500 mb-1">{{ $label }}</p>
+                        @if($modules[$key] ?? false)
+                            <span class="badge badge-green text-xs">Enabled</span>
+                        @else
+                            <span class="badge bg-slate-500/20 text-slate-400 text-xs">Disabled</span>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Service Type</p>
+                    <p class="text-white font-medium capitalize">{{ $business->service_type ?? 'directory' }}</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Bookable</p>
+                    @if($business->is_bookable)
+                        <span class="badge badge-green">Yes</span>
+                    @else
+                        <span class="badge bg-slate-500/20 text-slate-400">No</span>
+                    @endif
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Price Range</p>
+                    <p class="text-white font-medium">{{ $business->price_range ? str_repeat('₹', $business->price_range) : '—' }}</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Products / Bookings / Orders</p>
+                    <p class="text-white font-medium text-sm">{{ $business->products_count ?? 0 }}p / {{ $business->bookings_count ?? 0 }}b / {{ $business->orders_count ?? 0 }}o</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Claim Settings -->
+        <div class="glass-card p-6">
+            <h3 class="text-white font-semibold mb-4">Claim Settings</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Notifications Enabled</p>
+                    @if($business->claim_notifications_enabled)
+                        <span class="badge badge-green">Yes</span>
+                    @else
+                        <span class="badge bg-slate-500/20 text-slate-400">No</span>
+                    @endif
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Delay (days)</p>
+                    <p class="text-white font-medium">{{ $business->claim_notification_delay_days ?? 3 }}</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Preferred Channel</p>
+                    <p class="text-white font-medium capitalize">{{ $business->claim_preferred_channel ?? 'all' }}</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Auto-Approve</p>
+                    @if($business->claim_auto_approve)
+                        <span class="badge badge-green">Yes</span>
+                    @else
+                        <span class="badge bg-slate-500/20 text-slate-400">No</span>
+                    @endif
+                </div>
+            </div>
+        </div>
+
         <!-- Contact Information -->
         <div class="glass-card p-6">
             <h3 class="text-white font-semibold mb-4">Contact Information</h3>
@@ -220,6 +294,36 @@
                 </div>
             @else
                 <p class="text-slate-600 text-sm italic">No coordinates available.</p>
+            @endif
+        </div>
+
+        <!-- Delivery Zones -->
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-white font-semibold">Delivery Zones ({{ $business->deliveryZones->count() }})</h3>
+                <a href="{{ route('owner.businesses.delivery-zones', $business->id) }}" target="_blank" class="btn-ghost text-xs">Manage in Vendor Dashboard</a>
+            </div>
+            @if($business->deliveryZones->count())
+                <div class="space-y-2">
+                    @foreach($business->deliveryZones as $zone)
+                        <div class="flex justify-between items-center bg-white/5 rounded-xl p-3">
+                            <div>
+                                <p class="text-white text-sm font-medium">{{ $zone->area?->name ?? 'Area #'.$zone->area_id }}</p>
+                                <p class="text-slate-500 text-xs">Delivery Fee: ₹{{ number_format($zone->delivery_fee, 2) }}</p>
+                            </div>
+                            <div class="text-right text-xs text-slate-500">
+                                @if($zone->pincodes)
+                                    <p>{{ is_array($zone->pincodes) ? count($zone->pincodes) : 0 }} pincodes</p>
+                                @endif
+                                <span class="badge {{ $zone->is_active ? 'badge-green' : 'badge-red' }}">
+                                    {{ $zone->is_active ? 'Active' : 'Inactive' }}
+                                </span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <p class="text-slate-600 text-sm italic">No delivery zones configured.</p>
             @endif
         </div>
 

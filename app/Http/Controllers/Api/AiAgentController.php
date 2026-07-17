@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AiAgent;
 use App\Models\AiAgentTask;
 use App\Models\ImportItem;
+use App\Services\AgentSkillService;
 use Illuminate\Http\Request;
 
 class AiAgentController extends Controller
@@ -95,7 +96,7 @@ class AiAgentController extends Controller
         }
 
         $request->validate([
-            'skill' => 'required|string|in:' . implode(',', $agent->skills),
+            'skill' => 'required|string|in:'.implode(',', $agent->skills),
         ]);
 
         $skill = $request->skill;
@@ -109,7 +110,7 @@ class AiAgentController extends Controller
         ]);
 
         // Run skill via service
-        $service = app(\App\Services\AgentSkillService::class);
+        $service = app(AgentSkillService::class);
         $result = $service->run($agent, $task);
 
         return response()->json([

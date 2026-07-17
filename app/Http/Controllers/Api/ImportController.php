@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\Category;
 use App\Models\ImportBatch;
 use App\Models\ImportItem;
+use App\Models\Pincode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -34,7 +35,7 @@ class ImportController extends Controller
         }
 
         if ($request->source) {
-            $query->whereHas('batch', fn($q) => $q->where('source', $request->source));
+            $query->whereHas('batch', fn ($q) => $q->where('source', $request->source));
         }
 
         $items = $query->latest()->paginate(20);
@@ -51,14 +52,14 @@ class ImportController extends Controller
         $existingBusiness = null;
 
         // Check by google_place_id (external_id)
-        if (!empty($item->external_id)) {
+        if (! empty($item->external_id)) {
             $existingBusiness = Business::withoutTrashed()->where('external_id', $item->external_id)->first();
         }
 
         // Check by name + similar address
-        if (!$existingBusiness && !empty($data['name'])) {
+        if (! $existingBusiness && ! empty($data['name'])) {
             $existingBusiness = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [Str::lower(trim($data['name']))])->first();
-            if ($existingBusiness && !empty($data['address'])) {
+            if ($existingBusiness && ! empty($data['address'])) {
                 // Verify address is also similar
                 $existingAddr = Str::lower($existingBusiness->address);
                 $newAddr = Str::lower($data['address']);
@@ -70,7 +71,7 @@ class ImportController extends Controller
         }
 
         // Check by phone number
-        if (!$existingBusiness && !empty($data['phone'])) {
+        if (! $existingBusiness && ! empty($data['phone'])) {
             $normalizedPhone = Str::replace([' ', '-', '(', ')', '+'], '', $data['phone']);
             $existingBusiness = Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
         }
@@ -98,25 +99,55 @@ class ImportController extends Controller
         $slug = Str::slug($data['name']);
         $existing = Business::where('slug', $slug)->first();
         if ($existing) {
-            $slug .= '-' . Str::random(5);
+            $slug .= '-'.Str::random(5);
         }
 
         // Download photos if available
         $photos = [];
-        if (!empty($data['photos']) && is_array($data['photos'])) {
+        if (! empty($data['photos']) && is_array($data['photos'])) {
             foreach ($data['photos'] as $photoUrl) {
                 try {
                     $response = Http::timeout(10)->get($photoUrl);
                     if ($response->successful()) {
                         $ext = 'jpg';
-                        $filename = 'businesses/' . $slug . '_' . Str::random(6) . '.' . $ext;
+                        $filename = 'businesses/'.$slug.'_'.Str::random(6).'.'.$ext;
                         Storage::disk('public')->put($filename, $response->body());
-                        $photos[] = 'storage/' . $filename;
+                        $photos[] = 'storage/'.$filename;
                     }
                 } catch (\Exception $e) {
                     continue;
                 }
             }
+        }
+
+        // Derive pincode from data or fallback
+        $pincode = null;
+        if (! empty($data['pincode'])) {
+            $pincode = Pincode::lookup($data['pincode']);
+        }
+        // Try to find pincode by lat/lng fallback
+        if (! $pincode && ! empty($data['latitude']) && ! empty($data['longitude'])) {
+            $pincode = Pincode::haversine($data['latitude'], $data['longitude'], 1)->where('serviceable', true)->first();
+        }
+        // Last resort fallback to district default
+        if (! $pincode) {
+            $district = $data['district'] ?? 'Churachandpur';
+            $pincode = Pincode::where('district', $district)->where('serviceable', true)->first();
+        }
+
+        // Skip if pincode not found or not serviceable
+        if (! $pincode || ! $pincode->serviceable) {
+            $item->update([
+                'status' => 'rejected',
+                'notes' => 'Area not yet serviceable: ' . ($data['district'] ?? 'unknown'),
+            ]);
+            $item->batch->increment('rejected');
+            $item->batch->decrement('pending');
+
+            return response()->json([
+                'message' => 'Skipped: Area not yet serviceable.',
+                'skipped' => true,
+            ]);
         }
 
         $business = Business::create([
@@ -125,7 +156,9 @@ class ImportController extends Controller
             'description' => $data['description'] ?? null,
             'address' => $data['address'] ?? '',
             'locality' => $data['locality'] ?? null,
-            'district' => $data['district'] ?? 'Churachandpur',
+            'district' => $data['district'] ?? $pincode->district,
+            'pincode' => $pincode->pincode,
+            'state' => $pincode->state,
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'phone' => $data['phone'] ?? null,

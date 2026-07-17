@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClaimRequest;
-use App\Models\Business;
 use App\Services\ActivityLogService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class ClaimController extends Controller
 {

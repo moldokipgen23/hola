@@ -10,14 +10,14 @@ class MailConfigServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        if (!$this->app->runningInConsole() && !DB::getSchemaBuilder()->hasTable('settings')) {
+        if (! $this->app->runningInConsole() && ! DB::getSchemaBuilder()->hasTable('settings')) {
             return;
         }
 
         try {
             $smtpSettings = $this->getSmtpSettings();
 
-            if (!empty($smtpSettings['smtp_driver'])) {
+            if (! empty($smtpSettings['smtp_driver'])) {
                 Config::set('mail.default', $smtpSettings['smtp_driver']);
             }
 
@@ -31,10 +31,10 @@ class MailConfigServiceProvider extends ServiceProvider
                 Config::set('mail.mailers.smtp.local_domain', $smtpSettings['smtp_local_domain'] ?? null);
             }
 
-            if (!empty($smtpSettings['smtp_from_address'])) {
+            if (! empty($smtpSettings['smtp_from_address'])) {
                 Config::set('mail.from.address', $smtpSettings['smtp_from_address']);
             }
-            if (!empty($smtpSettings['smtp_from_name'])) {
+            if (! empty($smtpSettings['smtp_from_name'])) {
                 Config::set('mail.from.name', $smtpSettings['smtp_from_name']);
             }
         } catch (\Exception $e) {

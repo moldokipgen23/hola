@@ -38,6 +38,17 @@
                     class="input-dark" placeholder="e.g., 🏪">
             </div>
 
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Module Type *</label>
+                <select name="module_type" required class="input-dark">
+                    <option value="directory" {{ old('module_type', $category->module_type ?? '') === 'directory' ? 'selected' : '' }}>Directory (listing only)</option>
+                    <option value="ordering" {{ old('module_type', $category->module_type ?? '') === 'ordering' ? 'selected' : '' }}>Shopping / Ordering (products, cart, checkout)</option>
+                    <option value="booking" {{ old('module_type', $category->module_type ?? '') === 'booking' ? 'selected' : '' }}>Booking (services, reservations, appointments)</option>
+                    <option value="both" {{ old('module_type', $category->module_type ?? '') === 'both' ? 'selected' : '' }}>Both (ordering + booking)</option>
+                </select>
+                <p class="text-xs text-slate-500 mt-1">New businesses under this category will auto-enable the chosen features.</p>
+            </div>
+
             <div class="flex items-center gap-4">
                 <label class="flex items-center gap-2">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', $category->is_active ?? 1) ? 'checked' : '' }}>

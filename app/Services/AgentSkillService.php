@@ -2,13 +2,16 @@
 
 namespace App\Services;
 
+use App\Models\AgentImportedBusiness;
 use App\Models\AiAgent;
 use App\Models\AiAgentTask;
+use App\Models\Area;
+use App\Models\Business;
+use App\Models\Category;
 use App\Models\ImportBatch;
 use App\Models\ImportItem;
 use App\Models\SearchHistory;
-use App\Models\Business;
-use App\Models\Category;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -18,8 +21,8 @@ class AgentSkillService
     const DISTRICT_BOUNDS = [
         'north' => 24.4500,
         'south' => 24.2000,
-        'east'  => 93.8500,
-        'west'  => 93.5500,
+        'east' => 93.8500,
+        'west' => 93.5500,
     ];
 
     public function run(AiAgent $agent, AiAgentTask $task): array
@@ -106,10 +109,10 @@ class AgentSkillService
     private function googlePlacesImport(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
-        $apiKey = \App\Models\Setting::get('api_key_google_places')
+        $apiKey = Setting::get('api_key_google_places')
             ?? config('services.google.places_api_key');
 
-        if (!$apiKey) {
+        if (! $apiKey) {
             throw new \Exception('Google Places API key not configured.');
         }
 
@@ -120,7 +123,7 @@ class AgentSkillService
 
         // Build search query from area + zipcode + query
         $location = implode(' ', array_filter([$area, $zipcode]));
-        $searchQuery = $query . ($location ? ' in ' . $location : '');
+        $searchQuery = $query.($location ? ' in '.$location : '');
 
         // Text Search with pagination (Google returns max 20 per page)
         $places = [];
@@ -139,7 +142,7 @@ class AgentSkillService
             $response = Http::get('https://maps.googleapis.com/maps/api/place/textsearch/json', $params);
 
             if ($response->failed()) {
-                throw new \Exception('Google Places API request failed: ' . $response->body());
+                throw new \Exception('Google Places API request failed: '.$response->body());
             }
 
             $data = $response->json();
@@ -147,7 +150,7 @@ class AgentSkillService
             if (($data['status'] ?? '') !== 'OK' && ($data['status'] ?? '') !== 'ZERO_RESULTS') {
                 if ($page === 0) {
                     $errorMsg = $data['error_message'] ?? $data['status'] ?? 'Unknown error';
-                    throw new \Exception('Google Places API error: ' . $errorMsg);
+                    throw new \Exception('Google Places API error: '.$errorMsg);
                 }
                 break;
             }
@@ -155,7 +158,7 @@ class AgentSkillService
             $places = array_merge($places, $data['results'] ?? []);
             $pageToken = $data['next_page_token'] ?? null;
 
-            if (!$pageToken) {
+            if (! $pageToken) {
                 break;
             }
 
@@ -171,7 +174,10 @@ class AgentSkillService
         $places = array_filter($places, function ($place) use ($bounds) {
             $lat = $place['geometry']['location']['lat'] ?? null;
             $lng = $place['geometry']['location']['lng'] ?? null;
-            if (!$lat || !$lng) return true; // keep if no coordinates (will be checked later)
+            if (! $lat || ! $lng) {
+                return true;
+            } // keep if no coordinates (will be checked later)
+
             return $lat >= $bounds['south'] && $lat <= $bounds['north']
                 && $lng >= $bounds['west'] && $lng <= $bounds['east'];
         });
@@ -191,7 +197,7 @@ class AgentSkillService
 
             foreach ($previousSearches as $prevTask) {
                 $meta = $prevTask->search_metadata ?? [];
-                if (!empty($meta['place_ids'])) {
+                if (! empty($meta['place_ids'])) {
                     $previousPlaceIds = array_merge($previousPlaceIds, $meta['place_ids']);
                 }
             }
@@ -202,13 +208,13 @@ class AgentSkillService
 
         // AI MEMORY: Load ALL businesses this agent has ever imported (census checklist)
         try {
-            $agentImportedPlaceIds = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+            $agentImportedPlaceIds = AgentImportedBusiness::where('agent_id', $agent->id)
                 ->whereNotNull('google_place_id')
                 ->pluck('google_place_id')
                 ->toArray();
-            $agentImportedNames = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+            $agentImportedNames = AgentImportedBusiness::where('agent_id', $agent->id)
                 ->pluck('business_name')
-                ->map(fn($n) => Str::lower(trim($n)))
+                ->map(fn ($n) => Str::lower(trim($n)))
                 ->toArray();
         } catch (\Exception $e) {
             // Memory table might not exist yet — fall back to empty
@@ -238,9 +244,9 @@ class AgentSkillService
 
         // Pre-load existing ACTIVE businesses for duplicate detection (exclude soft-deleted)
         $existingPlaceIds = Business::withoutTrashed()->whereNotNull('external_id')->pluck('external_id')->toArray();
-        $existingNames = Business::withoutTrashed()->pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+        $existingNames = Business::withoutTrashed()->pluck('name')->map(fn ($n) => Str::lower($n))->toArray();
         // Also pre-load cleaned names (without city suffix) for faster matching
-        $existingCleanedNames = array_map(fn($n) => preg_replace('/\s*[-–,]\s*(churachandpur|lamka|manipur|india).*$/i', '', $n), $existingNames);
+        $existingCleanedNames = array_map(fn ($n) => preg_replace('/\s*[-–,]\s*(churachandpur|lamka|manipur|india).*$/i', '', $n), $existingNames);
 
         foreach ($places as $place) {
             $placeId = $place['place_id'] ?? null;
@@ -267,11 +273,11 @@ class AgentSkillService
             }
 
             // DUPLICATE CHECK 1b: This agent already imported this business (census memory)
-            if (!$isDuplicate && $placeId && in_array($placeId, $agentImportedPlaceIds)) {
+            if (! $isDuplicate && $placeId && in_array($placeId, $agentImportedPlaceIds)) {
                 $isDuplicate = true;
-                $importedRecord = \App\Models\AgentImportedBusiness::where('agent_id', $agent->id)
+                $importedRecord = AgentImportedBusiness::where('agent_id', $agent->id)
                     ->where('google_place_id', $placeId)->first();
-                $duplicateReason = "You already imported this business" . ($importedRecord ? " on {$importedRecord->imported_at->format('M d, Y')}" : '');
+                $duplicateReason = 'You already imported this business'.($importedRecord ? " on {$importedRecord->imported_at->format('M d, Y')}" : '');
             }
 
             // DUPLICATE CHECK 2: Same name (exact or close match) — fast in-memory check first
@@ -279,24 +285,24 @@ class AgentSkillService
             $normalizedAddress = Str::lower(trim($address));
             // Strip common suffixes like city names for comparison
             $cleanName = preg_replace('/\s*[-–,]\s*(churachandpur|lamka|manipur|india).*$/i', '', $normalizedName);
-            
-            if (!$isDuplicate && (in_array($normalizedName, $existingNames) || in_array($cleanName, $existingCleanedNames))) {
+
+            if (! $isDuplicate && (in_array($normalizedName, $existingNames) || in_array($cleanName, $existingCleanedNames))) {
                 $isDuplicate = true;
-                $duplicateReason = "Name matches existing business";
+                $duplicateReason = 'Name matches existing business';
             }
 
             // DUPLICATE CHECK 2b: This agent imported a business with this name (census memory)
-            if (!$isDuplicate && (in_array($normalizedName, $agentImportedNames) || in_array($cleanName, $agentImportedNames))) {
+            if (! $isDuplicate && (in_array($normalizedName, $agentImportedNames) || in_array($cleanName, $agentImportedNames))) {
                 $isDuplicate = true;
-                $duplicateReason = "You already imported this business";
+                $duplicateReason = 'You already imported this business';
             }
 
             // DUPLICATE CHECK 2c: Fuzzy match — name contains or is contained in existing name (min 5 chars)
-            if (!$isDuplicate && strlen($cleanName) >= 5) {
+            if (! $isDuplicate && strlen($cleanName) >= 5) {
                 foreach ($existingCleanedNames as $existingName) {
                     if (strlen($existingName) >= 5 && ($existingName === $cleanName || Str::contains($existingName, $cleanName) || Str::contains($cleanName, $existingName))) {
                         $isDuplicate = true;
-                        $duplicateReason = "Similar name matches existing business";
+                        $duplicateReason = 'Similar name matches existing business';
                         break;
                     }
                 }
@@ -305,6 +311,7 @@ class AgentSkillService
             // QUALITY CHECK: Skip places without address
             if (strlen($address) < 5) {
                 $skipped++;
+
                 continue;
             }
 
@@ -326,7 +333,7 @@ class AgentSkillService
                         $website = $detailData['website'] ?? null;
 
                         // Extract working hours
-                        if (!empty($detailData['opening_hours']['weekday_text'])) {
+                        if (! empty($detailData['opening_hours']['weekday_text'])) {
                             $hoursMap = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
                             $workingHours = [];
                             foreach ($detailData['opening_hours']['weekday_text'] as $index => $text) {
@@ -345,16 +352,16 @@ class AgentSkillService
                             }
                         }
 
-                        if (!empty($detailData['photos'])) {
+                        if (! empty($detailData['photos'])) {
                             foreach (array_slice($detailData['photos'], 0, 10) as $photo) {
-                                if (!empty($photo['photo_reference'])) {
+                                if (! empty($photo['photo_reference'])) {
                                     $photoUrls[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
                                 }
                             }
                         }
                         // Capture reviews
                         $googleReviews = [];
-                        if (!empty($detailData['reviews'])) {
+                        if (! empty($detailData['reviews'])) {
                             foreach (array_slice($detailData['reviews'], 0, 5) as $rev) {
                                 $googleReviews[] = [
                                     'author' => $rev['author_name'] ?? 'Anonymous',
@@ -392,15 +399,15 @@ class AgentSkillService
             $lat = $place['geometry']['location']['lat'] ?? null;
             $lng = $place['geometry']['location']['lng'] ?? null;
             if ($lat && $lng) {
-                $area = \App\Models\Area::findByCoordinates($lat, $lng);
+                $area = Area::findByCoordinates($lat, $lng);
                 if ($area) {
                     $areaId = $area->id;
                 }
             }
             // Fallback: try matching by locality name or address keywords
-            if (!$areaId) {
-                $searchText = strtolower($name . ' ' . $address . ' ' . ($locality ?? ''));
-                $area = \App\Models\Area::where('is_active', true)->get()->first(function ($a) use ($searchText) {
+            if (! $areaId) {
+                $searchText = strtolower($name.' '.$address.' '.($locality ?? ''));
+                $area = Area::where('is_active', true)->get()->first(function ($a) use ($searchText) {
                     return Str::contains($searchText, strtolower($a->name));
                 });
                 if ($area) {
@@ -408,9 +415,11 @@ class AgentSkillService
                 }
             }
             // Final fallback: "Other" area
-            if (!$areaId) {
-                $otherArea = \App\Models\Area::where('slug', 'other')->where('is_active', true)->first();
-                if ($otherArea) $areaId = $otherArea->id;
+            if (! $areaId) {
+                $otherArea = Area::where('slug', 'other')->where('is_active', true)->first();
+                if ($otherArea) {
+                    $areaId = $otherArea->id;
+                }
             }
 
             $placeData = [
@@ -430,7 +439,7 @@ class AgentSkillService
                 'photos' => $photoUrls,
                 'working_hours' => $workingHours,
                 'google_reviews' => $googleReviews ?? [],
-                'photo_references' => array_map(fn($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
+                'photo_references' => array_map(fn ($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
             ];
 
             // Auto-match category
@@ -442,19 +451,32 @@ class AgentSkillService
             // Calculate confidence based on data quality
             $rating = $place['rating'] ?? null;
             $confidence = 0.6;
-            if ($phone) $confidence += 0.1;
-            if ($website) $confidence += 0.1;
-            if ($rating && $rating >= 4.0) $confidence += 0.1;
-            if (($place['user_ratings_total'] ?? 0) >= 10) $confidence += 0.1;
-            if (count($photoUrls) > 0) $confidence += 0.1;
+            if ($phone) {
+                $confidence += 0.1;
+            }
+            if ($website) {
+                $confidence += 0.1;
+            }
+            if ($rating && $rating >= 4.0) {
+                $confidence += 0.1;
+            }
+            if (($place['user_ratings_total'] ?? 0) >= 10) {
+                $confidence += 0.1;
+            }
+            if (count($photoUrls) > 0) {
+                $confidence += 0.1;
+            }
             $confidence = min($confidence, 1.0);
 
             // Skip duplicates entirely — don't add to queue
             if ($isDuplicate) {
                 $duplicates++;
                 // Track for future duplicate detection
-                if ($placeId) $existingPlaceIds[] = $placeId;
+                if ($placeId) {
+                    $existingPlaceIds[] = $placeId;
+                }
                 $existingNames[] = $normalizedName;
+
                 continue;
             }
 
@@ -467,7 +489,9 @@ class AgentSkillService
             ]);
 
             // Track for future duplicate detection
-            if ($placeId) $existingPlaceIds[] = $placeId;
+            if ($placeId) {
+                $existingPlaceIds[] = $placeId;
+            }
             $existingNames[] = $normalizedName;
             $imported++;
         }
@@ -479,7 +503,7 @@ class AgentSkillService
         ]);
 
         // Detect disappeared businesses (were in previous searches but not in current)
-        if (!empty($previousPlaceIds)) {
+        if (! empty($previousPlaceIds)) {
             $disappearedPlaceIds = array_diff($previousPlaceIds, $currentPlaceIds);
             $disappearedPlaceIds = array_values($disappearedPlaceIds);
         }
@@ -506,23 +530,25 @@ class AgentSkillService
                 'search_metadata' => $searchMetadata,
                 'output' => $searchMetadata,
             ]);
-        } catch (\Exception $e) { /* memory write failure should not block search */ }
+        } catch (\Exception $e) { /* memory write failure should not block search */
+        }
 
         // Save to search_history table for long-term memory
         try {
             SearchHistory::create([
                 'agent_id' => $agent->id,
                 'query' => $query,
-            'area' => $area,
-            'zipcode' => $zipcode,
-            'source' => 'google_places',
-            'total_found' => count($currentPlaceIds),
-            'new_places' => max(0, $newPlaces),
-            'already_imported' => $alreadyImportedInDb,
-            'duplicates' => $duplicates,
+                'area' => $area,
+                'zipcode' => $zipcode,
+                'source' => 'google_places',
+                'total_found' => count($currentPlaceIds),
+                'new_places' => max(0, $newPlaces),
+                'already_imported' => $alreadyImportedInDb,
+                'duplicates' => $duplicates,
                 'place_ids' => $currentPlaceIds,
             ]);
-        } catch (\Exception $e) { /* memory write failure should not block search */ }
+        } catch (\Exception $e) { /* memory write failure should not block search */
+        }
 
         return [
             'count' => count($places),
@@ -540,7 +566,7 @@ class AgentSkillService
         $input = $task->input;
         $api = $this->getApiConfig($agent);
 
-        if (!$api['api_key']) {
+        if (! $api['api_key']) {
             throw new \Exception("API key not configured. Set the API key for this agent or add it to your .env for provider: {$agent->provider}.");
         }
 
@@ -573,7 +599,7 @@ Return ONLY a JSON array with these fields:
 EOT;
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $api['api_key'],
+            'Authorization' => 'Bearer '.$api['api_key'],
             'Content-Type' => 'application/json',
         ])->timeout(60)->post($api['endpoint'], [
             'model' => $api['model'],
@@ -591,7 +617,7 @@ EOT;
             if ($response->status() === 401) {
                 $message = "Invalid or missing API key for {$agent->provider}. Add the key to this agent or set it in your .env.";
             }
-            throw new \Exception('AI API request failed: ' . $message);
+            throw new \Exception('AI API request failed: '.$message);
         }
 
         $result = $response->json();
@@ -600,8 +626,8 @@ EOT;
         // Parse JSON from response
         $businesses = $this->parseJsonFromResponse($content);
 
-        if (!is_array($businesses)) {
-            throw new \Exception('AI returned invalid JSON. Response: ' . substr($content, 0, 500));
+        if (! is_array($businesses)) {
+            throw new \Exception('AI returned invalid JSON. Response: '.substr($content, 0, 500));
         }
 
         $batch = ImportBatch::create([
@@ -616,8 +642,8 @@ EOT;
         $skipped = 0;
 
         // Pre-load existing businesses for duplicate detection
-        $existingNames = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
-        $existingPhones = Business::whereNotNull('phone')->pluck('phone')->map(fn($p) => Str::replace([' ', '-', '(', ')'], '', $p))->toArray();
+        $existingNames = Business::pluck('name')->map(fn ($n) => Str::lower($n))->toArray();
+        $existingPhones = Business::whereNotNull('phone')->pluck('phone')->map(fn ($p) => Str::replace([' ', '-', '(', ')'], '', $p))->toArray();
 
         foreach ($businesses as $biz) {
             $name = $biz['name'] ?? null;
@@ -626,6 +652,7 @@ EOT;
 
             if (empty($name)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -633,6 +660,7 @@ EOT;
             $normalizedName = Str::lower(trim($name));
             if (in_array($normalizedName, $existingNames)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -641,13 +669,15 @@ EOT;
                 $normalizedPhone = Str::replace([' ', '-', '(', ')'], '', $phone);
                 if (in_array($normalizedPhone, $existingPhones)) {
                     $skipped++;
+
                     continue;
                 }
             }
 
             // QUALITY CHECK: Must have at least a phone or address
-            if (!$phone && !$address) {
+            if (! $phone && ! $address) {
                 $skipped++;
+
                 continue;
             }
 
@@ -664,10 +694,18 @@ EOT;
 
             // Calculate confidence based on data quality
             $confidence = 0.5;
-            if ($phone) $confidence += 0.15;
-            if ($address) $confidence += 0.1;
-            if (!empty($itemData['website'])) $confidence += 0.1;
-            if (!empty($itemData['description'])) $confidence += 0.1;
+            if ($phone) {
+                $confidence += 0.15;
+            }
+            if ($address) {
+                $confidence += 0.1;
+            }
+            if (! empty($itemData['website'])) {
+                $confidence += 0.1;
+            }
+            if (! empty($itemData['description'])) {
+                $confidence += 0.1;
+            }
             $confidence = min($confidence, 1.0);
 
             ImportItem::create([
@@ -678,7 +716,9 @@ EOT;
 
             // Track for future duplicate detection
             $existingNames[] = $normalizedName;
-            if ($phone) $existingPhones[] = Str::replace([' ', '-', '(', ')'], '', $phone);
+            if ($phone) {
+                $existingPhones[] = Str::replace([' ', '-', '(', ')'], '', $phone);
+            }
             $imported++;
         }
 
@@ -707,7 +747,7 @@ EOT;
         $maxResults = $input['max_results'] ?? 30;
         $scope = $input['scope'] ?? 'pending'; // 'pending' or 'existing' or 'all'
 
-        if (!$api['api_key']) {
+        if (! $api['api_key']) {
             throw new \Exception('API key not configured for AI categorization.');
         }
 
@@ -717,7 +757,9 @@ EOT;
 
         if ($scope === 'pending' || $scope === 'all') {
             $query = ImportItem::where('status', 'pending')->whereNull('data->category');
-            if ($batchId) $query->where('batch_id', $batchId);
+            if ($batchId) {
+                $query->where('batch_id', $batchId);
+            }
             $items = $query->limit($maxResults)->get();
         }
 
@@ -733,7 +775,7 @@ EOT;
         }
 
         $existingCategories = Category::pluck('name')->toArray();
-        $catList = !empty($existingCategories) ? implode("\n- ", $existingCategories) : 'No categories exist yet. Create new ones.';
+        $catList = ! empty($existingCategories) ? implode("\n- ", $existingCategories) : 'No categories exist yet. Create new ones.';
 
         $businessList = [];
 
@@ -784,7 +826,7 @@ Businesses:
 EOT;
 
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $api['api_key'],
+            'Authorization' => 'Bearer '.$api['api_key'],
             'Content-Type' => 'application/json',
         ])->timeout(60)->post($api['endpoint'], [
             'model' => $api['model'],
@@ -797,14 +839,14 @@ EOT;
         ]);
 
         if ($response->failed()) {
-            throw new \Exception('AI categorization failed: ' . $response->body());
+            throw new \Exception('AI categorization failed: '.$response->body());
         }
 
         $result = $response->json();
         $content = $result['choices'][0]['message']['content'] ?? '';
         $mappings = $this->parseJsonFromResponse($content);
 
-        if (!is_array($mappings)) {
+        if (! is_array($mappings)) {
             throw new \Exception('AI categorization returned invalid JSON');
         }
 
@@ -819,10 +861,12 @@ EOT;
             $isNew = $map['is_new'] ?? false;
             $wasChanged = $map['changed'] ?? false;
 
-            if (!$sourceId || !$catName) continue;
+            if (! $sourceId || ! $catName) {
+                continue;
+            }
 
             // Create category if new
-            if ($isNew && !in_array($catName, $existingCategories) && !in_array($catName, $created)) {
+            if ($isNew && ! in_array($catName, $existingCategories) && ! in_array($catName, $created)) {
                 Category::create([
                     'name' => $catName,
                     'slug' => Str::slug($catName),
@@ -878,7 +922,7 @@ EOT;
         }
         $items = $query->limit($maxResults)->get();
 
-        $existing = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+        $existing = Business::pluck('name')->map(fn ($n) => Str::lower($n))->toArray();
         $duplicates = 0;
 
         foreach ($items as $item) {
@@ -902,13 +946,13 @@ EOT;
         $api = $this->getApiConfig($agent);
         $maxResults = $input['max_results'] ?? 10;
 
-        if (!$api['api_key']) {
+        if (! $api['api_key']) {
             throw new \Exception('API key not configured.');
         }
 
         $batchId = $input['batch_id'] ?? null;
         $items = ImportItem::where('status', 'pending')
-            ->when($batchId, fn($q) => $q->where('batch_id', $batchId))
+            ->when($batchId, fn ($q) => $q->where('batch_id', $batchId))
             ->whereNull('data->description')
             ->limit($maxResults)
             ->get();
@@ -920,7 +964,7 @@ EOT;
             $address = $item->data['address'] ?? '';
 
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $api['api_key'],
+                'Authorization' => 'Bearer '.$api['api_key'],
             ])->timeout(30)->post($api['endpoint'], [
                 'model' => $api['model'],
                 'messages' => [
@@ -964,13 +1008,27 @@ EOT;
             $score = 0;
             $data = $item->data;
 
-            if (!empty($data['name'])) $score += 20;
-            if (!empty($data['address'])) $score += 20;
-            if (!empty($data['phone'])) $score += 15;
-            if (!empty($data['description'])) $score += 15;
-            if (!empty($data['website'])) $score += 10;
-            if (!empty($data['category'])) $score += 10;
-            if (!empty($data['latitude'])) $score += 10;
+            if (! empty($data['name'])) {
+                $score += 20;
+            }
+            if (! empty($data['address'])) {
+                $score += 20;
+            }
+            if (! empty($data['phone'])) {
+                $score += 15;
+            }
+            if (! empty($data['description'])) {
+                $score += 15;
+            }
+            if (! empty($data['website'])) {
+                $score += 10;
+            }
+            if (! empty($data['category'])) {
+                $score += 10;
+            }
+            if (! empty($data['latitude'])) {
+                $score += 10;
+            }
 
             $item->update(['confidence' => $score / 100]);
             $checked++;
@@ -988,7 +1046,7 @@ EOT;
         $input = $task->input;
         $filePath = $input['file_path'] ?? null;
 
-        if (!$filePath || !file_exists($filePath)) {
+        if (! $filePath || ! file_exists($filePath)) {
             throw new \Exception('CSV file not found.');
         }
 
@@ -998,7 +1056,7 @@ EOT;
         $batch = ImportBatch::create([
             'agent_id' => $agent->id,
             'source' => 'csv',
-            'name' => 'CSV Import: ' . basename($filePath),
+            'name' => 'CSV Import: '.basename($filePath),
             'total' => count($csv),
             'status' => 'processing',
         ]);
@@ -1008,7 +1066,9 @@ EOT;
         foreach ($csv as $row) {
             $data = array_combine($headers, $row);
 
-            if (empty($data['name'])) continue;
+            if (empty($data['name'])) {
+                continue;
+            }
 
             ImportItem::create([
                 'batch_id' => $batch->id,
@@ -1140,8 +1200,10 @@ EOT;
         foreach ($placeTypes as $type) {
             if (isset($typeMap[$type])) {
                 $targetName = $typeMap[$type];
-                $match = collect($categoryNames)->first(fn($cn) => strtolower(trim($cn)) === strtolower($targetName));
-                if ($match) return $match;
+                $match = collect($categoryNames)->first(fn ($cn) => strtolower(trim($cn)) === strtolower($targetName));
+                if ($match) {
+                    return $match;
+                }
             }
         }
 
@@ -1149,8 +1211,10 @@ EOT;
         foreach ($placeTypes as $type) {
             if (isset($typeMap[$type])) {
                 $targetName = $typeMap[$type];
-                $match = collect($categoryNames)->first(fn($cn) => Str::contains(Str::lower($cn), Str::lower($targetName)));
-                if ($match) return $match;
+                $match = collect($categoryNames)->first(fn ($cn) => Str::contains(Str::lower($cn), Str::lower($targetName)));
+                if ($match) {
+                    return $match;
+                }
             }
         }
 
@@ -1160,16 +1224,17 @@ EOT;
             ['name' => $newCatName, 'slug' => Str::slug($newCatName)],
             ['icon' => '📂', 'is_active' => true]
         );
+
         return $newCat->name;
     }
 
     private function serpapiBusinessSearch(AiAgent $agent, AiAgentTask $task): array
     {
         $input = $task->input;
-        $apiKey = \App\Models\Setting::get('api_key_serpapi')
+        $apiKey = Setting::get('api_key_serpapi')
             ?? config('services.serpapi.api_key');
 
-        if (!$apiKey) {
+        if (! $apiKey) {
             throw new \Exception('SerpAPI key not configured. Add it in Settings → API Keys or on this agent.');
         }
 
@@ -1179,7 +1244,7 @@ EOT;
         $maxResults = min($input['max_results'] ?? 20, 50);
 
         $location = implode(' ', array_filter([$area, $zipcode]));
-        $searchQuery = $query . ($location ? ' in ' . $location : '');
+        $searchQuery = $query.($location ? ' in '.$location : '');
 
         $response = Http::get('https://serpapi.com/search', [
             'engine' => 'google_maps',
@@ -1190,7 +1255,7 @@ EOT;
         ]);
 
         if ($response->failed()) {
-            throw new \Exception('SerpAPI request failed: ' . $response->body());
+            throw new \Exception('SerpAPI request failed: '.$response->body());
         }
 
         $data = $response->json();
@@ -1210,7 +1275,7 @@ EOT;
 
         $imported = 0;
         $skipped = 0;
-        $existingNames = Business::pluck('name')->map(fn($n) => Str::lower($n))->toArray();
+        $existingNames = Business::pluck('name')->map(fn ($n) => Str::lower($n))->toArray();
 
         foreach (array_slice($places, 0, $maxResults) as $place) {
             $name = $place['title'] ?? '';
@@ -1223,6 +1288,7 @@ EOT;
 
             if (empty($name) || strlen($name) < 3) {
                 $skipped++;
+
                 continue;
             }
 
@@ -1232,6 +1298,7 @@ EOT;
             $normalizedName = Str::lower(trim($cleanName));
             if (in_array($normalizedName, $existingNames)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -1248,10 +1315,18 @@ EOT;
             ];
 
             $confidence = 0.5;
-            if ($phone) $confidence += 0.15;
-            if ($website) $confidence += 0.1;
-            if ($address) $confidence += 0.15;
-            if ($rating) $confidence += 0.1;
+            if ($phone) {
+                $confidence += 0.15;
+            }
+            if ($website) {
+                $confidence += 0.1;
+            }
+            if ($address) {
+                $confidence += 0.15;
+            }
+            if ($rating) {
+                $confidence += 0.1;
+            }
             $confidence = min($confidence, 1.0);
 
             ImportItem::create([
@@ -1290,16 +1365,17 @@ EOT;
                     'area' => $area,
                     'source' => 'serpapi',
                     'total_found' => count($places),
-                'new_places' => $imported,
-                'already_imported' => $skipped,
-            ],
-            'output' => [
-                'query' => $searchQuery,
-                'total_found' => count($places),
-                'new_places' => $imported,
-            ],
-        ]);
-        } catch (\Exception $e) { /* memory write failure should not block search */ }
+                    'new_places' => $imported,
+                    'already_imported' => $skipped,
+                ],
+                'output' => [
+                    'query' => $searchQuery,
+                    'total_found' => count($places),
+                    'new_places' => $imported,
+                ],
+            ]);
+        } catch (\Exception $e) { /* memory write failure should not block search */
+        }
 
         return [
             'count' => count($places),

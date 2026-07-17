@@ -50,11 +50,16 @@
                     class="input-dark">{{ old('description', $product->description ?? '') }}</textarea>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Price (₹)</label>
                     <input type="number" step="0.01" name="price" value="{{ old('price', $product->price ?? '') }}"
                         class="input-dark">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Stock</label>
+                    <input type="number" name="stock" value="{{ old('stock', $product->stock ?? '') }}"
+                        class="input-dark" placeholder="Leave empty for unlimited" min="0">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Availability</label>

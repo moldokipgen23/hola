@@ -68,8 +68,8 @@ class AiAgent extends Model
             return $this->api_key;
         }
 
-        $settingKey = 'api_key_' . ($this->provider ?? 'openrouter');
-        $settingValue = \App\Models\Setting::get($settingKey);
+        $settingKey = 'api_key_'.($this->provider ?? 'openrouter');
+        $settingValue = Setting::get($settingKey);
 
         if ($settingValue) {
             return $settingValue;

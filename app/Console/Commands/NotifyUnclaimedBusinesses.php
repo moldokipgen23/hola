@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Business;
-use App\Models\Setting;
 use App\Models\NotificationLog;
+use App\Models\Setting;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Mail;
 class NotifyUnclaimedBusinesses extends Command
 {
     protected $signature = 'business:notify-unclaimed {--limit=50} {--dry-run}';
+
     protected $description = 'Notify unclaimed businesses via free channels (Email + Telegram + WhatsApp CallMeBot)';
 
     public function handle(): int
@@ -42,7 +43,8 @@ class NotifyUnclaimedBusinesses extends Command
             ->get();
 
         if ($businesses->isEmpty()) {
-            $this->info("No unclaimed businesses to notify.");
+            $this->info('No unclaimed businesses to notify.');
+
             return 0;
         }
 
@@ -57,6 +59,7 @@ class NotifyUnclaimedBusinesses extends Command
             if ($dryRun) {
                 $this->info("    [DRY RUN] Would notify via {$business->claim_preferred_channel}");
                 $notified++;
+
                 continue;
             }
 
@@ -75,7 +78,9 @@ class NotifyUnclaimedBusinesses extends Command
             $channels = $this->getChannelOrder($effectiveChannel);
 
             foreach ($channels as $channel) {
-                if ($sent) break;
+                if ($sent) {
+                    break;
+                }
 
                 // Check if channel is enabled globally
                 $enabled = match ($channel) {
@@ -85,24 +90,32 @@ class NotifyUnclaimedBusinesses extends Command
                     default => false,
                 };
 
-                if (!$enabled) continue;
+                if (! $enabled) {
+                    continue;
+                }
 
                 switch ($channel) {
                     case 'email':
                         if ($business->email) {
                             $subject = $this->buildEmailSubject($business);
                             $sent = $this->sendEmail($business->email, $subject, $message);
-                            if ($sent) $usedChannel = 'email';
+                            if ($sent) {
+                                $usedChannel = 'email';
+                            }
                         }
                         break;
                     case 'telegram':
                         $sent = $this->sendTelegram($message);
-                        if ($sent) $usedChannel = 'telegram';
+                        if ($sent) {
+                            $usedChannel = 'telegram';
+                        }
                         break;
                     case 'whatsapp':
                         if ($business->phone) {
                             $sent = $this->sendWhatsAppCallMeBot($business->phone, $message);
-                            if ($sent) $usedChannel = 'whatsapp';
+                            if ($sent) {
+                                $usedChannel = 'whatsapp';
+                            }
                         }
                         break;
                 }
@@ -119,21 +132,22 @@ class NotifyUnclaimedBusinesses extends Command
                     'status' => $sent ? 'sent' : 'failed',
                     'sent_at' => $sent ? now() : null,
                 ]);
-            } catch (\Exception $e) { /* log failure should not block */ }
+            } catch (\Exception $e) { /* log failure should not block */
+            }
 
             if ($sent) {
                 $notified++;
                 $this->info("    ✅ Sent via {$usedChannel}");
             } else {
                 $failed++;
-                $this->warn("    ❌ Failed (no channel enabled or no contact info)");
+                $this->warn('    ❌ Failed (no channel enabled or no contact info)');
             }
 
             usleep(500000);
         }
 
-        $this->info("");
-        $this->info("📊 Notification complete:");
+        $this->info('');
+        $this->info('📊 Notification complete:');
         $this->info("  Sent: {$notified}");
         $this->info("  Failed: {$failed}");
 
@@ -146,6 +160,7 @@ class NotifyUnclaimedBusinesses extends Command
         if (in_array($preferred, ['email', 'telegram', 'whatsapp'])) {
             return array_merge([$preferred], array_diff(['email', 'telegram', 'whatsapp'], [$preferred]));
         }
+
         // 'all' or unknown -> use global preference order
         return ['email', 'telegram', 'whatsapp'];
     }
@@ -164,14 +179,14 @@ class NotifyUnclaimedBusinesses extends Command
             );
         }
 
-        return "Hi! Your business \"{$business->name}\" is listed on {$siteName} - {$district}'s #1 business directory.\n\n" .
-            "Claim your listing for FREE to:\n" .
-            "- Update your business info\n" .
-            "- Add photos & products\n" .
-            "- Respond to reviews\n" .
-            "- Get found by more customers\n\n" .
-            "Claim now: {$claimUrl}\n\n" .
-            "Questions? Reply to this message.";
+        return "Hi! Your business \"{$business->name}\" is listed on {$siteName} - {$district}'s #1 business directory.\n\n".
+            "Claim your listing for FREE to:\n".
+            "- Update your business info\n".
+            "- Add photos & products\n".
+            "- Respond to reviews\n".
+            "- Get found by more customers\n\n".
+            "Claim now: {$claimUrl}\n\n".
+            'Questions? Reply to this message.';
     }
 
     private function buildEmailSubject(Business $business): string
@@ -197,20 +212,23 @@ class NotifyUnclaimedBusinesses extends Command
             $fromAddress = Setting::get('smtp_from_address', config('mail.from.address'));
             $fromName = Setting::get('smtp_from_name', config('mail.from.name', 'Hola'));
 
-            if (!$fromAddress) return false;
+            if (! $fromAddress) {
+                return false;
+            }
 
             Mail::raw(
                 $body,
                 function ($message) use ($to, $subject, $fromAddress, $fromName) {
                     $message->to($to)
-                            ->subject($subject)
-                            ->from($fromAddress, $fromName);
+                        ->subject($subject)
+                        ->from($fromAddress, $fromName);
                 }
             );
 
             return true;
         } catch (\Exception $e) {
             $this->warn("    Email failed: {$e->getMessage()}");
+
             return false;
         }
     }
@@ -221,7 +239,9 @@ class NotifyUnclaimedBusinesses extends Command
             $token = Setting::get('telegram_bot_token');
             $chatId = Setting::get('telegram_chat_id');
 
-            if (!$token || !$chatId) return false;
+            if (! $token || ! $chatId) {
+                return false;
+            }
 
             $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
                 'chat_id' => $chatId,
@@ -231,6 +251,7 @@ class NotifyUnclaimedBusinesses extends Command
             return $response->successful();
         } catch (\Exception $e) {
             $this->warn("    Telegram failed: {$e->getMessage()}");
+
             return false;
         }
     }
@@ -239,11 +260,13 @@ class NotifyUnclaimedBusinesses extends Command
     {
         try {
             $apiKey = Setting::get('callmebot_api_key');
-            if (!$apiKey) return false;
+            if (! $apiKey) {
+                return false;
+            }
 
             $to = $this->normalizePhone($phone);
 
-            $response = Http::get("https://api.callmebot.com/whatsapp.php", [
+            $response = Http::get('https://api.callmebot.com/whatsapp.php', [
                 'phone' => $to,
                 'text' => $message,
                 'apikey' => $apiKey,
@@ -252,6 +275,7 @@ class NotifyUnclaimedBusinesses extends Command
             return $response->successful();
         } catch (\Exception $e) {
             $this->warn("    WhatsApp failed: {$e->getMessage()}");
+
             return false;
         }
     }
@@ -259,11 +283,12 @@ class NotifyUnclaimedBusinesses extends Command
     private function normalizePhone(string $phone): string
     {
         $phone = preg_replace('/[^0-9+]/', '', $phone);
-        if (!str_starts_with($phone, '+')) {
+        if (! str_starts_with($phone, '+')) {
             if (strlen($phone) === 10) {
-                $phone = '+91' . $phone;
+                $phone = '+91'.$phone;
             }
         }
+
         return $phone;
     }
 }

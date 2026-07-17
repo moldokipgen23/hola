@@ -1,6 +1,10 @@
 <?php
 
-if (!function_exists('matchImportCategory')) {
+use App\Models\Category;
+use App\Models\Subcategory;
+use Illuminate\Support\Str;
+
+if (! function_exists('matchImportCategory')) {
     /**
      * Smart category matching for imports.
      * Maps Google's category names to our existing categories.
@@ -8,9 +12,9 @@ if (!function_exists('matchImportCategory')) {
      */
     function matchImportCategory(?string $rawCategory, array $categories): int
     {
-        if (!$rawCategory) {
-            return \App\Models\Category::where('slug', 'general')->value('id')
-                ?? \App\Models\Category::firstOrCreate(['name' => 'General', 'slug' => 'general'])->id;
+        if (! $rawCategory) {
+            return Category::where('slug', 'general')->value('id')
+                ?? Category::firstOrCreate(['name' => 'General', 'slug' => 'general'])->id;
         }
 
         $rawLower = strtolower(trim($rawCategory));
@@ -32,8 +36,10 @@ if (!function_exists('matchImportCategory')) {
         ];
         foreach ($specificMappings as $keyword => $targetCat) {
             if (str_contains($rawLower, $keyword)) {
-                $match = collect($categories)->first(fn($n) => strtolower($n) === strtolower($targetCat));
-                if ($match) return $categories[$match];
+                $match = collect($categories)->first(fn ($n) => strtolower($n) === strtolower($targetCat));
+                if ($match) {
+                    return $categories[$match];
+                }
             }
         }
 
@@ -72,8 +78,10 @@ if (!function_exists('matchImportCategory')) {
         foreach ($mapping as $targetCat => $keywords) {
             foreach ($keywords as $kw) {
                 if (str_contains($rawLower, $kw)) {
-                    $match = collect($categories)->first(fn($n) => strtolower($n) === $targetCat);
-                    if ($match) return $categories[$match];
+                    $match = collect($categories)->first(fn ($n) => strtolower($n) === $targetCat);
+                    if ($match) {
+                        return $categories[$match];
+                    }
                 }
             }
         }
@@ -86,16 +94,17 @@ if (!function_exists('matchImportCategory')) {
         }
 
         // 5. No match — create new category
-        $slug = \Illuminate\Support\Str::slug($rawCategory);
-        $cat = \App\Models\Category::firstOrCreate(
+        $slug = Str::slug($rawCategory);
+        $cat = Category::firstOrCreate(
             ['name' => $rawCategory, 'slug' => $slug],
             ['description' => 'Auto-created from import']
         );
+
         return $cat->id;
     }
 }
 
-if (!function_exists('matchImportSubcategory')) {
+if (! function_exists('matchImportSubcategory')) {
     /**
      * Match subcategory based on business name/address/types.
      * Returns subcategory_id or null.
@@ -106,19 +115,21 @@ if (!function_exists('matchImportSubcategory')) {
         $nameLower = strtolower(trim($businessName ?? ''));
 
         // Load subcategories for this category
-        $subcategories = \App\Models\Subcategory::where('category_id', $categoryId)
+        $subcategories = Subcategory::where('category_id', $categoryId)
             ->where('is_active', true)
             ->get()
-            ->keyBy(fn($s) => strtolower($s->name));
+            ->keyBy(fn ($s) => strtolower($s->name));
 
-        if ($subcategories->isEmpty()) return null;
+        if ($subcategories->isEmpty()) {
+            return null;
+        }
 
         // Pharmacy matching
         if ($categoryId === 3) { // Healthcare
             foreach (['pharmacy', 'pharmacies', 'medical store', 'drugstore', 'chemist', 'medicine'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
                     return $subcategories->get('pharmacies')?->id
-                        ?? $subcategories->keys()->first(fn($k) => str_contains($k, 'pharm')) ? $subcategories->first(fn($s) => str_contains(strtolower($s->name), 'pharm'))?->id : null;
+                        ?? $subcategories->keys()->first(fn ($k) => str_contains($k, 'pharm')) ? $subcategories->first(fn ($s) => str_contains(strtolower($s->name), 'pharm'))?->id : null;
                 }
             }
             foreach (['hospital'] as $kw) {
@@ -160,6 +171,7 @@ if (!function_exists('matchImportSubcategory')) {
                     return $subcategories->get('homestays')?->id ?? null;
                 }
             }
+
             // Default to Hotels
             return $subcategories->get('hotels')?->id ?? null;
         }
@@ -186,6 +198,7 @@ if (!function_exists('matchImportSubcategory')) {
                     return $subcategories->get('catering')?->id ?? null;
                 }
             }
+
             // Default to Restaurants
             return $subcategories->get('restaurants')?->id ?? null;
         }
@@ -202,6 +215,7 @@ if (!function_exists('matchImportSubcategory')) {
                     return $subcategories->get('tuition centers')?->id ?? null;
                 }
             }
+
             // Default to Schools
             return $subcategories->get('schools')?->id ?? null;
         }

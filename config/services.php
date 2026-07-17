@@ -60,4 +60,15 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
     ],
 
+    'razorpay' => [
+        'key_id' => env('RAZORPAY_KEY_ID'),
+        'key_secret' => env('RAZORPAY_KEY_SECRET'),
+    ],
+
+    'cashfree' => [
+        'app_id' => env('CASHFREE_APP_ID'),
+        'secret_key' => env('CASHFREE_SECRET_KEY'),
+        'env' => env('CASHFREE_ENV', 'TEST'),
+    ],
+
 ];

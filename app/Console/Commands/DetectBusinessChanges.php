@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Business;
-use App\Models\Category;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +11,7 @@ use Illuminate\Support\Str;
 class DetectBusinessChanges extends Command
 {
     protected $signature = 'app:detect-business-changes {--limit=50} {--dry-run}';
+
     protected $description = 'Check Google Places API for changes in existing businesses and notify admin';
 
     public function handle()
@@ -35,20 +35,20 @@ class DetectBusinessChanges extends Command
             try {
                 $placeData = $this->getGooglePlaceData($business->external_id);
 
-                if (!$placeData) {
+                if (! $placeData) {
                     continue;
                 }
 
                 $businessChanges = $this->detectChanges($business, $placeData);
 
-                if (!empty($businessChanges)) {
+                if (! empty($businessChanges)) {
                     $changes[] = [
                         'business_id' => $business->id,
                         'business_name' => $business->name,
                         'changes' => $businessChanges,
                     ];
 
-                    if (!$dryRun) {
+                    if (! $dryRun) {
                         $this->updateBusiness($business, $placeData, $businessChanges);
                         $updated++;
                     }
@@ -59,13 +59,15 @@ class DetectBusinessChanges extends Command
 
             } catch (\Exception $e) {
                 $this->error("Error checking {$business->name}: {$e->getMessage()}");
+
                 continue;
             }
         }
 
         // Output results
         if (empty($changes)) {
-            $this->info("No changes detected.");
+            $this->info('No changes detected.');
+
             return 0;
         }
 
@@ -80,7 +82,7 @@ class DetectBusinessChanges extends Command
         }
 
         // Save changes log
-        if (!$dryRun) {
+        if (! $dryRun) {
             $logPath = storage_path('app/business_changes_log.json');
             $existingLog = file_exists($logPath) ? json_decode(file_get_contents($logPath), true) : [];
             $existingLog[] = [
@@ -93,7 +95,7 @@ class DetectBusinessChanges extends Command
             $this->info("Changes logged to: {$logPath}");
             $this->info("Updated {$updated} businesses.");
         } else {
-            $this->warn("DRY RUN - No changes were saved.");
+            $this->warn('DRY RUN - No changes were saved.');
         }
 
         return 0;
@@ -103,7 +105,7 @@ class DetectBusinessChanges extends Command
     {
         $apiKey = config('services.google.places_api_key');
 
-        if (!$apiKey) {
+        if (! $apiKey) {
             return null;
         }
 
@@ -127,7 +129,7 @@ class DetectBusinessChanges extends Command
         $changes = [];
 
         // Check name changes
-        if (!empty($placeData['name']) && $placeData['name'] !== $business->name) {
+        if (! empty($placeData['name']) && $placeData['name'] !== $business->name) {
             $changes['name'] = [
                 'old' => $business->name,
                 'new' => $placeData['name'],
@@ -135,7 +137,7 @@ class DetectBusinessChanges extends Command
         }
 
         // Check address changes
-        if (!empty($placeData['formatted_address']) && $placeData['formatted_address'] !== $business->address) {
+        if (! empty($placeData['formatted_address']) && $placeData['formatted_address'] !== $business->address) {
             $changes['address'] = [
                 'old' => $business->address,
                 'new' => $placeData['formatted_address'],
@@ -211,17 +213,17 @@ class DetectBusinessChanges extends Command
         }
 
         // Update photos if available
-        if (!empty($placeData['photos'])) {
+        if (! empty($placeData['photos'])) {
             $photos = [];
             foreach (array_slice($placeData['photos'], 0, 5) as $photo) {
-                if (!empty($photo['photo_reference'])) {
-                    $photoUrl = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key=" . config('services.google.places_api_key');
+                if (! empty($photo['photo_reference'])) {
+                    $photoUrl = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key=".config('services.google.places_api_key');
                     try {
                         $response = Http::timeout(10)->get($photoUrl);
                         if ($response->successful()) {
-                            $filename = 'businesses/' . $business->slug . '_' . Str::random(6) . '.jpg';
+                            $filename = 'businesses/'.$business->slug.'_'.Str::random(6).'.jpg';
                             Storage::disk('public')->put($filename, $response->body());
-                            $photos[] = 'storage/' . $filename;
+                            $photos[] = 'storage/'.$filename;
                         }
                     } catch (\Exception $e) {
                         continue;
@@ -229,14 +231,14 @@ class DetectBusinessChanges extends Command
                 }
             }
 
-            if (!empty($photos)) {
+            if (! empty($photos)) {
                 $updateData['photos'] = array_merge($business->photos ?? [], $photos);
                 // Keep only latest 10 photos
                 $updateData['photos'] = array_slice($updateData['photos'], -10);
             }
         }
 
-        if (!empty($updateData)) {
+        if (! empty($updateData)) {
             $updateData['last_synced_at'] = now();
             $business->update($updateData);
         }

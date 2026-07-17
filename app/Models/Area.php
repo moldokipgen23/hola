@@ -31,6 +31,7 @@ class Area extends Model
         'bounds_east' => 'float',
         'bounds_west' => 'float',
         'is_active' => 'boolean',
+        'pincodes' => 'array',
     ];
 
     public function businesses(): HasMany
@@ -48,7 +49,7 @@ class Area extends Model
      */
     public function contains(float $lat, float $lng): bool
     {
-        if (!$this->bounds_north || !$this->bounds_south || !$this->bounds_east || !$this->bounds_west) {
+        if (! $this->bounds_north || ! $this->bounds_south || ! $this->bounds_east || ! $this->bounds_west) {
             return false;
         }
 
@@ -80,14 +81,19 @@ class Area extends Model
 
         // Exact match first
         $area = static::active()->whereRaw('LOWER(name) = ?', [$safe])->first();
-        if ($area) return $area;
+        if ($area) {
+            return $area;
+        }
 
         // Partial match
         $area = static::active()->whereRaw('LOWER(name) LIKE ?', ["%{$safe}%"])->first();
-        if ($area) return $area;
+        if ($area) {
+            return $area;
+        }
 
         // Check aliases (stored as comma-separated in a column or just use the slug)
         $area = static::active()->whereRaw('LOWER(slug) LIKE ?', ["%{$safe}%"])->first();
+
         return $area;
     }
 }

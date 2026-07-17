@@ -8,7 +8,9 @@ return new class extends Migration
     public function up(): void
     {
         $agent = DB::table('ai_agents')->where('id', 1)->first();
-        if (!$agent) return;
+        if (! $agent) {
+            return;
+        }
 
         $prompt = $agent->system_prompt;
 

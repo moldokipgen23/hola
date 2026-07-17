@@ -81,9 +81,10 @@
                         class="input-dark">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">District</label>
-                    <input type="text" name="district" value="{{ old('district', $business->district ?? 'Churachandpur') }}"
-                        class="input-dark">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Pincode *</label>
+                    <input type="text" name="pincode" value="{{ old('pincode', $business->pincode ?? '') }}" required maxlength="6"
+                        class="input-dark" placeholder="e.g. 795128">
+                    <p class="text-slate-500 text-xs mt-1">State and district are auto-derived from the pincode.</p>
                 </div>
             </div>
 
@@ -145,7 +146,7 @@
 
         <div class="glass-card p-6 rounded-lg space-y-4 mt-4">
             <h4 class="font-semibold text-slate-300 border-b border-white/5 pb-2">Options</h4>
-            <div class="flex items-center gap-6">
+            <div class="flex flex-wrap items-center gap-6">
                 <label class="flex items-center gap-2">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', $business->is_active ?? 1) ? 'checked' : '' }}>
                     <span class="text-sm text-slate-300">Active</span>
@@ -153,6 +154,51 @@
                 <label class="flex items-center gap-2">
                     <input type="checkbox" name="is_featured" value="1" {{ old('is_featured', $business->is_featured ?? 0) ? 'checked' : '' }}>
                     <span class="text-sm text-slate-300">Featured</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="is_bookable" value="1" {{ old('is_bookable', $business->is_bookable ?? 0) ? 'checked' : '' }}>
+                    <span class="text-sm text-slate-300">Bookable</span>
+                </label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Service Type</label>
+                <select name="service_type" class="input-dark">
+                    <option value="directory" {{ old('service_type', $business->service_type ?? '') === 'directory' ? 'selected' : '' }}>Directory (listing only)</option>
+                    <option value="bookable" {{ old('service_type', $business->service_type ?? '') === 'bookable' ? 'selected' : '' }}>Bookable (services/appointments)</option>
+                    <option value="buyable" {{ old('service_type', $business->service_type ?? '') === 'buyable' ? 'selected' : '' }}>Buyable (products/ordering)</option>
+                    <option value="hybrid" {{ old('service_type', $business->service_type ?? '') === 'hybrid' ? 'selected' : '' }}>Hybrid (both)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Price Range (1-4)</label>
+                <input type="number" name="price_range" value="{{ old('price_range', $business->price_range ?? '') }}" min="0" max="4" class="input-dark" placeholder="0 = unknown, 1-4 = $ to $$$$">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Delivery Radius (km)</label>
+                <input type="number" name="delivery_radius_km" value="{{ old('delivery_radius_km', $business->delivery_radius_km ?? 5) }}" min="1" max="100" step="0.5" class="input-dark" placeholder="5">
+                <p class="text-slate-500 text-xs mt-1">Maximum distance this business will deliver. Uses GPS-based distance check.</p>
+            </div>
+        </div>
+
+        <div class="glass-card p-6 rounded-lg space-y-4 mt-4">
+            <h4 class="font-semibold text-slate-300 border-b border-white/5 pb-2">Payment Methods</h4>
+            <p class="text-slate-500 text-xs mb-2">Select which payment gateways this vendor can accept. Leave all unchecked to use platform defaults.</p>
+            @php $vendorMethods = old('payment_methods', !empty($business->payment_methods) ? $business->payment_methods : []); @endphp
+            <div class="flex flex-wrap gap-4">
+                <label class="flex items-center gap-2">
+                    <input type="hidden" name="payment_methods[razorpay]" value="0">
+                    <input type="checkbox" name="payment_methods[razorpay]" value="razorpay" {{ in_array('razorpay', $vendorMethods) ? 'checked' : '' }}>
+                    <span class="text-sm text-slate-300">Razorpay</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="hidden" name="payment_methods[cashfree]" value="0">
+                    <input type="checkbox" name="payment_methods[cashfree]" value="cashfree" {{ in_array('cashfree', $vendorMethods) ? 'checked' : '' }}>
+                    <span class="text-sm text-slate-300">Cashfree</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="hidden" name="payment_methods[cod]" value="0">
+                    <input type="checkbox" name="payment_methods[cod]" value="cod" {{ in_array('cod', $vendorMethods) ? 'checked' : '' }}>
+                    <span class="text-sm text-slate-300">Cash on Delivery</span>
                 </label>
             </div>
         </div>

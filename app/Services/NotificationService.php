@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\Notification;
-use App\Models\User;
 use App\Models\Business;
 use App\Models\ClaimRequest;
-use App\Models\Review;
 use App\Models\Conversation;
+use App\Models\Notification;
+use App\Models\Report;
+use App\Models\Review;
+use App\Models\User;
 
 class NotificationService
 {
@@ -55,7 +56,7 @@ class NotificationService
             $claim->user,
             'claim_rejected',
             'Claim Rejected',
-            "Your claim for \"{$claim->business->name}\" was rejected." . ($claim->admin_notes ? " Reason: {$claim->admin_notes}" : ''),
+            "Your claim for \"{$claim->business->name}\" was rejected.".($claim->admin_notes ? " Reason: {$claim->admin_notes}" : ''),
             ['business_id' => $claim->business_id]
         );
     }
@@ -127,7 +128,7 @@ class NotificationService
         }
     }
 
-    public static function reportResolved(\App\Models\Report $report): void
+    public static function reportResolved(Report $report): void
     {
         if ($report->user_id && $user = User::find($report->user_id)) {
             self::create(

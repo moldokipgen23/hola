@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Business;
+use App\Models\Category;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 
@@ -11,6 +13,7 @@ class SettingController extends Controller
     public function index()
     {
         $settings = Setting::getAll();
+
         return response()->json(['settings' => $settings]);
     }
 
@@ -31,7 +34,7 @@ class SettingController extends Controller
     public function publicSettings()
     {
         $settings = Setting::getAll();
-        
+
         // Filter out sensitive settings (API keys, secrets, etc.)
         foreach ($settings as $group => &$items) {
             if (is_array($items)) {
@@ -42,38 +45,39 @@ class SettingController extends Controller
                             return false;
                         }
                     }
+
                     return true;
                 }, ARRAY_FILTER_USE_KEY);
             }
         }
-        
+
         return response()->json(['settings' => $settings]);
     }
 
     public function sitemap()
     {
-        $businesses = \App\Models\Business::active()
+        $businesses = Business::active()
             ->select('slug', 'updated_at')
             ->get();
 
-        $categories = \App\Models\Category::select('slug', 'updated_at')
+        $categories = Category::select('slug', 'updated_at')
             ->get();
 
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 
         $baseUrl = Setting::get('site_url', 'https://hola.app');
 
         $xml .= $this->urlEntry($baseUrl, date('c'));
-        $xml .= $this->urlEntry($baseUrl . '/businesses', date('c'));
-        $xml .= $this->urlEntry($baseUrl . '/categories', date('c'));
+        $xml .= $this->urlEntry($baseUrl.'/businesses', date('c'));
+        $xml .= $this->urlEntry($baseUrl.'/categories', date('c'));
 
         foreach ($categories as $cat) {
-            $xml .= $this->urlEntry($baseUrl . '/category/' . $cat->slug, $cat->updated_at ? $cat->updated_at->toAtomString() : date('c'));
+            $xml .= $this->urlEntry($baseUrl.'/category/'.$cat->slug, $cat->updated_at ? $cat->updated_at->toAtomString() : date('c'));
         }
 
         foreach ($businesses as $biz) {
-            $xml .= $this->urlEntry($baseUrl . '/business/' . $biz->slug, $biz->updated_at ? $biz->updated_at->toAtomString() : date('c'));
+            $xml .= $this->urlEntry($baseUrl.'/business/'.$biz->slug, $biz->updated_at ? $biz->updated_at->toAtomString() : date('c'));
         }
 
         $xml .= '</urlset>';

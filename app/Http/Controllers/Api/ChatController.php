@@ -16,21 +16,22 @@ class ChatController extends Controller
         $userId = $request->user()->id;
         $conversations = Conversation::where(function ($q) use ($userId) {
             $q->where('user_id', $userId)
-              ->orWhere('business_owner_id', $userId);
+                ->orWhere('business_owner_id', $userId);
         })
-        ->with(['business:id,name,slug', 'user:id,name,avatar', 'lastMessage'])
-        ->latest('last_message_at')
-        ->get()
-        ->map(function ($c) use ($userId) {
-            $lastMsg = $c->lastMessage;
-            return [
-                'id' => $c->id,
-                'business' => $c->business,
-                'last_message' => $lastMsg?->body,
-                'last_message_time' => $lastMsg?->created_at?->diffForHumans(),
-                'unread_count' => $c->messages()->where('sender_id', '!=', $userId)->where('is_read', false)->count(),
-            ];
-        });
+            ->with(['business:id,name,slug', 'user:id,name,avatar', 'lastMessage'])
+            ->latest('last_message_at')
+            ->get()
+            ->map(function ($c) use ($userId) {
+                $lastMsg = $c->lastMessage;
+
+                return [
+                    'id' => $c->id,
+                    'business' => $c->business,
+                    'last_message' => $lastMsg?->body,
+                    'last_message_time' => $lastMsg?->created_at?->diffForHumans(),
+                    'unread_count' => $c->messages()->where('sender_id', '!=', $userId)->where('is_read', false)->count(),
+                ];
+            });
 
         return response()->json(compact('conversations'));
     }
@@ -51,7 +52,7 @@ class ChatController extends Controller
             ->with('sender')
             ->oldest()
             ->get()
-            ->map(fn($m) => [
+            ->map(fn ($m) => [
                 'id' => $m->id,
                 'message' => $m->body,
                 'is_mine' => $m->sender_id === $userId,

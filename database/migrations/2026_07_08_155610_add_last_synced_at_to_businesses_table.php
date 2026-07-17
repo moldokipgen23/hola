@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('businesses', function (Blueprint $table) {
-            if (!Schema::hasColumn('businesses', 'last_synced_at')) {
+            if (! Schema::hasColumn('businesses', 'last_synced_at')) {
                 $table->timestamp('last_synced_at')->nullable()->after('external_id');
             }
         });

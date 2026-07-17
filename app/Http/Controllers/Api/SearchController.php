@@ -17,9 +17,10 @@ class SearchController extends Controller
         ]);
 
         $query = $request->q;
-        $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $query) . '%';
+        $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $query).'%';
 
         $businesses = Business::active()
+            ->inServiceableArea()
             ->search($query)
             ->with(['category', 'subcategory'])
             ->limit(10)
@@ -50,9 +51,10 @@ class SearchController extends Controller
         ]);
 
         $query = $request->q;
-        $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $query) . '%';
+        $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $query).'%';
 
         $suggestions = Business::active()
+            ->inServiceableArea()
             ->where('name', 'like', $safe)
             ->pluck('name')
             ->take(5)

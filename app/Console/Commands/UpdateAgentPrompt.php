@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class UpdateAgentPrompt extends Command
 {
     protected $signature = 'agent:update-prompt';
+
     protected $description = 'Update agent system prompt with proper rules';
 
     public function handle(): int
@@ -135,13 +136,15 @@ WHAT TO REJECT
 EOT;
 
         $agent = AiAgent::first();
-        if (!$agent) {
+        if (! $agent) {
             $this->error('No agent found.');
+
             return 1;
         }
 
         $agent->update(['system_prompt' => $prompt]);
-        $this->info("Agent prompt updated. Length: " . strlen($prompt) . " chars");
+        $this->info('Agent prompt updated. Length: '.strlen($prompt).' chars');
+
         return 0;
     }
 }

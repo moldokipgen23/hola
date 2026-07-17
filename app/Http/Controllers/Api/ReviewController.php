@@ -85,7 +85,7 @@ class ReviewController extends Controller
     public function destroy(Request $request, Review $review)
     {
         $user = $request->user();
-        if ($review->user_id !== $user->id && !$user->isAdmin()) {
+        if ($review->user_id !== $user->id && ! $user->isAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

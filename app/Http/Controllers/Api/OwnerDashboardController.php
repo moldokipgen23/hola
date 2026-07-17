@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Business;
-use App\Models\Product;
-use App\Models\Review;
-use App\Models\Category;
-use App\Models\Service;
 use App\Models\Booking;
+use App\Models\Business;
+use App\Models\Conversation;
+use App\Models\DeliveryZone;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Services\ActivityLogService;
+use App\Models\Pincode;
+use App\Models\Product;
+use App\Models\Review;
+use App\Models\Service;
+use App\Models\TimeSlot;
+use App\Models\Trip;
+use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -24,6 +28,8 @@ class OwnerDashboardController extends Controller
         'bookings' => false,
         'orders' => false,
         'inventory' => false,
+        'transport' => false,
+        'turf' => false,
     ];
 
     // Module defaults by service_type
@@ -32,6 +38,8 @@ class OwnerDashboardController extends Controller
         'bookable' => ['catalog' => true, 'bookings' => true],
         'buyable' => ['catalog' => true, 'orders' => true, 'inventory' => true],
         'hybrid' => ['catalog' => true, 'bookings' => true, 'orders' => true],
+        'transport' => ['catalog' => true, 'transport' => true],
+        'turf' => ['catalog' => true, 'turf' => true],
     ];
 
     public function dashboard(Request $request)
@@ -47,7 +55,7 @@ class OwnerDashboardController extends Controller
         $totalSaves = $businesses->sum('saves_count');
         $totalShares = $businesses->sum('share_count');
 
-        $recentConversations = \App\Models\Conversation::whereIn('business_id', $businesses->pluck('id'))
+        $recentConversations = Conversation::whereIn('business_id', $businesses->pluck('id'))
             ->with(['user:id,name', 'business:id,name'])
             ->latest('last_message_at')
             ->take(5)
@@ -86,10 +94,10 @@ class OwnerDashboardController extends Controller
         $business = Business::where('created_by', $request->user()->id)
             ->with([
                 'category',
-                'products' => fn($q) => $q->latest()->take(10),
-                'services' => fn($q) => $q->orderBy('sort_order'),
-                'bookings' => fn($q) => $q->where('status', 'pending')->where('booking_date', '>=', now()->toDateString())->latest('booking_date')->take(10),
-                'orders' => fn($q) => $q->whereIn('status', ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'])->latest()->take(10),
+                'products' => fn ($q) => $q->latest()->take(10),
+                'services' => fn ($q) => $q->orderBy('sort_order'),
+                'bookings' => fn ($q) => $q->where('status', 'pending')->where('booking_date', '>=', now()->toDateString())->latest('booking_date')->take(10),
+                'orders' => fn ($q) => $q->whereIn('status', ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'])->latest()->take(10),
             ])
             ->findOrFail($id);
 
@@ -157,6 +165,8 @@ class OwnerDashboardController extends Controller
             'bookings' => 'sometimes|boolean',
             'orders' => 'sometimes|boolean',
             'inventory' => 'sometimes|boolean',
+            'transport' => 'sometimes|boolean',
+            'turf' => 'sometimes|boolean',
             'module_config' => 'sometimes|array',
         ]);
 
@@ -164,7 +174,7 @@ class OwnerDashboardController extends Controller
         $updatedModules = array_merge($currentModules, $validated);
 
         // If enabling bookings, ensure services exist
-        if (($validated['bookings'] ?? false) && !$business->services()->exists()) {
+        if (($validated['bookings'] ?? false) && ! $business->services()->exists()) {
             return response()->json([
                 'message' => 'Cannot enable bookings: no services configured. Add services first.',
             ], 422);
@@ -192,9 +202,22 @@ class OwnerDashboardController extends Controller
 
     protected function determineServiceType(array $modules): string
     {
-        if ($modules['orders'] && $modules['bookings']) return 'hybrid';
-        if ($modules['orders']) return 'buyable';
-        if ($modules['bookings']) return 'bookable';
+        if (($modules['transport'] ?? false)) {
+            return 'transport';
+        }
+        if (($modules['turf'] ?? false)) {
+            return 'turf';
+        }
+        if ($modules['orders'] && $modules['bookings']) {
+            return 'hybrid';
+        }
+        if ($modules['orders']) {
+            return 'buyable';
+        }
+        if ($modules['bookings']) {
+            return 'bookable';
+        }
+
         return 'directory';
     }
 
@@ -212,7 +235,7 @@ class OwnerDashboardController extends Controller
     public function showBusiness(Request $request, $id)
     {
         $business = Business::where('created_by', $request->user()->id)
-            ->with(['category', 'products', 'reviews' => fn($q) => $q->with('user:id,name')->latest()])
+            ->with(['category', 'products', 'reviews' => fn ($q) => $q->with('user:id,name')->latest()])
             ->findOrFail($id);
 
         return response()->json(compact('business'));
@@ -232,8 +255,25 @@ class OwnerDashboardController extends Controller
             'website' => 'nullable|url|max:255',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
+            'pincode' => 'sometimes|required|string|size:6',
+            'delivery_radius_km' => 'nullable|numeric|min:1|max:100',
             'working_hours' => 'nullable|array',
         ]);
+
+        // Handle pincode update
+        if ($request->has('pincode')) {
+            $pincode = Pincode::lookup($validated['pincode']);
+            if (! $pincode) {
+                return response()->json(['message' => 'Invalid pincode.'], 422);
+            }
+            if (! $pincode->serviceable) {
+                return response()->json([
+                    'message' => "We're not in {$pincode->district}, {$pincode->state} yet. This area is not serviceable.",
+                ], 422);
+            }
+            $validated['state'] = $pincode->state;
+            $validated['district'] = $pincode->district;
+        }
 
         $business->update($validated);
 
@@ -255,9 +295,9 @@ class OwnerDashboardController extends Controller
         $photos = $business->photos ?? [];
 
         foreach ($request->file('photos') as $file) {
-            $filename = 'businesses/' . $business->slug . '_' . Str::random(6) . '.' . $file->getClientOriginalExtension();
+            $filename = 'businesses/'.$business->slug.'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
             Storage::disk('public')->put($filename, file_get_contents($file));
-            $photos[] = 'storage/' . $filename;
+            $photos[] = 'storage/'.$filename;
         }
 
         $business->update(['photos' => $photos]);
@@ -300,12 +340,12 @@ class OwnerDashboardController extends Controller
         ]);
 
         $validated['business_id'] = $business->id;
-        $validated['slug'] = Str::slug($validated['name']) . '-' . Str::random(5);
+        $validated['slug'] = Str::slug($validated['name']).'-'.Str::random(5);
 
         if ($request->hasFile('image')) {
-            $filename = 'products/' . $validated['slug'] . '.' . $request->file('image')->getClientOriginalExtension();
+            $filename = 'products/'.$validated['slug'].'.'.$request->file('image')->getClientOriginalExtension();
             Storage::disk('public')->put($filename, file_get_contents($request->file('image')));
-            $validated['image'] = 'storage/' . $filename;
+            $validated['image'] = 'storage/'.$filename;
         }
 
         $product = Product::create($validated);
@@ -329,9 +369,9 @@ class OwnerDashboardController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $filename = 'products/' . $product->slug . '.' . $request->file('image')->getClientOriginalExtension();
+            $filename = 'products/'.$product->slug.'.'.$request->file('image')->getClientOriginalExtension();
             Storage::disk('public')->put($filename, file_get_contents($request->file('image')));
-            $validated['image'] = 'storage/' . $filename;
+            $validated['image'] = 'storage/'.$filename;
         }
 
         $product->update($validated);
@@ -452,7 +492,7 @@ class OwnerDashboardController extends Controller
         ]);
 
         $validated['business_id'] = $business->id;
-        $validated['slug'] = Str::slug($validated['name']) . '-' . Str::random(5);
+        $validated['slug'] = Str::slug($validated['name']).'-'.Str::random(5);
 
         $service = Service::create($validated);
 
@@ -638,5 +678,464 @@ class OwnerDashboardController extends Controller
         $booking->delete();
 
         return response()->json(['message' => 'Booking deleted.']);
+    }
+
+    // ─── Owner Orders CRUD ───
+
+    public function orders(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $query = $business->orders()->with('items');
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->has('date')) {
+            $query->whereDate('created_at', $request->date);
+        }
+
+        $orders = $query->paginate($request->get('per_page', 20));
+
+        return response()->json($orders);
+    }
+
+    public function showOrder(Request $request, $businessId, $orderId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $order = $business->orders()->with('items')->findOrFail($orderId);
+
+        return response()->json(compact('order'));
+    }
+
+    public function storeOrder(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'customer_name' => 'required|string|max:255',
+            'customer_phone' => 'required|string|max:20',
+            'customer_email' => 'nullable|email|max:255',
+            'delivery_address' => 'nullable|string',
+            'notes' => 'nullable|string',
+        ]);
+
+        $productIds = collect($validated['items'])->pluck('product_id');
+        $products = Product::where('business_id', $business->id)
+            ->whereIn('id', $productIds)
+            ->get();
+
+        if ($products->count() !== $productIds->count()) {
+            return response()->json(['message' => 'Invalid products in order.'], 422);
+        }
+
+        $orderNumber = 'ORD-'.strtoupper(Str::random(8));
+
+        $orderData = [
+            'business_id' => $business->id,
+            'order_number' => $orderNumber,
+            'customer_name' => $validated['customer_name'],
+            'customer_phone' => $validated['customer_phone'],
+            'customer_email' => $validated['customer_email'] ?? null,
+            'delivery_address' => $validated['delivery_address'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'status' => 'pending',
+            'payment_status' => 'unpaid',
+            'subtotal' => 0,
+            'total' => 0,
+            'user_id' => $request->user()->id,
+        ];
+
+        $order = Order::create($orderData);
+
+        $subtotal = 0;
+        foreach ($validated['items'] as $item) {
+            $product = $products->find($item['product_id']);
+
+            if ($product->stock !== null && $product->stock < $item['quantity']) {
+                $order->delete();
+
+                return response()->json([
+                    'message' => "Insufficient stock for {$product->name}. Available: {$product->stock}",
+                ], 422);
+            }
+
+            $totalPrice = $product->price * $item['quantity'];
+            $subtotal += $totalPrice;
+
+            OrderItem::create([
+                'order_id' => $order->id,
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'description' => $product->description,
+                'quantity' => $item['quantity'],
+                'unit_price' => $product->price,
+                'total_price' => $totalPrice,
+            ]);
+
+            if ($product->stock !== null) {
+                $product->decrement('stock', $item['quantity']);
+            }
+        }
+
+        $order->update([
+            'subtotal' => $subtotal,
+            'total' => $subtotal,
+        ]);
+
+        $order->load('items');
+
+        return response()->json([
+            'message' => 'Order created.',
+            'order' => $order,
+        ], 201);
+    }
+
+    protected const VALID_ORDER_TRANSITIONS = [
+        'pending' => ['confirmed', 'cancelled'],
+        'confirmed' => ['preparing', 'cancelled'],
+        'preparing' => ['ready', 'cancelled'],
+        'ready' => ['out_for_delivery'],
+        'out_for_delivery' => ['delivered'],
+        'delivered' => [],
+        'cancelled' => [],
+        'refunded' => [],
+    ];
+
+    public function updateOrderStatus(Request $request, $businessId, $orderId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $order = $business->orders()->findOrFail($orderId);
+
+        $validated = $request->validate([
+            'status' => 'required|in:pending,confirmed,preparing,ready,out_for_delivery,delivered,cancelled',
+            'cancellation_reason' => 'nullable|string',
+        ]);
+
+        $allowed = self::VALID_ORDER_TRANSITIONS[$order->status] ?? [];
+        if (! in_array($validated['status'], $allowed)) {
+            return response()->json([
+                'message' => "Cannot transition from '{$order->status}' to '{$validated['status']}'.",
+            ], 422);
+        }
+
+        $order->update($validated);
+
+        $statusTimestamps = [
+            'confirmed' => 'confirmed_at',
+            'ready' => 'ready_at',
+            'delivered' => 'delivered_at',
+            'cancelled' => 'cancelled_at',
+        ];
+
+        if (isset($statusTimestamps[$validated['status']])) {
+            $order->update([$statusTimestamps[$validated['status']] => now()]);
+        }
+
+        return response()->json([
+            'message' => 'Order status updated.',
+            'order' => $order->fresh()->load('items'),
+        ]);
+    }
+
+    public function destroyOrder(Request $request, $businessId, $orderId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $order = $business->orders()->findOrFail($orderId);
+
+        if (in_array($order->status, ['confirmed', 'preparing', 'out_for_delivery', 'delivered'])) {
+            return response()->json([
+                'message' => 'Cannot delete an active or completed order.',
+            ], 422);
+        }
+
+        $order->items()->delete();
+        $order->delete();
+
+        return response()->json(['message' => 'Order deleted.']);
+    }
+
+    // ─── Vehicle CRUD ───
+
+    public function vehicles(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $vehicles = $business->vehicles()->orderBy('sort_order')->get();
+
+        return response()->json(compact('vehicles'));
+    }
+
+    public function storeVehicle(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:car,bolero,suv,van,auto,bike',
+            'seats' => 'required|integer|min:1|max:50',
+            'base_fare' => 'required|numeric|min:0',
+            'fare_per_km' => 'required|numeric|min:0',
+            'min_km' => 'nullable|integer|min:1',
+            'registration_number' => 'nullable|string|max:50',
+            'description' => 'nullable|string|max:1000',
+            'is_active' => 'boolean',
+            'sort_order' => 'nullable|integer',
+        ]);
+
+        $validated['business_id'] = $business->id;
+        $validated['is_active'] = $validated['is_active'] ?? true;
+        $validated['sort_order'] = $validated['sort_order'] ?? 0;
+
+        if ($request->hasFile('image')) {
+            $filename = 'vehicles/'.Str::slug($validated['name']).'-'.Str::random(6).'.'.$request->file('image')->getClientOriginalExtension();
+            Storage::disk('public')->put($filename, file_get_contents($request->file('image')));
+            $validated['image'] = 'storage/'.$filename;
+        }
+
+        $vehicle = Vehicle::create($validated);
+
+        return response()->json([
+            'message' => 'Vehicle added.',
+            'vehicle' => $vehicle,
+        ], 201);
+    }
+
+    public function updateVehicle(Request $request, $businessId, $vehicleId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'type' => 'sometimes|in:car,bolero,suv,van,auto,bike',
+            'seats' => 'sometimes|integer|min:1|max:50',
+            'base_fare' => 'sometimes|numeric|min:0',
+            'fare_per_km' => 'sometimes|numeric|min:0',
+            'min_km' => 'nullable|integer|min:1',
+            'registration_number' => 'nullable|string|max:50',
+            'description' => 'nullable|string|max:1000',
+            'is_active' => 'boolean',
+            'sort_order' => 'nullable|integer',
+        ]);
+
+        $vehicle->update($validated);
+
+        return response()->json([
+            'message' => 'Vehicle updated.',
+            'vehicle' => $vehicle->fresh(),
+        ]);
+    }
+
+    public function destroyVehicle($businessId, $vehicleId)
+    {
+        $business = Business::where('created_by', request()->user()->id)->findOrFail($businessId);
+        $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
+
+        if ($vehicle->trips()->whereIn('status', ['pending', 'confirmed'])->exists()) {
+            return response()->json(['message' => 'Cannot delete vehicle with active trips.'], 422);
+        }
+
+        $vehicle->delete();
+
+        return response()->json(['message' => 'Vehicle deleted.']);
+    }
+
+    // ─── Trip Management ───
+
+    public function trips(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $query = $business->trips()->with('vehicle');
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->has('date')) {
+            $query->where('trip_date', $request->date);
+        }
+
+        $trips = $query->paginate($request->get('per_page', 20));
+
+        return response()->json($trips);
+    }
+
+    public function showTrip(Request $request, $businessId, $tripId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $trip = $business->trips()->with('vehicle')->findOrFail($tripId);
+
+        return response()->json(compact('trip'));
+    }
+
+    public function updateTripStatus(Request $request, $businessId, $tripId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $trip = $business->trips()->findOrFail($tripId);
+
+        $validated = $request->validate([
+            'status' => 'required|in:pending,confirmed,started,completed,cancelled',
+            'driver_name' => 'nullable|string|max:255',
+            'driver_phone' => 'nullable|string|max:20',
+            'cancellation_reason' => 'nullable|string|max:500',
+        ]);
+
+        $trip->update($validated);
+
+        if ($validated['status'] === 'confirmed') {
+            $trip->update(['booked_at' => now()]);
+        } elseif ($validated['status'] === 'started') {
+            $trip->update(['started_at' => now()]);
+        } elseif ($validated['status'] === 'completed') {
+            $trip->update(['completed_at' => now()]);
+        } elseif ($validated['status'] === 'cancelled') {
+            $trip->update(['cancelled_at' => now()]);
+        }
+
+        return response()->json([
+            'message' => 'Trip status updated.',
+            'trip' => $trip->fresh()->load('vehicle'),
+        ]);
+    }
+
+    // ─── Time Slot CRUD ───
+
+    public function timeSlots(Request $request, $businessId, $serviceId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+
+        $slots = $service->timeSlots()->orderBy('day_of_week')->orderBy('start_time')->get();
+
+        return response()->json(compact('slots'));
+    }
+
+    public function storeTimeSlot(Request $request, $businessId, $serviceId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+
+        $validated = $request->validate([
+            'day_of_week' => 'nullable|integer|between:0,6',
+            'start_time' => 'required',
+            'end_time' => 'required',
+            'capacity' => 'required|integer|min:1',
+            'price_override' => 'nullable|numeric|min:0',
+            'is_active' => 'boolean',
+        ]);
+
+        $validated['service_id'] = $service->id;
+        $slot = TimeSlot::create($validated);
+
+        return response()->json([
+            'message' => 'Time slot added.',
+            'slot' => $slot,
+        ], 201);
+    }
+
+    public function updateTimeSlot(Request $request, $businessId, $serviceId, $slotId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+        $slot = TimeSlot::where('service_id', $service->id)->findOrFail($slotId);
+
+        $validated = $request->validate([
+            'day_of_week' => 'nullable|integer|between:0,6',
+            'start_time' => 'sometimes',
+            'end_time' => 'sometimes',
+            'capacity' => 'sometimes|integer|min:1',
+            'price_override' => 'nullable|numeric|min:0',
+            'is_active' => 'boolean',
+        ]);
+
+        $slot->update($validated);
+
+        return response()->json([
+            'message' => 'Time slot updated.',
+            'slot' => $slot->fresh(),
+        ]);
+    }
+
+    public function destroyTimeSlot($businessId, $serviceId, $slotId)
+    {
+        $business = Business::where('created_by', request()->user()->id)->findOrFail($businessId);
+        $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+        $slot = TimeSlot::where('service_id', $service->id)->findOrFail($slotId);
+
+        if ($slot->bookings()->whereIn('status', ['pending', 'confirmed'])->exists()) {
+            return response()->json(['message' => 'Cannot delete slot with active bookings.'], 422);
+        }
+
+        $slot->delete();
+
+        return response()->json(['message' => 'Time slot deleted.']);
+    }
+
+    // ─── Delivery Zone CRUD ───
+
+    public function deliveryZones(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $zones = $business->deliveryZones()->with('area:id,name,slug')->get();
+
+        return response()->json(compact('zones'));
+    }
+
+    public function storeDeliveryZone(Request $request, $businessId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+
+        $validated = $request->validate([
+            'area_id' => 'required|exists:areas,id',
+            'min_order_amount' => 'nullable|numeric|min:0',
+            'delivery_fee' => 'required|numeric|min:0',
+            'estimated_minutes' => 'nullable|integer|min:1',
+            'is_active' => 'boolean',
+        ]);
+
+        $exists = $business->deliveryZones()->where('area_id', $validated['area_id'])->exists();
+        if ($exists) {
+            return response()->json(['message' => 'Delivery zone for this area already exists.'], 422);
+        }
+
+        $validated['business_id'] = $business->id;
+        $zone = DeliveryZone::create($validated);
+
+        return response()->json([
+            'message' => 'Delivery zone added.',
+            'zone' => $zone->load('area:id,name,slug'),
+        ], 201);
+    }
+
+    public function updateDeliveryZone(Request $request, $businessId, $zoneId)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $zone = DeliveryZone::where('business_id', $business->id)->findOrFail($zoneId);
+
+        $validated = $request->validate([
+            'min_order_amount' => 'nullable|numeric|min:0',
+            'delivery_fee' => 'sometimes|numeric|min:0',
+            'estimated_minutes' => 'nullable|integer|min:1',
+            'is_active' => 'boolean',
+        ]);
+
+        $zone->update($validated);
+
+        return response()->json([
+            'message' => 'Delivery zone updated.',
+            'zone' => $zone->fresh()->load('area:id,name,slug'),
+        ]);
+    }
+
+    public function destroyDeliveryZone($businessId, $zoneId)
+    {
+        $business = Business::where('created_by', request()->user()->id)->findOrFail($businessId);
+        $zone = DeliveryZone::where('business_id', $business->id)->findOrFail($zoneId);
+        $zone->delete();
+
+        return response()->json(['message' => 'Delivery zone deleted.']);
     }
 }

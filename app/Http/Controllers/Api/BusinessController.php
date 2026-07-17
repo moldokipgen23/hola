@@ -11,10 +11,24 @@ class BusinessController extends Controller
     public function index(Request $request)
     {
         $businesses = Business::active()
-            ->with(['category', 'subcategory', 'products'])
+            ->inServiceableArea()
+            ->with([
+                'category', 'subcategory', 'area',
+                'products' => fn ($q) => $q->where('is_active', true)->limit(4),
+                'services' => fn ($q) => $q->where('is_active', true)->limit(4),
+                'deliveryZones' => fn ($q) => $q->where('is_active', true),
+            ])
             ->when($request->category, function ($query, $category) {
                 $query->whereHas('category', function ($q) use ($category) {
                     $q->where('slug', $category);
+                });
+            })
+            ->when($request->module, fn ($q, $m) => $q->ofModule($m))
+            ->when($request->area_id, function ($query, $areaId) {
+                $query->where(function ($q) use ($areaId) {
+                    $q->whereHas('deliveryZones', function ($q2) use ($areaId) {
+                        $q2->where('area_id', $areaId)->where('is_active', true);
+                    })->orWhere('area_id', $areaId);
                 });
             })
             ->when($request->featured, function ($query) {
@@ -29,11 +43,13 @@ class BusinessController extends Controller
         ]);
     }
 
-    public function featured()
+    public function featured(Request $request)
     {
         $businesses = Business::active()
+            ->inServiceableArea()
             ->featured()
-            ->with(['category', 'subcategory'])
+            ->with(['category', 'subcategory', 'area'])
+            ->when($request->module, fn ($q, $m) => $q->ofModule($m))
             ->orderByDesc('created_at')
             ->limit(10)
             ->get();
@@ -43,10 +59,12 @@ class BusinessController extends Controller
         ]);
     }
 
-    public function trending()
+    public function trending(Request $request)
     {
         $businesses = Business::active()
-            ->with(['category', 'subcategory'])
+            ->inServiceableArea()
+            ->with(['category', 'subcategory', 'area'])
+            ->when($request->module, fn ($q, $m) => $q->ofModule($m))
             ->orderByDesc('views_count')
             ->limit(10)
             ->get();
@@ -56,10 +74,12 @@ class BusinessController extends Controller
         ]);
     }
 
-    public function newlyAdded()
+    public function newlyAdded(Request $request)
     {
         $businesses = Business::active()
-            ->with(['category', 'subcategory'])
+            ->inServiceableArea()
+            ->with(['category', 'subcategory', 'area'])
+            ->when($request->module, fn ($q, $m) => $q->ofModule($m))
             ->orderByDesc('created_at')
             ->limit(10)
             ->get();
@@ -71,8 +91,8 @@ class BusinessController extends Controller
 
     public function show($slug)
     {
-        $business = Business::active()->where('slug', $slug)
-            ->with(['category', 'subcategory', 'products'])
+        $business = Business::active()->inServiceableArea()->where('slug', $slug)
+            ->with(['category', 'subcategory', 'area', 'products' => fn ($q) => $q->where('is_active', true)->limit(10), 'deliveryZones' => fn ($q) => $q->where('is_active', true), 'deliveryZones.area', 'vehicles' => fn ($q) => $q->where('is_active', true)->limit(10)])
             ->firstOrFail();
 
         $business->increment('views_count');
@@ -84,7 +104,7 @@ class BusinessController extends Controller
 
     public function showById($id)
     {
-        $business = Business::active()->with(['category', 'subcategory', 'products'])
+        $business = Business::active()->inServiceableArea()->with(['category', 'subcategory', 'products'])
             ->findOrFail($id);
 
         return response()->json([
@@ -94,9 +114,10 @@ class BusinessController extends Controller
 
     public function related($slug)
     {
-        $business = Business::active()->where('slug', $slug)->firstOrFail();
+        $business = Business::active()->inServiceableArea()->where('slug', $slug)->firstOrFail();
 
         $related = Business::active()
+            ->inServiceableArea()
             ->where('category_id', $business->category_id)
             ->where('id', '!=', $business->id)
             ->with(['category', 'subcategory'])
@@ -111,6 +132,7 @@ class BusinessController extends Controller
     public function byCategory($categorySlug)
     {
         $businesses = Business::active()
+            ->inServiceableArea()
             ->whereHas('category', function ($q) use ($categorySlug) {
                 $q->where('slug', $categorySlug);
             })
@@ -137,23 +159,25 @@ class BusinessController extends Controller
         $radius = $request->radius ?? 5;
 
         $businesses = Business::active()
-            ->with(['category', 'subcategory'])
+            ->inServiceableArea()
+            ->with(['category', 'subcategory', 'area'])
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->selectRaw("*, (
+            ->when($request->module, fn ($q, $m) => $q->ofModule($m))
+            ->selectRaw('*, (
                 6371 * acos(
                     cos(radians(?)) * cos(radians(latitude)) *
                     cos(radians(longitude) - radians(?)) +
                     sin(radians(?)) * sin(radians(latitude))
                 )
-            ) AS distance", [$lat, $lng, $lat])
-            ->whereRaw("(
+            ) AS distance', [$lat, $lng, $lat])
+            ->whereRaw('(
                 6371 * acos(
                     cos(radians(?)) * cos(radians(latitude)) *
                     cos(radians(longitude) - radians(?)) +
                     sin(radians(?)) * sin(radians(latitude))
                 )
-            ) < ?", [$lat, $lng, $lat, $radius])
+            ) < ?', [$lat, $lng, $lat, $radius])
             ->orderBy('distance')
             ->limit(20)
             ->get();
@@ -171,7 +195,7 @@ class BusinessController extends Controller
 
         $business = Business::where('slug', $slug)->firstOrFail();
 
-        $actionField = match($request->action) {
+        $actionField = match ($request->action) {
             'call' => 'call_count',
             'whatsapp' => 'whatsapp_count',
             'directions' => 'directions_count',
@@ -184,5 +208,29 @@ class BusinessController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function services($slug)
+    {
+        $business = Business::active()->inServiceableArea()->where('slug', $slug)->firstOrFail();
+
+        $services = $business->services()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        return response()->json(compact('services'));
+    }
+
+    public function publicServices($id)
+    {
+        $business = Business::active()->inServiceableArea()->findOrFail($id);
+
+        $services = $business->services()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        return response()->json(compact('services'));
     }
 }

@@ -40,6 +40,7 @@ class ClaimVerification extends Model
 
         if (hash_equals($this->otp, $inputOtp)) {
             $this->update(['verified' => true]);
+
             return true;
         }
 

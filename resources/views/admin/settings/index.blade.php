@@ -41,6 +41,10 @@
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
             Notifications
         </button>
+        <button type="button" onclick="switchTab('payment')" data-tab="payment" class="settings-tab">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+            Payment
+        </button>
     </div>
 
     <!-- Tab: General -->
@@ -680,6 +684,109 @@
 
             <div class="mt-6">
                 <button type="submit" class="btn-primary">Save Notification Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Payment -->
+    <div id="tab-payment" class="tab-content" style="display:none">
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-green-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-white font-semibold">Payment Gateways</h3>
+                    <p class="text-slate-500 text-xs">Configure payment methods available on the platform</p>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <!-- COD -->
+                <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h4 class="text-white font-medium">Cash on Delivery</h4>
+                            <p class="text-slate-400 text-xs">Customers pay in cash when order is delivered</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="settings[payment_cod_enabled]" value="0">
+                            <input type="checkbox" name="settings[payment_cod_enabled]" value="1" class="sr-only peer" {{ ($settings['payment_cod_enabled'] ?? '1') == '1' ? 'checked' : '' }}>
+                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Razorpay -->
+                <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-white font-medium">Razorpay</h4>
+                            <p class="text-slate-400 text-xs">Online payments via UPI, cards, netbanking</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="settings[payment_razorpay_enabled]" value="0">
+                            <input type="checkbox" name="settings[payment_razorpay_enabled]" value="1" class="sr-only peer" {{ ($settings['payment_razorpay_enabled'] ?? '0') == '1' ? 'checked' : '' }}>
+                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Key ID</label>
+                            <input type="text" name="settings[payment_razorpay_key_id]" value="{{ $settings['payment_razorpay_key_id'] ?? env('RAZORPAY_KEY_ID', '') }}" class="input-dark" placeholder="rzp_live_xxxxx">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Key Secret</label>
+                            <input type="password" name="settings[payment_razorpay_key_secret]" value="{{ $settings['payment_razorpay_key_secret'] ?? env('RAZORPAY_KEY_SECRET', '') }}" class="input-dark" placeholder="xxxxxxxxxxxx">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cashfree -->
+                <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-white font-medium">Cashfree</h4>
+                            <p class="text-slate-400 text-xs">Online payments via UPI, cards, netbanking, Paylater</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="settings[payment_cashfree_enabled]" value="0">
+                            <input type="checkbox" name="settings[payment_cashfree_enabled]" value="1" class="sr-only peer" {{ ($settings['payment_cashfree_enabled'] ?? '0') == '1' ? 'checked' : '' }}>
+                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">App ID</label>
+                            <input type="text" name="settings[payment_cashfree_app_id]" value="{{ $settings['payment_cashfree_app_id'] ?? env('CASHFREE_APP_ID', '') }}" class="input-dark" placeholder="CF12345...">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Secret Key</label>
+                            <input type="password" name="settings[payment_cashfree_secret_key]" value="{{ $settings['payment_cashfree_secret_key'] ?? env('CASHFREE_SECRET_KEY', '') }}" class="input-dark" placeholder="sk_xxxxx">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Environment</label>
+                            <select name="settings[payment_cashfree_env]" class="input-dark">
+                                <option value="TEST" {{ ($settings['payment_cashfree_env'] ?? env('CASHFREE_ENV', 'TEST')) == 'TEST' ? 'selected' : '' }}>TEST (Sandbox)</option>
+                                <option value="PRODUCTION" {{ ($settings['payment_cashfree_env'] ?? env('CASHFREE_ENV', 'TEST')) == 'PRODUCTION' ? 'selected' : '' }}>PRODUCTION (Live)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Default -->
+                <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Default Payment Method (for new vendors)</label>
+                    <select name="settings[payment_default]" class="input-dark">
+                        <option value="cod" {{ ($settings['payment_default'] ?? 'cod') == 'cod' ? 'selected' : '' }}>COD</option>
+                        <option value="razorpay" {{ ($settings['payment_default'] ?? 'cod') == 'razorpay' ? 'selected' : '' }}>Razorpay</option>
+                        <option value="cashfree" {{ ($settings['payment_default'] ?? 'cod') == 'cashfree' ? 'selected' : '' }}>Cashfree</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="btn-primary">Save Payment Settings</button>
             </div>
         </div>
     </div>

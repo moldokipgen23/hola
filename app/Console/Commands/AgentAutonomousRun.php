@@ -4,45 +4,32 @@ namespace App\Console\Commands;
 
 use App\Models\AiAgent;
 use App\Models\AiAgentTask;
+use App\Models\Business;
 use App\Models\ImportItem;
+use App\Models\Setting;
 use App\Services\AgentSkillService;
 use Illuminate\Console\Command;
 
 class AgentAutonomousRun extends Command
 {
     protected $signature = 'agent:auto-run {--skill=} {--dry-run}';
+
     protected $description = 'Run AI agent skills autonomously on schedule';
 
     // Pre-configured search queries — pulled from Settings (supports multiple areas + zipcodes)
     private function getSearchQueries(): array
     {
-        $district = \App\Models\Setting::get('search_district', 'Churachandpur');
-        $state = \App\Models\Setting::get('search_state', 'Manipur');
-        $zipcodes = array_map('trim', explode(',', \App\Models\Setting::get('search_zipcodes', '795128')));
-        $areas = array_map('trim', explode(',', \App\Models\Setting::get('search_areas', 'Lamka')));
+        $district = Setting::get('search_district', 'Churachandpur');
+        $state = Setting::get('search_state', 'Manipur');
+        $zipcodes = array_map('trim', explode(',', Setting::get('search_zipcodes', '795128')));
+        $areas = array_map('trim', explode(',', Setting::get('search_areas', 'Lamka')));
 
-        // Priority 1: Core businesses (rotated frequently)
-        $priority1 = [
-            'restaurants', 'schools', 'pharmacies', 'hotels',
-            'computer shops', 'electronics shops', 'shopping malls',
-            'football turf', 'swimming pool', 'resorts',
-            'hospitals', 'clinics', 'picnic spots',
+        // Priority: Only these categories — real bookable businesses first
+        $priority = [
+            'restaurants', 'hotels', 'football turf', 'swimming pool',
+            'resorts', 'schools', 'pharmacies', 'beauty salons',
         ];
-        // Priority 2: Supporting businesses (less frequent)
-        $priority2 = [
-            'grocery stores', 'mobile shops', 'beauty salons',
-            'hardware stores', 'stationery shops', 'tailoring shops',
-            'photography studios', 'tuition centers', 'catering services',
-        ];
-        // Priority 3: Public/utility businesses (least frequent)
-        $priority3 = [
-            'banks', 'atm', 'post office', 'police station',
-            'fire station', 'community hall', 'churches', 'temples',
-            'mosques', 'government offices', 'petrol pumps',
-            'hospitals', 'clinics', 'diagnostic labs', 'blood banks',
-            'water supply', 'electricity office', 'telecom office',
-        ];
-        $queries = array_merge($priority1, $priority2, $priority3);
+        $queries = $priority;
 
         $searchQueries = [];
         foreach ($queries as $query) {
@@ -64,8 +51,9 @@ class AgentAutonomousRun extends Command
         $skillFilter = $this->option('skill');
 
         $agent = AiAgent::where('status', 'active')->first();
-        if (!$agent) {
+        if (! $agent) {
             $this->error('No active agent found.');
+
             return 1;
         }
 
@@ -75,38 +63,48 @@ class AgentAutonomousRun extends Command
         $results = [];
         $searchQueries = $this->getSearchQueries();
 
-        // STEP 1: Search & Import (pick a random query to avoid repetition)
-        if (!$skillFilter || $skillFilter === 'google_places_import') {
-            $query = $searchQueries[array_rand($searchQueries)];
-            $this->info("  🔍 Searching: {$query['query']} in {$query['area']}");
+        // STEP 1: Search & Import (search 3 priority categories per run for faster coverage)
+        if (! $skillFilter || $skillFilter === 'google_places_import') {
+            $selected = count($searchQueries) <= 3
+                ? $searchQueries
+                : array_rand($searchQueries, 3);
 
-            if (!$dryRun) {
-                $task = AiAgentTask::create([
-                    'agent_id' => $agent->id,
-                    'type' => 'google_places_import',
-                    'input' => array_merge($query, ['max_results' => 20]),
-                    'status' => 'pending',
-                ]);
+            if (! is_array($selected)) {
+                $selected = [$selected];
+            }
 
-                try {
-                    $result = $service->run($agent, $task);
-                    $results['search'] = $result;
-                    $this->info("  ✅ Found {$result['count']} | Imported {$result['imported']} | Duplicates {$result['duplicates']}");
-                } catch (\Exception $e) {
-                    $this->error("  ❌ Search failed: {$e->getMessage()}");
+            foreach ($selected as $idx) {
+                $query = is_array($idx) ? $idx : $searchQueries[$idx];
+                $this->info("  🔍 Searching: {$query['query']} in {$query['area']}");
+
+                if (! $dryRun) {
+                    $task = AiAgentTask::create([
+                        'agent_id' => $agent->id,
+                        'type' => 'google_places_import',
+                        'input' => array_merge($query, ['max_results' => 20]),
+                        'status' => 'pending',
+                    ]);
+
+                    try {
+                        $result = $service->run($agent, $task);
+                        $results[] = $result;
+                        $this->info("  ✅ Found {$result['count']} | Imported {$result['imported']} | Duplicates {$result['duplicates']}");
+                    } catch (\Exception $e) {
+                        $this->error("  ❌ Search failed: {$e->getMessage()}");
+                    }
+                } else {
+                    $this->info("  [DRY RUN] Would search: {$query['query']}");
                 }
-            } else {
-                $this->info("  [DRY RUN] Would search: {$query['query']}");
             }
         }
 
         // STEP 2: Auto-categorize pending imports
-        if (!$skillFilter || $skillFilter === 'auto_categorize') {
+        if (! $skillFilter || $skillFilter === 'auto_categorize') {
             $pendingCount = ImportItem::where('status', 'pending')->count();
             if ($pendingCount > 0) {
                 $this->info("  📂 Categorizing {$pendingCount} pending items...");
 
-                if (!$dryRun) {
+                if (! $dryRun) {
                     $task = AiAgentTask::create([
                         'agent_id' => $agent->id,
                         'type' => 'auto_categorize',
@@ -125,17 +123,17 @@ class AgentAutonomousRun extends Command
                     $this->info("  [DRY RUN] Would categorize {$pendingCount} items");
                 }
             } else {
-                $this->info("  📂 No pending items to categorize");
+                $this->info('  📂 No pending items to categorize');
             }
         }
 
         // STEP 3: Quality check pending imports
-        if (!$skillFilter || $skillFilter === 'quality_checker') {
+        if (! $skillFilter || $skillFilter === 'quality_checker') {
             $pendingForQuality = ImportItem::where('status', 'pending')->count();
             if ($pendingForQuality > 0) {
-                $this->info("  🔎 Running quality check...");
+                $this->info('  🔎 Running quality check...');
 
-                if (!$dryRun) {
+                if (! $dryRun) {
                     $task = AiAgentTask::create([
                         'agent_id' => $agent->id,
                         'type' => 'quality_checker',
@@ -154,12 +152,12 @@ class AgentAutonomousRun extends Command
                     $this->info("  [DRY RUN] Would quality check {$pendingForQuality} items");
                 }
             } else {
-                $this->info("  🔎 No pending items for quality check");
+                $this->info('  🔎 No pending items for quality check');
             }
         }
 
         // STEP 4: Write descriptions for items without them
-        if (!$skillFilter || $skillFilter === 'description_writer') {
+        if (! $skillFilter || $skillFilter === 'description_writer') {
             $noDesc = ImportItem::where('status', 'pending')
                 ->whereNull('data->description')
                 ->orWhere('data->description', '')
@@ -168,7 +166,7 @@ class AgentAutonomousRun extends Command
             if ($noDesc > 0) {
                 $this->info("  ✍️ Writing descriptions for {$noDesc} items...");
 
-                if (!$dryRun) {
+                if (! $dryRun) {
                     $task = AiAgentTask::create([
                         'agent_id' => $agent->id,
                         'type' => 'description_writer',
@@ -187,13 +185,13 @@ class AgentAutonomousRun extends Command
                     $this->info("  [DRY RUN] Would write {$noDesc} descriptions");
                 }
             } else {
-                $this->info("  ✍️ All items have descriptions");
+                $this->info('  ✍️ All items have descriptions');
             }
         }
 
         // STEP 5: Google Sync — detect changes to already-imported businesses
-        if (!$skillFilter || $skillFilter === 'google_sync') {
-            $importedCount = \App\Models\Business::where('source', 'import')
+        if (! $skillFilter || $skillFilter === 'google_sync') {
+            $importedCount = Business::where('source', 'import')
                 ->where('is_active', true)
                 ->whereNotNull('external_id')
                 ->count();
@@ -201,7 +199,7 @@ class AgentAutonomousRun extends Command
             if ($importedCount > 0) {
                 $this->info("  🔄 Syncing {$importedCount} businesses with Google...");
 
-                if (!$dryRun) {
+                if (! $dryRun) {
                     $task = AiAgentTask::create([
                         'agent_id' => $agent->id,
                         'type' => 'google_sync',
@@ -213,7 +211,7 @@ class AgentAutonomousRun extends Command
                         \Artisan::call('google:sync', ['--limit' => 20]);
                         $output = \Artisan::output();
                         $task->update(['status' => 'completed', 'output' => ['raw' => $output]]);
-                        $this->info("  ✅ Google sync complete");
+                        $this->info('  ✅ Google sync complete');
                     } catch (\Exception $e) {
                         $this->error("  ❌ Google sync failed: {$e->getMessage()}");
                     }
@@ -221,12 +219,12 @@ class AgentAutonomousRun extends Command
                     $this->info("  [DRY RUN] Would sync {$importedCount} businesses with Google");
                 }
             } else {
-                $this->info("  🔄 No imported businesses to sync");
+                $this->info('  🔄 No imported businesses to sync');
             }
         }
 
         $pending = ImportItem::where('status', 'pending')->count();
-        $this->info("");
+        $this->info('');
         $this->info("📊 Pipeline complete. Pending items for review: {$pending}");
 
         return 0;

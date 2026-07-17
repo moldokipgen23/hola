@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
-use Illuminate\Http\Request;
 
 class ActivityLogService
 {

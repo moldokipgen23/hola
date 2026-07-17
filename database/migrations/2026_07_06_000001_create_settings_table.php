@@ -65,7 +65,7 @@ return new class extends Migration
         ];
 
         foreach ($settings as $setting) {
-            \DB::table('settings')->insert([
+            DB::table('settings')->insert([
                 ...$setting,
                 'created_at' => now(),
                 'updated_at' => now(),

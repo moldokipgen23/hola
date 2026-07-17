@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\Category;
-use App\Models\Subcategory;
+use App\Models\ClaimRequest;
+use App\Models\Pincode;
 use App\Models\Product;
 use App\Models\Report;
+use App\Models\Subcategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -25,6 +27,7 @@ class AdminController extends Controller
             'address' => 'required|string|max:255',
             'locality' => 'nullable|string|max:255',
             'district' => 'nullable|string|max:255',
+            'pincode' => 'required|string|size:6',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'phone' => 'nullable|string|max:20',
@@ -38,12 +41,25 @@ class AdminController extends Controller
             'photos.*' => 'image|max:2048',
         ]);
 
+        // Validate pincode
+        $pincode = Pincode::lookup($request->pincode);
+        if (! $pincode) {
+            return response()->json(['message' => 'Invalid pincode.'], 422);
+        }
+        if (! $pincode->serviceable) {
+            return response()->json([
+                'message' => "Cannot create business in {$pincode->district}, {$pincode->state}. This area is not yet serviceable.",
+            ], 422);
+        }
+
         $data = $request->only([
             'name', 'category_id', 'subcategory_id', 'description',
             'address', 'locality', 'district', 'latitude', 'longitude',
             'phone', 'whatsapp', 'email', 'website', 'working_hours', 'is_featured', 'is_active',
         ]);
 
+        $data['pincode'] = $pincode->pincode;
+        $data['state'] = $pincode->state;
         $data['slug'] = Str::slug($request->name);
         $data['created_by'] = $request->user()->id;
 
@@ -72,6 +88,7 @@ class AdminController extends Controller
             'address' => 'sometimes|required|string|max:255',
             'locality' => 'nullable|string|max:255',
             'district' => 'nullable|string|max:255',
+            'pincode' => 'sometimes|required|string|size:6',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'phone' => 'nullable|string|max:20',
@@ -92,6 +109,22 @@ class AdminController extends Controller
             'phone', 'whatsapp', 'email', 'website', 'working_hours', 'is_featured', 'is_active',
             'verification_status',
         ]);
+
+        // Handle pincode update
+        if ($request->has('pincode')) {
+            $pincode = Pincode::lookup($request->pincode);
+            if (! $pincode) {
+                return response()->json(['message' => 'Invalid pincode.'], 422);
+            }
+            if (! $pincode->serviceable) {
+                return response()->json([
+                    'message' => "Cannot set business to {$pincode->district}, {$pincode->state}. This area is not yet serviceable.",
+                ], 422);
+            }
+            $data['pincode'] = $pincode->pincode;
+            $data['state'] = $pincode->state;
+            $data['district'] = $data['district'] ?? $pincode->district;
+        }
 
         if ($request->has('name')) {
             $data['slug'] = Str::slug($request->name);
@@ -360,8 +393,8 @@ class AdminController extends Controller
             'total_products' => Product::count(),
             'total_reports' => Report::count(),
             'pending_reports' => Report::where('status', 'pending')->count(),
-            'total_claims' => \App\Models\ClaimRequest::count(),
-            'pending_claims' => \App\Models\ClaimRequest::where('status', 'pending')->count(),
+            'total_claims' => ClaimRequest::count(),
+            'pending_claims' => ClaimRequest::where('status', 'pending')->count(),
             'featured_businesses' => Business::where('is_featured', true)->count(),
             'verified_businesses' => Business::where('verification_status', 'verified')->count(),
             'top_businesses' => $topBusinesses,
