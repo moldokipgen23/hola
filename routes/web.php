@@ -2479,6 +2479,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/products', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['orders'] ?? false, 404);
             $products = Product::where('business_id', $business->id)->latest()->paginate(20);
 
             return view('vendor.products.index', compact('products', 'business'));
@@ -2487,6 +2488,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/products/create', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['orders'] ?? false, 404);
 
             return view('vendor.products.form', compact('business'));
         })->name('products.create');
@@ -2494,6 +2496,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::post('/businesses/{businessId}/products', function (Request $request, $businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['orders'] ?? false, 404);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
@@ -2512,6 +2515,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/products/{id}/edit', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['orders'] ?? false, 404);
             $product = Product::where('business_id', $business->id)->findOrFail($id);
 
             return view('vendor.products.form', compact('business', 'product'));
@@ -2520,6 +2524,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/businesses/{businessId}/products/{id}', function (Request $request, $businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['orders'] ?? false, 404);
             $product = Product::where('business_id', $business->id)->findOrFail($id);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
@@ -2537,6 +2542,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::delete('/businesses/{businessId}/products/{id}', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['orders'] ?? false, 404);
             Product::where('business_id', $business->id)->findOrFail($id)->delete();
 
             return redirect()->route('vendor.products', $business->id)->with('success', 'Product deleted.');
@@ -2546,6 +2552,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/services', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
             $services = Service::where('business_id', $business->id)->orderBy('sort_order')->paginate(20);
 
             return view('vendor.services.index', compact('services', 'business'));
@@ -2554,7 +2561,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/services/create', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            $businesses = Business::where('created_by', $user->id)->get();
+            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
 
             return view('vendor.services.form', compact('business'));
         })->name('services.create');
@@ -2562,6 +2569,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::post('/businesses/{businessId}/services', function (Request $request, $businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
@@ -2581,6 +2589,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/services/{id}/edit', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
             $service = Service::where('business_id', $business->id)->findOrFail($id);
 
             return view('vendor.services.form', compact('business', 'service'));
@@ -2589,6 +2598,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/businesses/{businessId}/services/{id}', function (Request $request, $businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
             $service = Service::where('business_id', $business->id)->findOrFail($id);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
@@ -2607,6 +2617,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::delete('/businesses/{businessId}/services/{id}', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
             Service::where('business_id', $business->id)->findOrFail($id)->delete();
 
             return redirect()->route('vendor.services', $business->id)->with('success', 'Service deleted.');
@@ -2616,6 +2627,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/bookings', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
             $query = Booking::where('business_id', $business->id)->with('service:id,name')->latest('booking_date');
 
             if ($status = request('status')) {
@@ -2660,6 +2672,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/orders', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
+            abort_unless($business->enabled_modules['orders'] ?? false, 404);
             $query = Order::where('business_id', $business->id)->with('items')->latest();
 
             if ($status = request('status')) {
