@@ -11,7 +11,7 @@ class LeadController extends BaseController
 {
     public function index(Request $request)
     {
-        $leads = Business::whereNull('claimed_by')
+        $leads = Business::where('claim_status', 'unclaimed')
             ->with('category:id,name')
             ->when($request->search, fn ($q, $v) => $q->where('name', 'like', "%{$v}%"))
             ->when($request->category_id, fn ($q, $v) => $q->where('category_id', $v))
@@ -33,8 +33,8 @@ class LeadController extends BaseController
         $business = Business::findOrFail($id);
 
         $validated = $request->validate([
-            'lead_score' => 'required|integer|min:0|max:100',
-            'lead_notes' => 'nullable|string',
+            'confidence' => 'sometimes|integer|min:0|max:100',
+            'is_featured' => 'sometimes|boolean',
         ]);
 
         $business->update($validated);
