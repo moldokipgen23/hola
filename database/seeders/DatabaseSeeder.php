@@ -269,5 +269,8 @@ class DatabaseSeeder extends Seeder
         foreach ($smtpDefaults as $key => $value) {
             Setting::set($key, $value, 'smtp');
         }
+
+        // Phase-1 launch surface: Directory + Turf only.
+        $this->call(LaunchPhase1Seeder::class);
     }
 }
