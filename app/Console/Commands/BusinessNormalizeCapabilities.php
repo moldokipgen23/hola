@@ -41,6 +41,14 @@ class BusinessNormalizeCapabilities extends Command
         foreach ($businesses as $business) {
             $counts['total']++;
 
+            // Skip unclaimed (AI-imported) businesses — they must stay
+            // directory-only until a vendor claims them and picks their
+            // module type in the onboarding wizard.
+            if ($business->claim_status === 'unclaimed') {
+                $counts['unchanged']++;
+                continue;
+            }
+
             // 1. Normalize enabled_modules
             $rawModules = $business->enabled_modules ?? [];
             $normalized = $moduleService->normalize($rawModules);
