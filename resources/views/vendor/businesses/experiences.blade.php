@@ -58,21 +58,29 @@
 
                 @foreach($allExperiences as $key => $info)
                     @php
-                        $enabled = in_array($key, old('enabled_experiences', $enabledExperiences));
+                        $globallyEnabled = $globallyEnabledExperiences ?? [];
+                        $disabled = ! in_array($key, $globallyEnabled, true);
+                        $enabled = ! $disabled && in_array($key, old('enabled_experiences', $enabledExperiences));
                         $moduleReady = !$info['module'] || ($business->enabled_modules[$info['module']] ?? false);
                     @endphp
-                    <label class="flex items-start gap-3 p-3 rounded-lg border {{ $enabled ? 'border-purple-500/50 bg-purple-500/5' : 'border-white/5' }} transition-colors cursor-pointer">
-                        <input type="checkbox" name="enabled_experiences[]" value="{{ $key }}" {{ $enabled ? 'checked' : '' }} class="mt-1">
+                    <label class="flex items-start gap-3 p-3 rounded-lg border {{ $enabled ? 'border-purple-500/50 bg-purple-500/5' : 'border-white/5' }} transition-colors {{ $disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer' }}"
+                           @if($disabled) title="Unavailable — this experience is switched off in Launch Controls" @endif>
+                        <input type="checkbox" name="enabled_experiences[]" value="{{ $key }}" {{ $enabled ? 'checked' : '' }} {{ $disabled ? 'disabled' : '' }} class="mt-1">
                         <div class="flex-1">
                             <div class="flex items-center gap-2">
                                 <span class="text-white text-sm font-medium">{{ $info['label'] }}</span>
-                                @if($info['module'])
+                                @if($disabled)
+                                    <span class="badge badge-gray">Off globally</span>
+                                @elseif($info['module'])
                                     <span class="text-xs {{ $moduleReady ? 'text-green-400' : 'text-slate-500' }}">
                                         ({{ $moduleReady ? 'Module ready' : 'Needs '.ucfirst($info['module']).' module' }})
                                     </span>
                                 @endif
                             </div>
                             <p class="text-xs text-slate-500 mt-0.5">{{ $info['desc'] }}</p>
+                            @if($disabled)
+                                <p class="text-xs text-slate-500 mt-0.5">Switched off in Launch Controls. Contact the administrator to enable it platform-wide.</p>
+                            @endif
                         </div>
                     </label>
                 @endforeach

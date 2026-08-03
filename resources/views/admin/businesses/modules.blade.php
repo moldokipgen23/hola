@@ -26,21 +26,29 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             @foreach($definitions as $key => $definition)
                 @php
-                    $enabled = old('modules') !== null ? in_array($key, old('modules', []), true) : ($modules[$key] ?? false);
+                    $globallyEnabled = $globallyEnabledModules ?? [];
+                    $disabled = ! in_array($key, $globallyEnabled, true);
+                    $enabled = ! $disabled && (old('modules') !== null ? in_array($key, old('modules', []), true) : ($modules[$key] ?? false));
                     $state = $readiness[$key] ?? [];
                 @endphp
-                <label class="glass-card p-5 rounded-lg cursor-pointer border {{ $enabled ? 'border-purple-500/50' : 'border-white/5' }} hover:border-purple-500/40 transition-colors">
+                <label class="glass-card p-5 rounded-lg cursor-pointer border {{ $enabled ? 'border-purple-500/50' : 'border-white/5' }} hover:border-purple-500/40 transition-colors {{ $disabled ? 'opacity-60' : '' }}"
+                       @if($disabled) title="Unavailable — this feature is switched off in Launch Controls" @endif>
                     <div class="flex items-start gap-3">
-                        <input type="checkbox" name="modules[]" value="{{ $key }}" {{ $enabled ? 'checked' : '' }} class="mt-1">
+                        <input type="checkbox" name="modules[]" value="{{ $key }}" {{ $enabled ? 'checked' : '' }} {{ $disabled ? 'disabled' : '' }} class="mt-1">
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 <h3 class="font-semibold text-white">{{ $definition['label'] }}</h3>
                                 @if(in_array($key, $recommended, true))<span class="badge badge-blue">Recommended</span>@endif
-                                @if(($state['enabled'] ?? false) && !($state['ready'] ?? true))<span class="badge badge-yellow">Setup needed</span>@endif
+                                @if($disabled)<span class="badge badge-gray">Off globally</span>
+                                @elseif(($state['enabled'] ?? false) && !($state['ready'] ?? true))<span class="badge badge-yellow">Setup needed</span>@endif
                             </div>
                             <p class="text-sm text-slate-400 mt-1">{{ $definition['description'] }}</p>
-                            @if($definition['depends_on'])<p class="text-xs text-slate-500 mt-2">Also enables: {{ collect($definition['depends_on'])->map(fn ($dependency) => $definitions[$dependency]['label'])->join(', ') }}</p>@endif
-                            @if($state['next_step'] ?? null)<p class="text-xs text-amber-400 mt-2">Next: {{ $state['next_step'] }}</p>@endif
+                            @if($disabled)
+                                <p class="text-xs text-slate-500 mt-2">Switched off in Launch Controls. Enable it platform-wide before turning it on for this business.</p>
+                            @else
+                                @if($definition['depends_on'])<p class="text-xs text-slate-500 mt-2">Also enables: {{ collect($definition['depends_on'])->map(fn ($dependency) => $definitions[$dependency]['label'])->join(', ') }}</p>@endif
+                                @if($state['next_step'] ?? null)<p class="text-xs text-amber-400 mt-2">Next: {{ $state['next_step'] }}</p>@endif
+                            @endif
                         </div>
                     </div>
                 </label>

@@ -812,6 +812,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'modules' => $moduleService->effectiveFor($business),
             'recommended' => $moduleService->recommendedFor($business),
             'readiness' => $moduleService->readiness($business),
+            'globallyEnabledModules' => app(LaunchControlService::class)->enabledModuleKeys(),
         ]);
     })->name('businesses.modules');
 
@@ -2799,6 +2800,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 'modules' => $moduleService->effectiveFor($business),
                 'recommended' => $moduleService->recommendedFor($business),
                 'readiness' => $moduleService->readiness($business),
+                'globallyEnabledModules' => app(LaunchControlService::class)->enabledModuleKeys(),
             ]);
         })->name('businesses.modules');
 
@@ -3515,7 +3517,11 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $experienceService = app(\App\Services\Experience\BusinessExperienceService::class);
             $readiness = $experienceService->calculateReadiness($business);
 
-            return view('vendor.businesses.experiences', compact('business', 'readiness'));
+            return view('vendor.businesses.experiences', [
+                'business' => $business,
+                'readiness' => $readiness,
+                'globallyEnabledExperiences' => app(LaunchControlService::class)->enabledExperienceKeys(),
+            ]);
         })->name('businesses.experiences');
 
         Route::put('/businesses/{businessId}/experiences', function (Request $request, $businessId) {
