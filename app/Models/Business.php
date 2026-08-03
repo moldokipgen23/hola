@@ -310,6 +310,27 @@ class Business extends Model
         return $this->hasModule('bookings');
     }
 
+    /**
+     * A low-risk directory listing: no transactional modules enabled and no
+     * transactional experiences. Such listings may auto-verify on claim;
+     * transactional businesses must pass admin verification first.
+     */
+    public function isDirectoryOnly(): bool
+    {
+        $modules = is_array($this->enabled_modules) ? $this->enabled_modules : [];
+        $hasTransactionalModule = collect($modules)
+            ->filter(fn ($enabled) => filter_var($enabled, FILTER_VALIDATE_BOOL))
+            ->isNotEmpty();
+
+        if ($hasTransactionalModule) {
+            return false;
+        }
+
+        $experiences = array_values(is_array($this->enabled_experiences) ? $this->enabled_experiences : ['directory']);
+
+        return collect($experiences)->filter(fn (string $experience) => $experience !== 'directory')->isEmpty();
+    }
+
     public function hasOrdersModule(): bool
     {
         return $this->hasModule('orders');

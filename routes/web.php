@@ -829,6 +829,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             ->with('success', 'Business modules updated. Required dependencies were enabled automatically.');
     })->name('businesses.modules.update');
 
+    Route::post('/businesses/{id}/verify', function ($id) {
+        $business = Business::findOrFail($id);
+        $business->update(['verification_status' => 'verified', 'is_active' => true]);
+        ActivityLogService::log('business_verified', $business, ['business_id' => $business->id]);
+
+        return back()->with('success', 'Business verified and now live.');
+    })->name('businesses.verify');
+
     Route::put('/businesses/{id}', function (Request $request, $id) {
         $business = Business::findOrFail($id);
 
@@ -1105,7 +1113,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::patch('/claims/{id}/approve', function ($id) {
         $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
         $claim->update(['status' => 'approved']);
-        $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
+        // Phase 6 lifecycle: directory-only listings auto-verify (low risk);
+        // transactional businesses stay `pending` until an admin verifies them.
+        $claim->business->update(array_merge(
+            ['claim_status' => 'claimed', 'created_by' => $claim->user_id],
+            $claim->business->isDirectoryOnly()
+                ? ['verification_status' => 'verified', 'is_active' => true]
+                : [],
+        ));
         if ($claim->user->role === 'customer') {
             $claim->user->update(['role' => 'owner']);
         }
@@ -1134,7 +1149,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         foreach ($ids as $id) {
             $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
             $claim->update(['status' => 'approved']);
-            $claim->business->update(['claim_status' => 'claimed', 'created_by' => $claim->user_id]);
+            $claim->business->update(array_merge(
+                ['claim_status' => 'claimed', 'created_by' => $claim->user_id],
+                $claim->business->isDirectoryOnly()
+                    ? ['verification_status' => 'verified', 'is_active' => true]
+                    : [],
+            ));
             if ($claim->user->role === 'customer') {
                 $claim->user->update(['role' => 'owner']);
             }
@@ -2757,6 +2777,42 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
 
             return view('vendor.businesses.index', compact('businesses'));
         })->name('businesses');
+
+        Route::get('/businesses/create', function () {
+            $categories = Category::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'parent_id']);
+
+            return view('vendor.businesses.create', compact('categories'));
+        })->name('businesses.create');
+
+        Route::post('/businesses', function (Request $request) {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'category_id' => 'required|exists:categories,id',
+                'address' => 'required|string|max:255',
+                'phone' => 'nullable|string|max:20',
+                'whatsapp' => 'nullable|string|max:20',
+                'email' => 'nullable|email|max:255',
+                'description' => 'nullable|string',
+            ]);
+
+            $business = Business::create(array_merge($validated, [
+                // Phase 6 lifecycle: self-created listings are owned by the
+                // vendor and must pass admin verification before going live.
+                'slug' => Str::slug($request->name),
+                'created_by' => Auth::id(),
+                'claim_status' => 'claimed',
+                'verification_status' => 'pending',
+                'source' => 'vendor',
+                'is_active' => true,
+            ]));
+            $business->syncPrimaryClassification($validated['category_id'], 'vendor_created');
+            ActivityLogService::log('business_created', $business, ['business_id' => $business->id, 'source' => 'vendor_self_create']);
+
+            return redirect()->route('vendor.businesses.setup', $business->id)
+                ->with('success', 'Business created! Tell us what you offer to finish setup.');
+        })->name('businesses.store');
 
         Route::get('/businesses/{id}/edit', function ($id) {
             $user = Auth::user();

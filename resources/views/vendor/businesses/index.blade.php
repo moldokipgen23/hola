@@ -5,6 +5,10 @@
 
 @section('content')
 <div class="glass-card rounded-lg overflow-hidden">
+    <div class="flex items-center justify-between p-5 border-b border-white/5">
+        <h3 class="text-white font-semibold">Your businesses</h3>
+        <a href="{{ route('vendor.businesses.create') }}" class="btn-primary text-sm px-4 py-2">+ Add business</a>
+    </div>
     <table class="data-table">
         <thead>
             <tr>

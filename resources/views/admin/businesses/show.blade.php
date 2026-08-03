@@ -406,6 +406,12 @@
             <h3 class="text-white font-semibold mb-4">Actions</h3>
             <div class="space-y-2">
                 <a href="{{ route('admin.businesses.edit', $business->id) }}" class="btn-primary w-full text-center block">Edit Business</a>
+                @if($business->verification_status !== 'verified')
+                    <form method="POST" action="{{ route('admin.businesses.verify', $business->id) }}" class="w-full">
+                        @csrf
+                        <button type="submit" class="btn-primary w-full bg-emerald-600 hover:bg-emerald-700">Verify & Make Live</button>
+                    </form>
+                @endif
                 @if($business->latitude && $business->longitude)
                     <a href="https://www.google.com/maps/dir/?api=1&destination={{ $business->latitude }},{{ $business->longitude }}" target="_blank" class="btn-ghost w-full text-center block">Get Directions</a>
                 @endif
