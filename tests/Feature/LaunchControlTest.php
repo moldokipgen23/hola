@@ -81,4 +81,23 @@ class LaunchControlTest extends TestCase
             ->assertJsonPath('business.capabilities.catalog', true)
             ->assertJsonPath('business.capabilities.orders', false);
     }
+
+    public function test_phase3_ride_bucket_is_folded_into_booking(): void
+    {
+        $this->getJson('/api/platform/features')
+            ->assertOk()
+            ->assertJsonPath('data.experiences.taxi', true)
+            ->assertJsonPath('data.worlds.ride', false);
+
+        $config = app(\App\Services\LaunchControlService::class)->publicConfig();
+        $this->assertNotContains('ride', $config['enabled_tabs'], 'enabled_tabs must never contain ride');
+        $this->assertContains('book', $config['enabled_tabs']);
+
+        // Taxi now gates under the Book world, not Ride.
+        app(\App\Services\LaunchControlService::class)->clearCache();
+        FeatureFlag::where('key', 'world.ride')->firstOrFail()->update(['is_enabled' => false]);
+        $this->getJson('/api/platform/features')
+            ->assertOk()
+            ->assertJsonPath('data.experiences.taxi', true);
+    }
 }

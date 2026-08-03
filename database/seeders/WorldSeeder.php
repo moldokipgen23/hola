@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\CapabilityTemplate;
+use App\Models\Category;
 use App\Models\World;
 use Illuminate\Database\Seeder;
 
@@ -122,7 +123,7 @@ class WorldSeeder extends Seeder
 
         $worlds = [
             [
-                'name' => 'Shop',
+                'name' => 'Shopping',
                 'slug' => 'shop',
                 'icon' => 'store',
                 'description' => 'Browse and buy products from local stores',
@@ -130,7 +131,6 @@ class WorldSeeder extends Seeder
                 'is_active' => true,
                 'is_primary' => true,
                 'nav_config' => [
-                    'sub_tabs' => ['Grocery', 'Food', 'Medicine', 'Shopping'],
                     'search_placeholder' => 'Search products, stores...',
                 ],
             ],
@@ -140,15 +140,14 @@ class WorldSeeder extends Seeder
                 'icon' => 'directions_car',
                 'description' => 'Get around town or ship goods',
                 'sort_order' => 2,
-                'is_active' => true,
-                'is_primary' => true,
+                'is_active' => false,
+                'is_primary' => false,
                 'nav_config' => [
-                    'sub_tabs' => ['Local Taxi', 'Shared', 'Outstation', 'Rental', 'Goods'],
                     'search_placeholder' => 'Enter pickup location...',
                 ],
             ],
             [
-                'name' => 'Book',
+                'name' => 'Booking',
                 'slug' => 'book',
                 'icon' => 'calendar_today',
                 'description' => 'Reserve rooms, slots, and appointments',
@@ -156,12 +155,11 @@ class WorldSeeder extends Seeder
                 'is_active' => true,
                 'is_primary' => true,
                 'nav_config' => [
-                    'sub_tabs' => ['Hotels', 'Turf', 'Salon', 'Doctors', 'Events'],
                     'search_placeholder' => 'What do you want to book?',
                 ],
             ],
             [
-                'name' => 'Discover',
+                'name' => 'Directory',
                 'slug' => 'discover',
                 'icon' => 'explore',
                 'description' => 'Find businesses, services, and places',
@@ -169,7 +167,6 @@ class WorldSeeder extends Seeder
                 'is_active' => true,
                 'is_primary' => true,
                 'nav_config' => [
-                    'sub_tabs' => ['Businesses', 'Professionals', 'Institutions', 'Places'],
                     'search_placeholder' => 'Search businesses, services...',
                 ],
             ],
@@ -180,6 +177,62 @@ class WorldSeeder extends Seeder
                 ['slug' => $world['slug']],
                 $world
             );
+        }
+
+        $this->seedLevelOneCategories();
+    }
+
+    /**
+     * Initial level-1 categories per world — these become the app sub-tabs
+     * (derived, not hard-coded). Idempotent via slug.
+     */
+    private function seedLevelOneCategories(): void
+    {
+        $levelOne = [
+            'shop' => ['module_type' => 'ordering', 'categories' => [
+                ['Restaurants', 'restaurants'],
+                ['Grocery', 'grocery'],
+                ['Medicine', 'medicine'],
+                ['Electronics', 'electronics'],
+                ['General', 'general'],
+            ]],
+            'book' => ['module_type' => 'booking', 'categories' => [
+                ['Taxi', 'taxi'],
+                ['Hotel', 'hotel'],
+                ['Turf', 'turf'],
+                ['Salon', 'salon'],
+                ['Doctor', 'doctor'],
+                ['Events', 'events'],
+            ]],
+            'discover' => ['module_type' => 'directory', 'categories' => [
+                ['Businesses', 'businesses'],
+                ['Professionals', 'professionals'],
+                ['Institutions', 'institutions'],
+                ['Places', 'places'],
+            ]],
+        ];
+
+        foreach ($levelOne as $worldSlug => $config) {
+            $world = World::where('slug', $worldSlug)->first();
+            if (! $world) {
+                continue;
+            }
+
+            foreach ($config['categories'] as [$name, $slug]) {
+                Category::updateOrCreate(
+                    ['slug' => $slug],
+                    [
+                        'name' => $name,
+                        'world_id' => $world->id,
+                        'parent_id' => null,
+                        'level' => 1,
+                        'module_type' => $config['module_type'],
+                        'is_active' => true,
+                        'is_canonical' => false,
+                        'launch_phase' => 'phase1',
+                    ]
+                );
+            }
         }
     }
 }
