@@ -44,20 +44,20 @@ class CategoryTaxonomyTest extends TestCase
         $bookWorld = World::where('slug', 'book')->firstOrFail();
 
         $this->actingAs($admin)->post(route('admin.categories.store'), [
-            'name' => 'Turf & Sports',
+            'name' => 'Test Turf Grounds',
             'module_type' => 'booking',
             'is_active' => 1,
         ]);
-        $parent = Category::where('slug', 'turf-sports')->firstOrFail();
+        $parent = Category::where('slug', 'test-turf-grounds')->firstOrFail();
 
         $this->actingAs($admin)->post(route('admin.categories.store'), [
-            'name' => 'Football Turf',
+            'name' => 'Test Football Field',
             'module_type' => 'booking',
             'parent_id' => $parent->id,
             'is_active' => 1,
         ])->assertRedirect(route('admin.categories'));
 
-        $child = Category::where('slug', 'football-turf')->firstOrFail();
+        $child = Category::where('slug', 'test-football-field')->firstOrFail();
         $this->assertSame($parent->id, $child->parent_id);
         $this->assertSame($bookWorld->id, $child->world_id, 'child inherits parent world');
         $this->assertSame(2, (int) $child->level);

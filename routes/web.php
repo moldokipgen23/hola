@@ -23,7 +23,6 @@ use App\Models\Review;
 use App\Models\SearchHistory;
 use App\Models\Service;
 use App\Models\Setting;
-use App\Models\Subcategory;
 use App\Models\TimeSlot;
 use App\Models\Transaction;
 use App\Models\Trip;
@@ -748,7 +747,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     Route::get('/businesses/create', function () {
         $categories = Category::orderBy('name')->get();
-        $subcategories = Subcategory::orderBy('name')->get();
+        $subcategories = Category::whereNotNull('parent_id')->orderBy('name')->get();
 
         return view('admin.businesses.form', compact('categories', 'subcategories'));
     })->name('businesses.create');
@@ -797,7 +796,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/businesses/{id}/edit', function ($id) {
         $business = Business::findOrFail($id);
         $categories = Category::orderBy('name')->get();
-        $subcategories = Subcategory::orderBy('name')->get();
+        $subcategories = Category::whereNotNull('parent_id')->orderBy('name')->get();
 
         return view('admin.businesses.form', compact('business', 'categories', 'subcategories'));
     })->name('businesses.edit');
@@ -981,63 +980,37 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return redirect()->route('admin.categories')->with('success', 'Category deleted.');
     })->name('categories.destroy');
 
-    // Subcategories
+    // Subcategories — legacy table is read-only after being merged into
+    // level-2 category children (migrate_subcategories_to_category_children).
+    // The admin screen is hidden; everything redirects to the Categories screen.
     Route::get('/subcategories', function () {
-        $subcategories = Subcategory::with('category')->orderBy('name')->paginate(20);
-
-        return view('admin.subcategories.index', compact('subcategories'));
+        return redirect()->route('admin.categories')
+            ->with('info', 'Subcategories have been merged into Categories as child categories.');
     })->name('subcategories');
 
     Route::get('/subcategories/create', function () {
-        $categories = Category::orderBy('name')->get();
-
-        return view('admin.subcategories.form', compact('categories'));
+        return redirect()->route('admin.categories.create')
+            ->with('info', 'Subcategories have been merged into Categories — create a category with a parent instead.');
     })->name('subcategories.create');
 
-    Route::post('/subcategories', function (Request $request) {
-        $validated = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|max:255',
-            'recommended_modules' => 'nullable|array',
-            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
-        ]);
-        $validated['slug'] = $request->slug ?: Str::slug($request->name);
-        $validated['is_active'] = $request->boolean('is_active');
-        $validated['order'] = $request->order ?? 0;
-
-        Subcategory::create($validated);
-
-        return redirect()->route('admin.subcategories')->with('success', 'Subcategory created.');
+    Route::post('/subcategories', function () {
+        return redirect()->route('admin.categories')
+            ->with('error', 'Subcategories are read-only legacy rows — create child categories under Categories instead.');
     })->name('subcategories.store');
 
-    Route::get('/subcategories/{id}/edit', function ($id) {
-        $subcategory = Subcategory::findOrFail($id);
-        $categories = Category::orderBy('name')->get();
-
-        return view('admin.subcategories.form', compact('subcategory', 'categories'));
+    Route::get('/subcategories/{id}/edit', function () {
+        return redirect()->route('admin.categories')
+            ->with('info', 'Subcategories have been merged into Categories as child categories.');
     })->name('subcategories.edit');
 
-    Route::put('/subcategories/{id}', function (Request $request, $id) {
-        $subcategory = Subcategory::findOrFail($id);
-        $validated = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|max:255',
-            'recommended_modules' => 'nullable|array',
-            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
-        ]);
-        $validated['slug'] = $request->slug ?: Str::slug($request->name);
-        $validated['is_active'] = $request->boolean('is_active');
-        $validated['order'] = $request->order ?? 0;
-
-        $subcategory->update($validated);
-
-        return redirect()->route('admin.subcategories')->with('success', 'Subcategory updated.');
+    Route::put('/subcategories/{id}', function () {
+        return redirect()->route('admin.categories')
+            ->with('error', 'Subcategories are read-only legacy rows — edit child categories under Categories instead.');
     })->name('subcategories.update');
 
-    Route::delete('/subcategories/{id}', function ($id) {
-        Subcategory::findOrFail($id)->delete();
-
-        return redirect()->route('admin.subcategories')->with('success', 'Subcategory deleted.');
+    Route::delete('/subcategories/{id}', function () {
+        return redirect()->route('admin.categories')
+            ->with('error', 'Subcategories are read-only legacy rows — delete child categories under Categories instead.');
     })->name('subcategories.destroy');
 
     // Products

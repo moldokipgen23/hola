@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Category;
-use App\Models\Subcategory;
 
 if (! function_exists('matchImportCategory')) {
     /**
@@ -148,14 +147,17 @@ if (! function_exists('resolveApprovedImportTaxonomy')) {
 
         $subcategory = null;
         if (! empty($data['subcategory_id'])) {
-            $subcategory = Subcategory::active()
-                ->where('category_id', $category->id)
-                ->find($data['subcategory_id']);
+            // Legacy subcategory ids are resolved through their migrated
+            // level-2 child category (metadata.legacy_subcategory_id).
+            $subcategory = Category::active()
+                ->where('parent_id', $category->id)
+                ->where('metadata->legacy_subcategory_id', $data['subcategory_id'])
+                ->first();
         }
 
         if (! $subcategory && ! empty($data['subcategory_slug'])) {
-            $subcategory = Subcategory::active()
-                ->where('category_id', $category->id)
+            $subcategory = Category::active()
+                ->where('parent_id', $category->id)
                 ->where('slug', $data['subcategory_slug'])
                 ->first();
         }
@@ -178,8 +180,8 @@ if (! function_exists('matchImportSubcategory')) {
         $nameLower = strtolower(trim($businessName ?? ''));
         $categorySlug = Category::whereKey($categoryId)->value('slug');
 
-        // Load subcategories for this category
-        $subcategories = Subcategory::where('category_id', $categoryId)
+        // Legacy subcategories now live as level-2 category children.
+        $subcategories = Category::where('parent_id', $categoryId)
             ->where('is_active', true)
             ->get()
             ->keyBy(fn ($s) => strtolower($s->name));

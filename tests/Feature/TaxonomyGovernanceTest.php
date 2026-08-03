@@ -75,16 +75,25 @@ class TaxonomyGovernanceTest extends TestCase
         ]);
     }
 
-    public function test_subcategory_matching_uses_category_slug_instead_of_a_fixed_id(): void
+    public function test_subcategory_matching_resolves_the_migrated_category_child(): void
     {
         $healthcare = Category::where('slug', 'healthcare')->firstOrFail();
         $pharmacy = Subcategory::where('category_id', $healthcare->id)
             ->where('slug', 'pharmacies')
             ->firstOrFail();
 
+        // Legacy subcategories were migrated into level-2 category children;
+        // the matcher must resolve to the child, not the legacy row.
+        $child = Category::where('parent_id', $healthcare->id)
+            ->whereRaw('LOWER(name) = ?', ['pharmacies'])
+            ->first();
+
+        $this->assertNotNull($child, 'migrated pharmacy child category must exist');
+        $this->assertNotSame($pharmacy->id, $child->id);
+
         $this->assertSame(
-            $pharmacy->id,
-            matchImportSubcategory('pharmacy', 'Community Medical Store', $healthcare->id)
+            (int) $child->id,
+            (int) matchImportSubcategory('pharmacy', 'Community Medical Store', $healthcare->id)
         );
     }
 

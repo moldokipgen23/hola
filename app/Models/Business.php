@@ -148,7 +148,17 @@ class Business extends Model
 
     public function subcategory(): BelongsTo
     {
-        return $this->belongsTo(Subcategory::class);
+        // Legacy subcategories were migrated into level-2 Category children
+        // (migrate_subcategories_to_category_children); subcategory_id now
+        // references those children directly.
+        return $this->belongsTo(Category::class, 'subcategory_id');
+    }
+
+    public function legacySubcategory(): BelongsTo
+    {
+        // Pre-migration fallback for businesses still pointing at the
+        // read-only legacy subcategories table.
+        return $this->belongsTo(Subcategory::class, 'subcategory_id');
     }
 
     public function area(): BelongsTo

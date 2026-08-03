@@ -9,7 +9,6 @@ use App\Models\ClaimRequest;
 use App\Models\Pincode;
 use App\Models\Product;
 use App\Models\Report;
-use App\Models\Subcategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -22,7 +21,7 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
-            'subcategory_id' => 'nullable|exists:subcategories,id',
+            'subcategory_id' => 'nullable|exists:categories,id',
             'description' => 'nullable|string',
             'address' => 'required|string|max:255',
             'locality' => 'nullable|string|max:255',
@@ -77,7 +76,7 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'category_id' => 'sometimes|required|exists:categories,id',
-            'subcategory_id' => 'nullable|exists:subcategories,id',
+            'subcategory_id' => 'nullable|exists:categories,id',
             'description' => 'nullable|string',
             'address' => 'sometimes|required|string|max:255',
             'locality' => 'nullable|string|max:255',
@@ -235,54 +234,23 @@ class AdminController extends Controller
 
     public function storeSubcategory(Request $request)
     {
-        $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255',
-            'icon' => 'nullable|string|max:10',
-            'order' => 'nullable|integer',
-            'is_active' => 'boolean',
-            'recommended_modules' => 'nullable|array',
-            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
-        ]);
-
-        $subcategory = Subcategory::create([
-            ...$request->only(['category_id', 'name', 'icon', 'order', 'is_active', 'recommended_modules']),
-            'slug' => Str::slug($request->name),
-        ]);
-
-        return response()->json(['subcategory' => $subcategory], 201);
+        return response()->json([
+            'message' => 'Subcategories are read-only legacy rows — create child categories (parent_id) instead.',
+        ], 409);
     }
 
     public function updateSubcategory(Request $request, $id)
     {
-        $subcategory = Subcategory::findOrFail($id);
-
-        $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'icon' => 'nullable|string|max:10',
-            'order' => 'nullable|integer',
-            'is_active' => 'boolean',
-            'recommended_modules' => 'nullable|array',
-            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
-        ]);
-
-        $data = $request->only(['name', 'icon', 'order', 'is_active', 'recommended_modules']);
-
-        if ($request->has('name')) {
-            $data['slug'] = Str::slug($request->name);
-        }
-
-        $subcategory->update($data);
-
-        return response()->json(['subcategory' => $subcategory]);
+        return response()->json([
+            'message' => 'Subcategories are read-only legacy rows — edit child categories instead.',
+        ], 409);
     }
 
     public function destroySubcategory($id)
     {
-        $subcategory = Subcategory::findOrFail($id);
-        $subcategory->delete();
-
-        return response()->json(['message' => 'Subcategory deleted.']);
+        return response()->json([
+            'message' => 'Subcategories are read-only legacy rows — delete child categories instead.',
+        ], 409);
     }
 
     // ─── Products ───

@@ -80,6 +80,13 @@ class BusinessModuleService
             return array_keys(array_filter($this->normalize($subcategory->recommended_modules)));
         }
 
+        // Pre-migration fallback: businesses whose subcategory_id still points
+        // at a row in the read-only legacy subcategories table.
+        $legacySubcategory = $business->legacySubcategory;
+        if ($legacySubcategory && $legacySubcategory->recommended_modules !== null) {
+            return array_keys(array_filter($this->normalize($legacySubcategory->recommended_modules)));
+        }
+
         // Transitional MODULE default for businesses that have not configured
         // enabled_modules yet (the ~500 AI imports). This is not a world/count
         // source of truth (world = categories.world_id, counts = classifications) —

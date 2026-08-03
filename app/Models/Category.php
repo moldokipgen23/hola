@@ -116,6 +116,16 @@ class Category extends Model
         return $this->hasMany(BusinessClassification::class);
     }
 
+    /**
+     * Transitional module defaults carried over from a legacy subcategory row
+     * (stored in metadata by migrate_subcategories_to_category_children), so
+     * BusinessModuleService::recommendedFor() keeps working after the repoint.
+     */
+    public function getRecommendedModulesAttribute(): ?array
+    {
+        return $this->metadata['recommended_modules'] ?? null;
+    }
+
     public function businesses(): HasMany
     {
         return $this->hasMany(Business::class);
