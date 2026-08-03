@@ -83,6 +83,28 @@ class PolicyAuthorizationTest extends TestCase
         $this->assertDatabaseHas('businesses', ['id' => $business->id, 'name' => 'Legit Update']);
     }
 
+    public function test_vendor_cannot_mass_assign_verification_or_featured_or_ownership(): void
+    {
+        [$owner, $business] = $this->ownedBusiness();
+        $attacker = User::factory()->create(['role' => 'owner']);
+
+        $this->actingAs($owner);
+        $this->put("/vendor/businesses/{$business->id}", [
+            'name' => 'Legit Update',
+            // Attempted privilege escalation via mass-assignment:
+            'verification_status' => 'verified',
+            'is_featured' => 1,
+            'is_active' => 1,
+            'created_by' => $attacker->id,
+        ])->assertRedirect(route('vendor.businesses'));
+
+        $business->refresh();
+        $this->assertSame('Legit Update', $business->name);
+        $this->assertNotSame('verified', $business->verification_status);
+        $this->assertFalse((bool) $business->is_featured);
+        $this->assertSame($owner->id, $business->created_by, 'ownership must not be reassignable by the vendor');
+    }
+
     private function ownedBusiness(): array
     {
         $owner = User::factory()->create(['role' => 'owner']);
