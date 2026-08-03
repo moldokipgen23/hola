@@ -81,8 +81,26 @@
                     <textarea name="description" class="input-dark" rows="2"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">Enabled Modules (JSON)</label>
-                    <textarea name="enabled_modules" class="input-dark" rows="3" placeholder='{"catalog": true, "orders": true}'></textarea>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Enabled Modules</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        @foreach(['catalog', 'orders', 'bookings', 'inventory', 'transport', 'turf'] as $module)
+                            <label class="flex items-center gap-2 text-sm text-slate-300">
+                                <input type="checkbox" name="enabled_modules[]" value="{{ $module }}" class="rounded">
+                                {{ ucfirst($module) }}
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Enabled Experiences</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        @foreach(['directory', 'retail', 'restaurant', 'appointment', 'stay', 'turf', 'taxi', 'seat_event'] as $experience)
+                            <label class="flex items-center gap-2 text-sm text-slate-300">
+                                <input type="checkbox" name="enabled_experiences[]" value="{{ $experience }}" class="rounded">
+                                {{ $experience }}
+                            </label>
+                        @endforeach
+                    </div>
                 </div>
                 <div class="flex items-center gap-2">
                     <input type="hidden" name="is_active" value="0">

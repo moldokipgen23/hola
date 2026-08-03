@@ -35,6 +35,8 @@ class CapabilityTemplateController extends Controller
             $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
         }
         $validated['is_active'] = $request->boolean('is_active', true);
+        $validated['enabled_modules'] = array_fill_keys($validated['enabled_modules'] ?? [], true);
+        $validated['enabled_experiences'] = array_values($validated['enabled_experiences'] ?? []);
 
         CapabilityTemplate::create($validated);
 
@@ -60,6 +62,8 @@ class CapabilityTemplateController extends Controller
             $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
         }
         $validated['is_active'] = $request->boolean('is_active', true);
+        $validated['enabled_modules'] = array_fill_keys($validated['enabled_modules'] ?? [], true);
+        $validated['enabled_experiences'] = array_values($validated['enabled_experiences'] ?? []);
 
         $template->update($validated);
 
