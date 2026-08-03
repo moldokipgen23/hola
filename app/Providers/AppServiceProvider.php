@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Subcategory;
 use App\Observers\SubcategoryObserver;
+use App\Services\AdminNavService;
 use App\Services\LaunchControlService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +31,12 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer(['layouts.public', 'public.*', 'partials._business-card'], function ($view) {
             $view->with('launchControl', app(LaunchControlService::class));
+        });
+
+        View::composer('layouts.admin', function ($view) {
+            $nav = app(AdminNavService::class);
+            $view->with('adminBadges', $nav->badges());
+            $view->with('isPowerUser', $nav->isPowerUser());
         });
     }
 }
