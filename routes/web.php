@@ -2650,7 +2650,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['is_active'] = $request->boolean('is_active');
         $validated['show_on_home'] = $request->boolean('show_on_home');
         $validated['is_featured'] = $request->boolean('is_featured');
-        $validated['level'] = $validated['parent_id'] ? (\App\Models\Category::find($validated['parent_id'])?->level ?? 0) + 1 : 0;
+
+        // Shared write-path: consistent world/parent/level with the standard form.
+        // Root keeps the admin's explicit world choice; a child inherits its parent's world.
+        \App\Models\Category::applyTaxonomy($validated, $validated['parent_id'] ?? null, $validated['world_id']);
 
         \App\Models\Category::create($validated);
 

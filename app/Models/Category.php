@@ -33,15 +33,18 @@ class Category extends Model
      * root category derives its world from module_type and is level 1.
      * Mutates $data in place so both the standard form and the tree manager stay consistent.
      */
-    public static function applyTaxonomy(array &$data, ?int $parentId = null): void
+    public static function applyTaxonomy(array &$data, ?int $parentId = null, ?int $explicitWorldId = null): void
     {
         $data['parent_id'] = $parentId ?: null;
 
         if ($parentId && ($parent = self::find($parentId))) {
+            // A child always inherits its parent's world and sits one level deeper.
             $data['world_id'] = $parent->world_id;
             $data['level'] = (int) ($parent->level ?? 1) + 1;
         } else {
-            $data['world_id'] = self::worldIdForModuleType($data['module_type'] ?? null);
+            // A root uses an explicit world if the UI provided one (tree manager),
+            // otherwise derives it from the module_type bucket (standard form).
+            $data['world_id'] = $explicitWorldId ?: self::worldIdForModuleType($data['module_type'] ?? null);
             $data['level'] = 1;
         }
     }
