@@ -227,6 +227,11 @@ class Business extends Model
         return $this->hasMany(DeliveryZone::class);
     }
 
+    public function media(): HasMany
+    {
+        return $this->hasMany(MediaLibrary::class);
+    }
+
     public function pincodeData(): BelongsTo
     {
         return $this->belongsTo(Pincode::class, 'pincode', 'pincode');

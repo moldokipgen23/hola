@@ -2746,10 +2746,14 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 'products' => $totalProducts,
             ];
 
+            $vendorSetup = $defaultBusinessId
+                ? \App\Models\VendorSetup::syncFromBusiness($businesses->first())
+                : null;
+
             return view('vendor.dashboard.index', compact(
                 'user', 'businesses', 'totalBookings', 'totalOrders', 'totalProducts',
                 'recentBookings', 'recentOrders', 'stats', 'defaultBusinessId',
-                'hasOrders', 'hasBookings', 'hasProducts'
+                'hasOrders', 'hasBookings', 'hasProducts', 'vendorSetup'
             ));
         })->name('dashboard');
 

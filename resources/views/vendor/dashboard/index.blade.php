@@ -29,6 +29,43 @@
 </div>
 @endif
 
+@if($vendorSetup ?? null)
+<div class="glass-card p-6 mb-8">
+    <div class="flex items-center justify-between gap-4 mb-4">
+        <div>
+            <h3 class="text-white font-semibold">Readiness checklist</h3>
+            <p class="text-slate-400 text-sm mt-1">
+                @php $nextStep = $vendorSetup->nextStep(); @endphp
+                @if($nextStep)
+                    Next step: <span class="text-purple-400 font-medium">{{ $nextStep }}</span>
+                @else
+                    Everything done — your listing is ready!
+                @endif
+            </p>
+        </div>
+        <div class="text-right shrink-0">
+            <p class="text-3xl font-bold text-white">{{ $vendorSetup->calculateCompletionPercentage() }}%</p>
+            <p class="text-xs text-slate-500">complete</p>
+        </div>
+    </div>
+    <div class="h-2 bg-white/10 rounded-full overflow-hidden mb-5">
+        <div class="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all" style="width: {{ $vendorSetup->calculateCompletionPercentage() }}%"></div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        @foreach($vendorSetup->checklist as $item)
+            <div class="flex items-center gap-2 text-sm {{ $item['done'] ? 'text-slate-400' : 'text-slate-500' }}">
+                @if($item['done'])
+                    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                @else
+                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                @endif
+                <span class="{{ $item['done'] ? '' : 'font-medium' }}">{{ $item['label'] }}</span>
+            </div>
+        @endforeach
+    </div>
+</div>
+@endif
+
 <!-- Stats -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
     <div class="stat-card">

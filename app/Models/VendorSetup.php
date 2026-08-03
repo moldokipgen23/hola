@@ -35,6 +35,39 @@ class VendorSetup extends Model
         return $this->belongsTo(Business::class);
     }
 
+    /**
+     * Recompute the readiness flags from the business's real state so the web
+     * dashboard and the API surface agree on one source of truth.
+     */
+    public static function syncFromBusiness(Business $business): self
+    {
+        $setup = static::firstOrCreate(
+            ['business_id' => $business->id],
+            ['business_id' => $business->id]
+        );
+
+        $setup->update([
+            'profile_complete' => (bool) ($business->name && $business->phone && $business->address && $business->category_id),
+            'products_added' => $business->products()->where('is_active', true)->exists()
+                || $business->services()->where('is_active', true)->exists(),
+            'photos_uploaded' => $business->media()->exists(),
+            'operating_hours_set' => is_array($business->working_hours) && count($business->working_hours) > 0,
+            'delivery_configured' => $business->deliveryZones()->where('is_active', true)->exists(),
+            'first_order_received' => $business->orders()->exists(),
+            'first_booking_received' => $business->bookings()->exists(),
+        ]);
+
+        $setup->markCompleteIfReady();
+
+        return $setup;
+    }
+
+    public function nextStep(): ?string
+    {
+        return collect($this->checklist)
+            ->first(fn (array $item) => ! $item['done'])['label'] ?? null;
+    }
+
     public function calculateCompletionPercentage(): int
     {
         $steps = [
