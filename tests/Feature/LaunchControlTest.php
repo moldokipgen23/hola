@@ -100,6 +100,58 @@ class LaunchControlTest extends TestCase
         $this->assertContains('catalog', $service->enabledModuleKeys());
     }
 
+    public function test_server_refuses_globally_disabled_module_for_vendor(): void
+    {
+        $category = Category::firstOrFail();
+        $business = Business::create([
+            'category_id' => $category->id,
+            'name' => 'Gate Test Shop',
+            'slug' => 'gate-test-shop',
+            'address' => 'Test address',
+            'phone' => '9876543210',
+            'is_active' => true,
+            'enabled_modules' => [],
+        ]);
+
+        FeatureFlag::where('key', 'module.transport')->firstOrFail()->update(['is_enabled' => false]);
+        app(\App\Services\LaunchControlService::class)->clearCache();
+
+        app(\App\Services\BusinessModuleService::class)->update($business, ['catalog' => true, 'transport' => true]);
+
+        $this->assertTrue($business->hasModule('catalog'));
+        $this->assertFalse($business->hasModule('transport'));
+    }
+
+    public function test_vendor_experience_update_drops_globally_disabled_experience(): void
+    {
+        $owner = \App\Models\User::factory()->create(['role' => 'owner']);
+        $category = Category::firstOrFail();
+        $business = Business::create([
+            'category_id' => $category->id,
+            'created_by' => $owner->id,
+            'name' => 'Gate Test Venue',
+            'slug' => 'gate-test-venue',
+            'address' => 'Test address',
+            'phone' => '9876543210',
+            'is_active' => true,
+            'enabled_modules' => [],
+            'enabled_experiences' => ['directory'],
+            'primary_experience' => 'directory',
+        ]);
+
+        FeatureFlag::where('key', 'module.transport')->firstOrFail()->update(['is_enabled' => false]);
+        app(\App\Services\LaunchControlService::class)->clearCache();
+
+        $this->actingAs($owner)
+            ->put(route('vendor.businesses.experiences.update', $business->id), [
+                'primary_experience' => 'taxi',
+                'enabled_experiences' => ['taxi', 'directory'],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(['directory'], $business->refresh()->enabled_experiences);
+    }
+
     public function test_phase3_ride_bucket_is_folded_into_booking(): void
     {
         $this->getJson('/api/platform/features')

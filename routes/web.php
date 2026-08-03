@@ -3534,7 +3534,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
 
             $business->update([
                 'primary_experience' => $validated['primary_experience'] ?? $business->primary_experience,
-                'enabled_experiences' => $validated['enabled_experiences'] ?? $business->enabled_experiences,
+                'enabled_experiences' => app(LaunchControlService::class)->filterExperiences($validated['enabled_experiences'] ?? $business->enabled_experiences),
             ]);
 
             return back()->with('success', 'Experiences updated.');

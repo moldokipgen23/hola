@@ -114,7 +114,26 @@ class BusinessModuleService
 
     public function update(Business $business, array $modules, ?array $config = null): Business
     {
-        $normalized = $this->normalize($modules);
+        $launchControl = app(LaunchControlService::class);
+        $globallyEnabled = $launchControl->enabledModuleKeys();
+
+        // Effective capability = Global ∧ Vendor: keys switched off in Launch
+        // Controls cannot be enabled here, and their dependencies cannot be
+        // auto-enabled through them either.
+        $filtered = [];
+        foreach ($modules ?? [] as $key => $value) {
+            $module = is_int($key) ? $value : $key;
+            if (in_array($module, $globallyEnabled, true)) {
+                $filtered[$key] = $value;
+            }
+        }
+
+        $normalized = $this->normalize($filtered);
+        foreach ($normalized as $module => $enabled) {
+            if (! in_array($module, $globallyEnabled, true)) {
+                $normalized[$module] = false;
+            }
+        }
 
         $business->forceFill([
             'enabled_modules' => $normalized,
