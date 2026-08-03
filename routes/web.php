@@ -781,7 +781,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         $businesses = $query->latest()->paginate(20)->withQueryString();
 
-        return view('admin.businesses.index', compact('businesses'));
+        return view('admin.businesses.index', compact('businesses') + ['typeLabel' => null, 'typeFilter' => null]);
     })->name('businesses');
 
     // Detect business changes

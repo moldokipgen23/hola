@@ -1,11 +1,11 @@
 @extends('layouts.admin')
 
 @section('title', $typeLabel ?? 'Businesses')
-@section('header', ($typeLabel ? $typeLabel . ' Businesses' : 'All Businesses'))
+@section('header', (($typeLabel ?? null) ? $typeLabel . ' Businesses' : 'All Businesses'))
 
 @section('content')
 <div class="flex justify-between items-center mb-6">
-    <h3 class="text-white font-semibold text-lg">{{ $typeLabel ? $typeLabel . ' Businesses' : 'All Businesses' }}</h3>
+    <h3 class="text-white font-semibold text-lg">{{ ($typeLabel ?? null) ? $typeLabel . ' Businesses' : 'All Businesses' }}</h3>
     <div class="flex gap-2">
         @if($typeFilter ?? null)
         <a href="{{ route('admin.businesses') }}" class="px-4 py-2 text-sm rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 transition">View All</a>
