@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\DeliveryConfig;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class DeliveryConfigController extends Controller
 {
@@ -22,10 +23,8 @@ class DeliveryConfigController extends Controller
 
     public function update(Request $request, int $business)
     {
-        $user = $request->user();
-        $businessModel = Business::query()
-            ->when(! $user->isAdmin(), fn ($query) => $query->where('created_by', $user->id))
-            ->findOrFail($business);
+        $businessModel = Business::findOrFail($business);
+        Gate::authorize('update', $businessModel);
 
         $validated = $request->validate([
             'delivery_radius_km' => 'nullable|numeric|min:0|max:100',

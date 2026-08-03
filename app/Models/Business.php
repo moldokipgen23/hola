@@ -70,6 +70,7 @@ class Business extends Model
     ];
 
     protected $casts = [
+        'created_by' => 'integer',
         'photos' => 'array',
         'working_hours' => 'array',
         'photos_downloaded_at' => 'datetime',

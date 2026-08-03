@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\MediaLibrary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -73,8 +74,7 @@ class MediaController extends Controller
 
     public function destroy(MediaLibrary $media)
     {
-        $user = Auth::user();
-        abort_unless($media->user_id === $user->id, 403);
+        Gate::authorize('delete', $media);
 
         if ($media->path && Storage::disk($media->disk)->exists($media->path)) {
             Storage::disk($media->disk)->delete($media->path);

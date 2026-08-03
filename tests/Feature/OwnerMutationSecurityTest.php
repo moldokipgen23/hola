@@ -27,7 +27,7 @@ class OwnerMutationSecurityTest extends TestCase
         Sanctum::actingAs($otherOwner);
         $this->putJson("/api/businesses/{$business->id}/delivery-config", [
             'delivery_radius_km' => 5,
-        ])->assertNotFound();
+        ])->assertForbidden();
 
         Sanctum::actingAs($owner);
         $this->putJson("/api/businesses/{$business->id}/delivery-config", [

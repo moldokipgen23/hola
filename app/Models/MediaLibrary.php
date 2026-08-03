@@ -27,6 +27,8 @@ class MediaLibrary extends Model
 
     protected $casts = [
         'size_bytes' => 'integer',
+        'user_id' => 'integer',
+        'business_id' => 'integer',
     ];
 
     public function user(): BelongsTo

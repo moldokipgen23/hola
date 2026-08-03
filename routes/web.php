@@ -40,6 +40,7 @@ use App\Services\LaunchControlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -2774,8 +2775,8 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         })->name('businesses.edit');
 
         Route::put('/businesses/{id}', function (Request $request, $id) {
-            $user = Auth::user();
-            $business = Business::where('created_by', $user->id)->findOrFail($id);
+            $business = Business::findOrFail($id);
+            Gate::authorize('update', $business);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
