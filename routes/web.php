@@ -2762,7 +2762,11 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             Route::get('/setup', function () {
                 $user = Auth::user();
                 $business = Business::where('created_by', $user->id)
-                    ->whereNull('enabled_modules')
+                    ->where(function ($q) {
+                        $q->whereNull('enabled_modules')
+                          ->orWhere('enabled_modules', '[]')
+                          ->orWhere('enabled_modules', '{}');
+                    })
                     ->first();
 
                 if (! $business) {
