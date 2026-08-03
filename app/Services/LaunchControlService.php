@@ -129,6 +129,28 @@ class LaunchControlService
         return array_values(array_filter($experiences, fn (string $experience) => $this->experienceEnabled($experience)));
     }
 
+    public function enabledModuleKeys(): array
+    {
+        return array_values(array_filter(
+            array_map(
+                fn (string $key) => str_replace('module.', '', $key),
+                array_keys(array_filter(self::DEFINITIONS, fn (array $definition) => $definition['group'] === 'modules')),
+            ),
+            fn (string $module) => $this->moduleEnabled($module),
+        ));
+    }
+
+    public function enabledExperienceKeys(): array
+    {
+        return array_values(array_filter(
+            array_map(
+                fn (string $key) => str_replace('experience.', '', $key),
+                array_keys(array_filter(self::DEFINITIONS, fn (array $definition) => $definition['group'] === 'experiences')),
+            ),
+            fn (string $experience) => $this->experienceEnabled($experience),
+        ));
+    }
+
     public function publicConfig(): array
     {
         $worlds = [];

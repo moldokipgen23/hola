@@ -82,6 +82,24 @@ class LaunchControlTest extends TestCase
             ->assertJsonPath('business.capabilities.orders', false);
     }
 
+    public function test_enabled_module_and_experience_key_helpers_reflect_global_toggles(): void
+    {
+        $service = app(\App\Services\LaunchControlService::class);
+
+        $this->assertContains('catalog', $service->enabledModuleKeys());
+        $this->assertContains('transport', $service->enabledModuleKeys());
+        $this->assertNotContains('payments', $service->enabledModuleKeys());
+        $this->assertContains('taxi', $service->enabledExperienceKeys());
+        $this->assertContains('directory', $service->enabledExperienceKeys());
+
+        FeatureFlag::where('key', 'module.transport')->firstOrFail()->update(['is_enabled' => false]);
+        app(\App\Services\LaunchControlService::class)->clearCache();
+
+        $this->assertNotContains('transport', $service->enabledModuleKeys());
+        $this->assertNotContains('taxi', $service->enabledExperienceKeys());
+        $this->assertContains('catalog', $service->enabledModuleKeys());
+    }
+
     public function test_phase3_ride_bucket_is_folded_into_booking(): void
     {
         $this->getJson('/api/platform/features')
