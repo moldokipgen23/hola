@@ -8,6 +8,44 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
 {
+    /**
+     * Canonical mapping from the admin-facing bucket (module_type) to a single world.
+     * A category belongs to exactly ONE world. The legacy `both` value is no longer
+     * offered — a business that sells AND books is modelled at the business level.
+     */
+    public const MODULE_TYPE_WORLD = [
+        'directory' => 'discover',
+        'ordering' => 'shop',
+        'booking' => 'book',
+    ];
+
+    /** Resolve the world_id for a given module_type bucket (null if unknown). */
+    public static function worldIdForModuleType(?string $moduleType): ?int
+    {
+        $slug = self::MODULE_TYPE_WORLD[$moduleType] ?? null;
+
+        return $slug ? World::query()->where('slug', $slug)->value('id') : null;
+    }
+
+    /**
+     * Single write-path for taxonomy fields. Sets world_id + level from the tree
+     * position: a child inherits its parent's world and sits one level deeper; a
+     * root category derives its world from module_type and is level 1.
+     * Mutates $data in place so both the standard form and the tree manager stay consistent.
+     */
+    public static function applyTaxonomy(array &$data, ?int $parentId = null): void
+    {
+        $data['parent_id'] = $parentId ?: null;
+
+        if ($parentId && ($parent = self::find($parentId))) {
+            $data['world_id'] = $parent->world_id;
+            $data['level'] = (int) ($parent->level ?? 1) + 1;
+        } else {
+            $data['world_id'] = self::worldIdForModuleType($data['module_type'] ?? null);
+            $data['level'] = 1;
+        }
+    }
+
     protected $fillable = [
         'name',
         'slug',

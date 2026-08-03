@@ -923,7 +923,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated = $request->validate([
             'name' => 'required|max:255',
             'icon' => 'nullable|max:10',
-            'module_type' => 'required|in:directory,ordering,booking,both',
+            'module_type' => 'required|in:directory,ordering,booking',
+            'parent_id' => 'nullable|exists:categories,id',
         ]);
 
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
@@ -931,6 +932,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['is_featured'] = $request->boolean('is_featured');
         $validated['is_canonical'] = $request->boolean('is_canonical', true);
         $validated['order'] = $request->order ?? 0;
+
+        // Single-taxonomy: a category always resolves to exactly one world + tree position.
+        Category::applyTaxonomy($validated, $validated['parent_id'] ?? null);
 
         Category::create($validated);
 
@@ -949,14 +953,22 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated = $request->validate([
             'name' => 'required|max:255',
             'icon' => 'nullable|max:10',
-            'module_type' => 'required|in:directory,ordering,booking,both',
+            'module_type' => 'required|in:directory,ordering,booking',
+            'parent_id' => 'nullable|exists:categories,id',
         ]);
+
+        // A category cannot be its own parent.
+        if (($validated['parent_id'] ?? null) == $category->id) {
+            $validated['parent_id'] = null;
+        }
 
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_featured'] = $request->boolean('is_featured');
         $validated['is_canonical'] = $request->boolean('is_canonical');
         $validated['order'] = $request->order ?? 0;
+
+        Category::applyTaxonomy($validated, $validated['parent_id'] ?? null);
 
         $category->update($validated);
 
