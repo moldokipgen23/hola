@@ -3512,8 +3512,8 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         // Experience management
         Route::get('/businesses/{businessId}/experiences', function ($businessId) {
             $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
-            $experienceService = app(\App\Services\BusinessExperienceService::class);
-            $readiness = $experienceService->calculateExperienceReadiness($business);
+            $experienceService = app(\App\Services\Experience\BusinessExperienceService::class);
+            $readiness = $experienceService->calculateReadiness($business);
 
             return view('vendor.businesses.experiences', compact('business', 'readiness'));
         })->name('businesses.experiences');

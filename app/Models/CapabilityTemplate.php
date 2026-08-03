@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Services\BusinessExperienceService;
 use App\Services\BusinessModuleService;
+use App\Services\Experience\BusinessExperienceService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -66,6 +66,7 @@ class CapabilityTemplate extends Model
 
         if ($this->default_availability['mode'] ?? null) {
             $experienceService = app(BusinessExperienceService::class);
+
             foreach ($experiences as $exp) {
                 $experienceService->setAvailabilityMode($business, $exp, $this->default_availability['mode']);
             }

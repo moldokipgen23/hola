@@ -58,6 +58,55 @@ class ExperienceArchitectureTest extends TestCase
         $this->assertTrue($business->hasModule('orders'));
     }
 
+    public function test_merged_service_reports_primary_experience_readiness(): void
+    {
+        $business = $this->business([
+            'enabled_modules' => ['catalog' => true, 'orders' => true],
+            'enabled_experiences' => ['retail', 'directory'],
+            'primary_experience' => 'retail',
+        ]);
+        Product::create([
+            'business_id' => $business->id,
+            'name' => 'Ready Product',
+            'slug' => 'ready-product-'.str()->lower(str()->random(6)),
+            'price' => 50,
+            'is_active' => true,
+        ]);
+
+        $service = app(\App\Services\Experience\BusinessExperienceService::class);
+
+        $this->assertTrue($service->getPrimaryExperienceReadiness($business)['ready']);
+
+        $bare = $this->business([
+            'enabled_modules' => ['catalog' => true, 'orders' => true],
+            'enabled_experiences' => ['retail', 'directory'],
+            'primary_experience' => 'retail',
+        ]);
+        $this->assertFalse($service->getPrimaryExperienceReadiness($bare)['ready']);
+    }
+
+    public function test_merged_service_scope_ready_only_filters_by_module_and_activity(): void
+    {
+        $ready = $this->business(['enabled_modules' => ['catalog' => true]]);
+        $inactive = $this->business(['enabled_modules' => ['catalog' => true], 'is_active' => false]);
+        $noModule = $this->business(['enabled_modules' => []]);
+
+        $service = app(\App\Services\Experience\BusinessExperienceService::class);
+        $ids = $service->scopeReadyOnly(Business::query(), 'retail')->pluck('id');
+
+        $this->assertTrue($ids->contains($ready->id));
+        $this->assertFalse($ids->contains($inactive->id));
+        $this->assertFalse($ids->contains($noModule->id));
+    }
+
+    public function test_merged_service_set_availability_mode_requires_supported_mode(): void
+    {
+        $service = app(\App\Services\Experience\BusinessExperienceService::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $service->setAvailabilityMode($this->business(), 'retail', 'nonsense');
+    }
+
     public function test_business_worlds_are_resolved_through_classified_categories(): void
     {
         $world = World::create(['name' => 'Shop', 'slug' => 'shop']);

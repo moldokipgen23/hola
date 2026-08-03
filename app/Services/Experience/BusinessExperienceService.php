@@ -30,6 +30,65 @@ class BusinessExperienceService
         return $readiness;
     }
 
+    public function setAvailabilityMode(Business $business, string $experience, string $mode): Business
+    {
+        if (! in_array($mode, ['live', 'request', 'contact'], true)) {
+            throw new \InvalidArgumentException("Unsupported availability mode: {$mode}");
+        }
+
+        $enabledExperiences = $business->enabled_experiences ?? ['directory'];
+        if (! in_array($experience, $enabledExperiences, true)) {
+            $enabledExperiences[] = $experience;
+        }
+
+        $config = $business->experience_config ?? [];
+        $config[$experience]['availability_mode'] = $mode;
+
+        $business->forceFill([
+            'enabled_experiences' => array_values(array_unique($enabledExperiences)),
+            'experience_config' => $config,
+            'availability_updated_at' => now(),
+            'availability_is_stale' => false,
+        ])->save();
+
+        return $business->refresh();
+    }
+
+    public function getPrimaryExperienceReadiness(Business $business): ?array
+    {
+        $readiness = $this->calculateReadiness($business);
+        $primary = $business->primary_experience ?? 'directory';
+
+        return $readiness[$primary] ?? null;
+    }
+
+    public function scopeReadyOnly($query, ?string $experience = null)
+    {
+        return $query->where(function ($q) use ($experience) {
+            $experiences = $experience
+                ? [$experience]
+                : ['retail', 'restaurant', 'appointment', 'stay', 'turf', 'taxi', 'shared_transport', 'vehicle_rental', 'goods_transport', 'seat_event'];
+
+            foreach ($experiences as $exp) {
+                $requiredModule = $this->requiredModuleFor($exp);
+                if ($requiredModule) {
+                    $q->orWhere("enabled_modules->{$requiredModule}", true);
+                }
+            }
+        })->where('is_active', true);
+    }
+
+    private function requiredModuleFor(string $experience): ?string
+    {
+        return match ($experience) {
+            'retail', 'restaurant' => 'catalog',
+            'appointment', 'stay', 'seat_event' => 'bookings',
+            'turf' => 'turf',
+            'taxi', 'shared_transport', 'vehicle_rental', 'goods_transport' => 'transport',
+            default => null,
+        };
+    }
+
     private function calculateExperienceReadiness(Business $business, string $experience, array $modules, array $config): array
     {
         $readiness = [
