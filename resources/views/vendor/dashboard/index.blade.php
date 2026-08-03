@@ -10,6 +10,25 @@
     <p class="text-slate-400 text-sm mt-1">Here's what's happening with your businesses today.</p>
 </div>
 
+@php
+    $needsSetup = $businesses->contains(fn ($b) => $b->enabled_modules === null);
+@endphp
+
+@if($needsSetup)
+<div class="bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-xl p-5 mb-8">
+    <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-xl bg-purple-500/30 flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <div class="flex-1">
+            <h4 class="text-white font-semibold">Finish setting up your business</h4>
+            <p class="text-slate-400 text-sm mt-1">Tell us what type of business you run and we'll set up the right features for you.</p>
+            <a href="{{ route('vendor.setup.redirect') }}" class="inline-block mt-3 btn-primary text-sm px-4 py-2">Set Up Now</a>
+        </div>
+    </div>
+</div>
+@endif
+
 <!-- Stats -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
     <div class="stat-card">

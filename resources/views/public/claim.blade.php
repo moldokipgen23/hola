@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Claim ' . $business->name . ' | Hola')
+@section('title', 'Claim ' . $business->name . ' | Eiho One')
 
 @section('content')
 <div class="bg-white border-b border-slate-100">

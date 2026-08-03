@@ -207,7 +207,7 @@
                     $currentBiz = $allBizs->first();
                     $currentBizId = $currentBiz->id;
                 }
-                $mods = $currentBiz ? (array) $currentBiz->enabled_modules : [];
+                $mods = $currentBiz ? $currentBiz->effectiveModules() : [];
             @endphp
 
             <!-- Nav -->
@@ -233,11 +233,21 @@
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     My Business
                 </a>
+                @if($currentBizId)
+                <a href="{{ route('vendor.businesses.modules', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.modules*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 16v-2m6-6h2M4 12h2m10.24-4.24 1.42-1.42M6.34 17.66l1.42-1.42m8.48 0 1.42 1.42M6.34 6.34l1.42 1.42M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Business Features
+                </a>
+                <a href="{{ route('vendor.businesses.experiences', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.experiences*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Experiences
+                </a>
+                @endif
 
                 @if($currentBizId)
-                @if(($mods['orders'] ?? false) || ($mods['bookings'] ?? false))
+                @if(($mods['catalog'] ?? false) || ($mods['bookings'] ?? false))
                 <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Catalog</p>
-                @if($mods['orders'] ?? false)
+                @if($mods['catalog'] ?? false)
                 <a href="{{ route('vendor.products', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.products*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     Products
@@ -246,7 +256,7 @@
                 @if($mods['bookings'] ?? false)
                 <a href="{{ route('vendor.services', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.services*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    Services
+                    Bookable Items
                 </a>
                 @endif
                 @endif
@@ -266,9 +276,67 @@
                 </a>
                 @endif
                 @endif
+
+                @if($currentBizId)
+                @if(($mods['turf'] ?? false) || ($mods['bookings'] ?? false) || ($mods['catalog'] ?? false))
+                <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Inventory</p>
+                @if($mods['catalog'] ?? false)
+                <a href="{{ route('vendor.businesses.turf', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.turf*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+                    Turf / Sports
+                </a>
+                @endif
+                @if($mods['bookings'] ?? false)
+                <a href="{{ route('vendor.businesses.rooms', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.rooms*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    Rooms / Stay
+                </a>
+                <a href="{{ route('vendor.businesses.appointments', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.appointments*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Appointments
+                </a>
+                <a href="{{ route('vendor.businesses.seats', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.seats*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
+                    Seat Events
+                </a>
+                @endif
+                @endif
+                @endif
+
+                @if($mods['transport'] ?? false)
+                <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Transport</p>
+                <a href="{{ route('vendor.vehicles', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.vehicles*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 13l2-5a2 2 0 012-1h10a2 2 0 012 1l2 5m-18 0v5m18-5v5M5 18h2m10 0h2M5 13h14"/></svg>
+                    Fleet & Options
+                </a>
+                <a href="{{ route('vendor.trips', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.trips*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
+                    Transport Requests
+                </a>
+                @endif
                 @endif
 
                 <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Account</p>
+                <a href="{{ route('vendor.analytics') }}" class="sidebar-link {{ request()->routeIs('vendor.analytics*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Analytics
+                </a>
+                <a href="{{ route('vendor.media') }}" class="sidebar-link {{ request()->routeIs('vendor.media*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Media Library
+                </a>
+                @php
+                    $unreadCount = \App\Models\VendorNotification::where('business_id', $currentBizId ?? 0)
+                        ->unread()
+                        ->count();
+                @endphp
+                <a href="{{ route('vendor.notifications') }}" class="sidebar-link {{ request()->routeIs('vendor.notifications*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    Notifications
+                    @if($unreadCount > 0)
+                        <span class="ml-auto bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{{ $unreadCount > 99 ? '99+' : $unreadCount }}</span>
+                    @endif
+                </a>
                 <a href="{{ route('vendor.settings') }}" class="sidebar-link {{ request()->routeIs('vendor.settings*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     Settings

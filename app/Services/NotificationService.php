@@ -9,24 +9,48 @@ use App\Models\Notification;
 use App\Models\Report;
 use App\Models\Review;
 use App\Models\User;
+use Illuminate\Support\Facades\App;
 
 class NotificationService
 {
+    private static function getPushService(): ?PushNotificationService
+    {
+        if (App::runningInConsole() || !App::has('push')) {
+            try {
+                return App::make(PushNotificationService::class);
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static function dispatch(User $user, string $type, string $title, string $body, array $data = []): void
+    {
+        $push = self::getPushService();
+        if ($push && $push->isConfigured()) {
+            $push->sendToUser($user->id, $title, $body, array_merge($data, ['type' => $type]));
+        }
+    }
+
     public static function create(User $user, string $type, string $title, string $body, array $data = []): Notification
     {
-        return Notification::create([
+        $notification = Notification::create([
             'user_id' => $user->id,
             'type' => $type,
             'title' => $title,
             'body' => $body,
             'data' => $data,
         ]);
+
+        self::dispatch($user, $type, $title, $body, $data);
+
+        return $notification;
     }
 
     // Claim Notifications
     public static function claimSubmitted(ClaimRequest $claim): void
     {
-        // Notify all admins
         $admins = User::whereIn('role', ['super_admin', 'admin'])->get();
         foreach ($admins as $admin) {
             self::create(
@@ -82,7 +106,6 @@ class NotificationService
     // Message Notifications
     public static function messageReceived(Conversation $conversation, string $message, ?int $senderId = null): void
     {
-        // Notify the business owner if user sent the message (and sender is not the owner)
         if ($conversation->user_id && $conversation->business_owner_id !== $conversation->user_id && $conversation->business_owner_id !== $senderId) {
             $owner = User::find($conversation->business_owner_id);
             if ($owner) {
@@ -96,7 +119,6 @@ class NotificationService
             }
         }
 
-        // Notify the user if owner sent the message (and sender is not the user)
         if ($conversation->user_id && $conversation->user_id !== $senderId) {
             $user = User::find($conversation->user_id);
             if ($user) {
@@ -121,7 +143,7 @@ class NotificationService
                     $owner,
                     'business_approved',
                     'Business Approved',
-                    "\"{$business->name}\" has been approved and is now live on Hola!",
+                    "\"{$business->name}\" has been approved and is now live on Eiho One!",
                     ['business_id' => $business->id]
                 );
             }
@@ -138,6 +160,60 @@ class NotificationService
                 "Your report for \"{$report->business->name}\" has been reviewed.",
                 ['business_id' => $report->business_id, 'report_id' => $report->id]
             );
+        }
+    }
+
+    public static function newOrder(\App\Models\Order $order): void
+    {
+        if ($order->business && $order->business->created_by) {
+            $owner = User::find($order->business->created_by);
+            if ($owner) {
+                self::create(
+                    $owner,
+                    'new_order',
+                    'New Order',
+                    "You have a new order #{$order->order_number}",
+                    ['order_id' => $order->id, 'business_id' => $order->business_id]
+                );
+
+                $push = self::getPushService();
+                if ($push) {
+                    $push->sendVendorNotification(
+                        $order->business_id,
+                        'new_order',
+                        'New Order',
+                        "You have a new order #{$order->order_number} — tap to view",
+                        ['order_id' => $order->id]
+                    );
+                }
+            }
+        }
+    }
+
+    public static function newBooking(\App\Models\Booking $booking): void
+    {
+        if ($booking->business && $booking->business->created_by) {
+            $owner = User::find($booking->business->created_by);
+            if ($owner) {
+                self::create(
+                    $owner,
+                    'new_booking',
+                    'New Booking',
+                    "You have a new booking for \"{$booking->business->name}\"",
+                    ['booking_id' => $booking->id, 'business_id' => $booking->business_id]
+                );
+
+                $push = self::getPushService();
+                if ($push) {
+                    $push->sendVendorNotification(
+                        $booking->business_id,
+                        'new_booking',
+                        'New Booking',
+                        "New booking for {$booking->business->name} — tap to view",
+                        ['booking_id' => $booking->id]
+                    );
+                }
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Hola - Discover Local Businesses in Churachandpur')
+@section('title', 'Eiho One - Discover Local Businesses in Churachandpur')
 @section('description', 'Find the best restaurants, shops, services, and businesses in Lamka, Churachandpur, Manipur. Browse by category, area, or search directly.')
 
 @section('content')
@@ -16,17 +16,18 @@
         </p>
 
         {{-- Search Bar --}}
-        <div class="max-w-2xl mx-auto relative" id="searchContainer">
+        <form action="{{ route('explore') }}" method="GET" class="max-w-2xl mx-auto relative" id="searchContainer">
             <div class="relative">
                 <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <input type="text" id="searchInput" placeholder="Search restaurants, shops, services..."
-                    class="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white text-slate-900 text-base shadow-lg shadow-slate-200/50 focus:outline-none search-glow transition-shadow" autocomplete="off">
+                <input type="search" id="searchInput" name="q" placeholder="Search restaurants, shops, services..."
+                    class="w-full pl-12 pr-12 py-4 rounded-2xl border border-slate-200 bg-white text-slate-900 text-base shadow-lg shadow-slate-200/50 focus:outline-none search-glow transition-shadow" autocomplete="off"
+                    aria-label="Search businesses" aria-autocomplete="list" aria-controls="searchResults">
                 <div id="searchSpinner" class="hidden absolute right-4 top-1/2 -translate-y-1/2">
                     <svg class="animate-spin h-5 w-5 text-primary-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 </div>
             </div>
-            <div id="searchResults" class="hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 search-dropdown z-50"></div>
-        </div>
+            <div id="searchResults" class="hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 search-dropdown z-50 text-left" role="listbox" aria-live="polite"></div>
+        </form>
 
         {{-- Popular Areas --}}
         <div class="mt-6 flex flex-wrap justify-center gap-2">
@@ -198,7 +199,7 @@
 <section class="max-w-6xl mx-auto px-4 py-10">
     <div class="bg-gradient-to-r from-primary-500 to-accent-500 rounded-2xl p-8 md:p-12 text-center text-white">
         <h2 class="text-2xl md:text-3xl font-bold mb-3">Own a Business?</h2>
-        <p class="text-white/80 mb-6 max-w-lg mx-auto">List your business for free on Hola. Reach more customers in Churachandpur.</p>
+        <p class="text-white/80 mb-6 max-w-lg mx-auto">List your business for free on Eiho One. Reach more customers in Churachandpur.</p>
         <a href="/admin" class="inline-block px-6 py-3 bg-white text-primary-600 rounded-xl font-semibold hover:bg-white/90 transition-colors">Claim Your Business →</a>
     </div>
 </section>
@@ -232,4 +233,99 @@
         </div>
     </div>
 </section>
+@endsection
+
+@section('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const container = document.getElementById('searchContainer');
+    const input = document.getElementById('searchInput');
+    const results = document.getElementById('searchResults');
+    const spinner = document.getElementById('searchSpinner');
+    let timer;
+    let activeRequest;
+
+    function hideResults() {
+        results.classList.add('hidden');
+        results.replaceChildren();
+    }
+
+    function resultRow(business) {
+        const link = document.createElement('a');
+        link.href = '/business/' + encodeURIComponent(business.slug);
+        link.className = 'flex items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-primary-50 focus:bg-primary-50 focus:outline-none';
+        link.setAttribute('role', 'option');
+
+        const icon = document.createElement('div');
+        icon.className = 'w-10 h-10 flex-shrink-0 rounded-xl bg-primary-50 flex items-center justify-center overflow-hidden';
+        if (business.photo) {
+            const image = document.createElement('img');
+            image.src = business.photo;
+            image.alt = '';
+            image.className = 'w-full h-full object-cover';
+            icon.appendChild(image);
+        } else {
+            icon.textContent = '📍';
+        }
+
+        const copy = document.createElement('div');
+        copy.className = 'min-w-0';
+        const name = document.createElement('p');
+        name.className = 'text-sm font-semibold text-slate-800 truncate';
+        name.textContent = business.name;
+        const context = document.createElement('p');
+        context.className = 'text-xs text-slate-400 truncate';
+        context.textContent = [business.category, business.area || business.address].filter(Boolean).join(' · ');
+        copy.append(name, context);
+        link.append(icon, copy);
+
+        return link;
+    }
+
+    async function search(query) {
+        activeRequest?.abort();
+        activeRequest = new AbortController();
+        spinner.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/api/instant-search?q=' + encodeURIComponent(query), {
+                headers: { 'Accept': 'application/json' },
+                signal: activeRequest.signal,
+            });
+            if (!response.ok) throw new Error('Search unavailable');
+
+            const payload = await response.json();
+            results.replaceChildren();
+            if (!payload.results.length) {
+                const empty = document.createElement('p');
+                empty.className = 'px-4 py-4 text-sm text-slate-500';
+                empty.textContent = 'No matches yet. Press Enter to search all listings.';
+                results.appendChild(empty);
+            } else {
+                payload.results.forEach((business) => results.appendChild(resultRow(business)));
+            }
+            results.classList.remove('hidden');
+        } catch (error) {
+            if (error.name !== 'AbortError') hideResults();
+        } finally {
+            spinner.classList.add('hidden');
+        }
+    }
+
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        const query = input.value.trim();
+        if (query.length < 2) {
+            activeRequest?.abort();
+            hideResults();
+            return;
+        }
+        timer = setTimeout(() => search(query), 250);
+    });
+
+    document.addEventListener('click', function (event) {
+        if (!container.contains(event.target)) hideResults();
+    });
+});
+</script>
 @endsection

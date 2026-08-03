@@ -15,12 +15,17 @@ class Order extends Model
         'business_id',
         'user_id',
         'order_number',
+        'client_reference',
         'customer_name',
         'customer_phone',
         'customer_email',
         'delivery_address',
+        'delivery_pincode',
+        'customer_latitude',
+        'customer_longitude',
         'delivery_method',
         'delivery_time_slot',
+        'estimated_ready_at',
         'subtotal',
         'tax',
         'delivery_fee',
@@ -35,6 +40,9 @@ class Order extends Model
         'ready_at',
         'delivered_at',
         'cancelled_at',
+        'rejection_reason',
+        'rejected_at',
+        'inventory_released_at',
         'metadata',
     ];
 
@@ -44,10 +52,15 @@ class Order extends Model
         'delivery_fee' => 'decimal:2',
         'discount' => 'decimal:2',
         'total' => 'decimal:2',
+        'customer_latitude' => 'decimal:7',
+        'customer_longitude' => 'decimal:7',
         'confirmed_at' => 'datetime',
         'ready_at' => 'datetime',
         'delivered_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'inventory_released_at' => 'datetime',
+        'estimated_ready_at' => 'datetime',
         'metadata' => 'array',
     ];
 
@@ -116,5 +129,10 @@ class Order extends Model
     public function markCancelled(?string $reason = null): void
     {
         $this->update(['status' => 'cancelled', 'cancelled_at' => now(), 'cancellation_reason' => $reason]);
+    }
+
+    public function markRejected(?string $reason = null): void
+    {
+        $this->update(['status' => 'rejected', 'rejected_at' => now(), 'rejection_reason' => $reason]);
     }
 }

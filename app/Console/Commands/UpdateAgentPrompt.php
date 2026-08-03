@@ -14,7 +14,7 @@ class UpdateAgentPrompt extends Command
     public function handle(): int
     {
         $prompt = <<<'EOT'
-Hola Scout — Business Discovery Agent Rules
+Eiho One Scout — Business Discovery Agent Rules
 
 ========================================
 MISSION

@@ -14,7 +14,8 @@
         <thead>
             <tr>
                 <th>Name</th>
-                <th>Duration</th>
+                <th>Type</th>
+                <th>Availability</th>
                 <th>Price</th>
                 <th>Status</th>
                 <th>Bookings</th>
@@ -25,8 +26,17 @@
             @forelse($services ?? [] as $service)
                 <tr>
                     <td class="font-medium">{{ $service->name }}</td>
-                    <td class="text-sm">{{ $service->duration }} min</td>
-                    <td class="text-sm font-mono">${{ number_format($service->price, 2) }}</td>
+                    <td><span class="badge badge-blue">{{ ucfirst($service->booking_mode ?? 'appointment') }}</span></td>
+                    <td class="text-sm text-slate-400">
+                        @if($service->booking_mode === 'stay')
+                            {{ $service->inventory_units }} {{ $service->unit_label ?: 'room(s)' }}
+                        @elseif(in_array($service->booking_mode, ['slot', 'seat']))
+                            {{ $service->time_slots_count }} active slots
+                        @else
+                            {{ $service->capacity ?? 1 }} at a time
+                        @endif
+                    </td>
+                    <td class="text-sm font-mono">₹{{ number_format($service->price, 2) }}/{{ $service->price_unit ?? 'booking' }}</td>
                     <td>
                         @if($service->is_active)
                             <span class="badge badge-green">Active</span>
@@ -37,6 +47,9 @@
                     <td class="text-sm">{{ $service->bookings_count ?? $service->bookings()->count() }}</td>
                     <td class="text-sm space-x-2">
                         <a href="{{ route('vendor.services.edit', ['businessId' => $business->id, 'id' => $service->id]) }}" class="text-purple-400 hover:text-purple-300">Edit</a>
+                        @if(in_array($service->booking_mode, ['slot', 'seat']))
+                            <a href="{{ route('vendor.services.slots', ['businessId' => $business->id, 'serviceId' => $service->id]) }}" class="text-sky-400 hover:text-sky-300">Slots</a>
+                        @endif
                         <form method="POST" action="{{ route('vendor.services.destroy', ['businessId' => $business->id, 'id' => $service->id]) }}" data-confirm="Delete this service?" class="inline">
                             @csrf @method('DELETE')
                             <button type="submit" class="text-red-400 hover:text-red-300">Delete</button>
@@ -44,7 +57,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center text-slate-400 py-8">No services yet.</td></tr>
+                <tr><td colspan="7" class="text-center text-slate-400 py-8">No bookable items yet. Add a service, room type, turf, or seat-based activity.</td></tr>
             @endforelse
         </tbody>
     </table>

@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', $category->name . ' | Hola - Churachandpur Directory')
+@section('title', $category->name . ' | Eiho One - Churachandpur Directory')
 @section('description', "Browse {$category->name} businesses in Lamka, Churachandpur, Manipur, India")
 
 @section('content')

@@ -1,9 +1,7 @@
 <?php
 
-use App\Providers\AppServiceProvider;
-use App\Providers\MailConfigServiceProvider;
-
 return [
-    AppServiceProvider::class,
-    MailConfigServiceProvider::class,
+    App\Providers\AppServiceProvider::class,
+    App\Providers\MailConfigServiceProvider::class,
+    App\Providers\TelescopeServiceProvider::class,
 ];

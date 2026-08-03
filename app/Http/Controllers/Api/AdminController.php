@@ -46,12 +46,6 @@ class AdminController extends Controller
         if (! $pincode) {
             return response()->json(['message' => 'Invalid pincode.'], 422);
         }
-        if (! $pincode->serviceable) {
-            return response()->json([
-                'message' => "Cannot create business in {$pincode->district}, {$pincode->state}. This area is not yet serviceable.",
-            ], 422);
-        }
-
         $data = $request->only([
             'name', 'category_id', 'subcategory_id', 'description',
             'address', 'locality', 'district', 'latitude', 'longitude',
@@ -115,11 +109,6 @@ class AdminController extends Controller
             $pincode = Pincode::lookup($request->pincode);
             if (! $pincode) {
                 return response()->json(['message' => 'Invalid pincode.'], 422);
-            }
-            if (! $pincode->serviceable) {
-                return response()->json([
-                    'message' => "Cannot set business to {$pincode->district}, {$pincode->state}. This area is not yet serviceable.",
-                ], 422);
             }
             $data['pincode'] = $pincode->pincode;
             $data['state'] = $pincode->state;
@@ -197,11 +186,13 @@ class AdminController extends Controller
             'order' => 'nullable|integer',
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
+            'is_canonical' => 'boolean',
         ]);
 
         $category = Category::create([
-            ...$request->only(['name', 'icon', 'image', 'order', 'is_featured', 'is_active']),
+            ...$request->only(['name', 'icon', 'image', 'order', 'is_featured', 'is_active', 'is_canonical']),
             'slug' => Str::slug($request->name),
+            'is_canonical' => $request->boolean('is_canonical', true),
         ]);
 
         return response()->json(['category' => $category], 201);
@@ -218,9 +209,10 @@ class AdminController extends Controller
             'order' => 'nullable|integer',
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
+            'is_canonical' => 'boolean',
         ]);
 
-        $data = $request->only(['name', 'icon', 'image', 'order', 'is_featured', 'is_active']);
+        $data = $request->only(['name', 'icon', 'image', 'order', 'is_featured', 'is_active', 'is_canonical']);
 
         if ($request->has('name')) {
             $data['slug'] = Str::slug($request->name);
@@ -249,10 +241,12 @@ class AdminController extends Controller
             'icon' => 'nullable|string|max:10',
             'order' => 'nullable|integer',
             'is_active' => 'boolean',
+            'recommended_modules' => 'nullable|array',
+            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
         ]);
 
         $subcategory = Subcategory::create([
-            ...$request->only(['category_id', 'name', 'icon', 'order', 'is_active']),
+            ...$request->only(['category_id', 'name', 'icon', 'order', 'is_active', 'recommended_modules']),
             'slug' => Str::slug($request->name),
         ]);
 
@@ -268,9 +262,11 @@ class AdminController extends Controller
             'icon' => 'nullable|string|max:10',
             'order' => 'nullable|integer',
             'is_active' => 'boolean',
+            'recommended_modules' => 'nullable|array',
+            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
         ]);
 
-        $data = $request->only(['name', 'icon', 'order', 'is_active']);
+        $data = $request->only(['name', 'icon', 'order', 'is_active', 'recommended_modules']);
 
         if ($request->has('name')) {
             $data['slug'] = Str::slug($request->name);

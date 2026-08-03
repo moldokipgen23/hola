@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AgentTaskInputSanitizer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -31,6 +32,14 @@ class AiAgentTask extends Model
     public function agent(): BelongsTo
     {
         return $this->belongsTo(AiAgent::class, 'agent_id');
+    }
+
+    protected function setInputAttribute(mixed $value): void
+    {
+        $this->attributes['input'] = json_encode(
+            AgentTaskInputSanitizer::sanitize($value),
+            JSON_THROW_ON_ERROR
+        );
     }
 
     public function scopePending($query)

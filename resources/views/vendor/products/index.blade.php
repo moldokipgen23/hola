@@ -36,6 +36,7 @@
                 <th>Name</th>
                 <th>Business</th>
                 <th>Price</th>
+                <th>Section</th>
                 <th>Stock</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -46,13 +47,14 @@
                 <tr>
                     <td class="font-medium">{{ $product->name }}</td>
                     <td class="text-sm">{{ $product->business->name ?? '-' }}</td>
-                    <td class="text-sm">${{ number_format($product->price, 2) }}</td>
+                    <td class="text-sm">₹{{ number_format($product->price, 2) }}</td>
+                    <td class="text-sm">{{ $product->menu_section ?: '-' }}</td>
                     <td class="text-sm">{{ $product->stock ?? '-' }}</td>
                     <td>
-                        @if($product->is_active)
-                            <span class="badge badge-green">Active</span>
+                        @if($product->is_orderable)
+                            <span class="badge badge-green">Available</span>
                         @else
-                            <span class="badge badge-red">Inactive</span>
+                            <span class="badge badge-red">{{ $product->availability_message }}</span>
                         @endif
                     </td>
                     <td class="text-sm space-x-2">
@@ -64,7 +66,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center text-slate-400 py-8">No products yet.</td></tr>
+                <tr><td colspan="7" class="text-center text-slate-400 py-8">No products yet.</td></tr>
             @endforelse
         </tbody>
     </table>

@@ -91,10 +91,14 @@ class ImportController extends Controller
             ]);
         }
 
-        $categories = Category::pluck('id', 'name')->toArray();
-
-        // Smart category matching
-        $categoryId = matchImportCategory($data['category'] ?? $data['type'] ?? null, $categories);
+        $taxonomy = resolveApprovedImportTaxonomy($data);
+        if (! $taxonomy) {
+            return response()->json([
+                'message' => 'This import needs an approved Business Type mapping before it can be approved.',
+            ], 422);
+        }
+        $categoryId = $taxonomy['category_id'];
+        $subcategoryId = $taxonomy['subcategory_id'];
 
         $slug = Str::slug($data['name']);
         $existing = Business::where('slug', $slug)->first();
@@ -127,27 +131,12 @@ class ImportController extends Controller
         }
         // Try to find pincode by lat/lng fallback
         if (! $pincode && ! empty($data['latitude']) && ! empty($data['longitude'])) {
-            $pincode = Pincode::haversine($data['latitude'], $data['longitude'], 1)->where('serviceable', true)->first();
+            $pincode = Pincode::haversine($data['latitude'], $data['longitude'], 1)->first();
         }
         // Last resort fallback to district default
         if (! $pincode) {
             $district = $data['district'] ?? 'Churachandpur';
-            $pincode = Pincode::where('district', $district)->where('serviceable', true)->first();
-        }
-
-        // Skip if pincode not found or not serviceable
-        if (! $pincode || ! $pincode->serviceable) {
-            $item->update([
-                'status' => 'rejected',
-                'notes' => 'Area not yet serviceable: ' . ($data['district'] ?? 'unknown'),
-            ]);
-            $item->batch->increment('rejected');
-            $item->batch->decrement('pending');
-
-            return response()->json([
-                'message' => 'Skipped: Area not yet serviceable.',
-                'skipped' => true,
-            ]);
+            $pincode = Pincode::where('district', $district)->first();
         }
 
         $business = Business::create([
@@ -156,15 +145,16 @@ class ImportController extends Controller
             'description' => $data['description'] ?? null,
             'address' => $data['address'] ?? '',
             'locality' => $data['locality'] ?? null,
-            'district' => $data['district'] ?? $pincode->district,
-            'pincode' => $pincode->pincode,
-            'state' => $pincode->state,
+            'district' => $data['district'] ?? $pincode?->district ?? 'Unknown',
+            'pincode' => $pincode?->pincode,
+            'state' => $pincode?->state ?? ($data['state'] ?? null),
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
             'website' => $data['website'] ?? null,
             'category_id' => $categoryId,
+            'subcategory_id' => $subcategoryId,
             'source' => $item->batch->source ?? 'import',
             'external_id' => $item->external_id,
             'import_batch_id' => $item->batch_id,

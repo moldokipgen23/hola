@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'All Businesses | Hola - Churachandpur Directory')
+@section('title', 'All Businesses | Eiho One - Churachandpur Directory')
 @section('description', 'Browse all local businesses in Lamka, Churachandpur, Manipur, India')
 
 @section('content')

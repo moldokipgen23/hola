@@ -7,7 +7,7 @@ return [
     | Cross-Origin Resource Sharing (CORS) Configuration
     |--------------------------------------------------------------------------
     |
-    | The Hola API is consumed by the Flutter app. Restrict allowed origins to
+    | The Eiho One API is consumed by the Flutter app. Restrict allowed origins to
     | the configured FRONTEND_URL (and localhost for local development) so that
     | credentialed requests are not accepted from arbitrary origins.
     |

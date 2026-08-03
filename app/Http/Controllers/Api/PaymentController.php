@@ -15,6 +15,11 @@ use Razorpay\Api\Api;
 
 class PaymentController extends Controller
 {
+    private function onlinePaymentsEnabled(): bool
+    {
+        return filter_var(Setting::get('payment_online_enabled', false), FILTER_VALIDATE_BOOL);
+    }
+
     private function razorpay(): Api
     {
         return new Api(config('services.razorpay.key_id'), config('services.razorpay.key_secret'));
@@ -22,6 +27,13 @@ class PaymentController extends Controller
 
     public function createOrder(Request $request)
     {
+        if (! $this->onlinePaymentsEnabled()) {
+            return response()->json([
+                'message' => 'Online payments are not enabled. Pay the business directly by cash/COD.',
+                'payment_mode' => 'offline',
+            ], 503);
+        }
+
         $validated = $request->validate([
             'amount' => 'required|numeric|min:1',
             'currency' => 'nullable|string|size:3',
@@ -33,7 +45,7 @@ class PaymentController extends Controller
         $gateway = $validated['gateway'] ?? 'razorpay';
         $currency = $validated['currency'] ?? 'INR';
         $amountPaise = (int) round($validated['amount'] * 100);
-        $receipt = $validated['type'] . '_' . $validated['reference_id'] . '_' . time();
+        $receipt = $validated['type'].'_'.$validated['reference_id'].'_'.time();
 
         if ($gateway === 'cashfree') {
             $env = config('services.cashfree.env', 'TEST');
@@ -41,7 +53,7 @@ class PaymentController extends Controller
                 ? 'https://api.cashfree.com/pg'
                 : 'https://sandbox.cashfree.com/pg';
 
-            $orderId = 'CF_' . $receipt;
+            $orderId = 'CF_'.$receipt;
 
             $customerName = 'Customer';
             $customerPhone = '9999999999';
@@ -64,13 +76,13 @@ class PaymentController extends Controller
                 'x-client-id' => config('services.cashfree.app_id'),
                 'x-client-secret' => config('services.cashfree.secret_key'),
                 'Content-Type' => 'application/json',
-            ])->post($baseUrl . '/orders', [
+            ])->post($baseUrl.'/orders', [
                 'order_id' => $orderId,
                 'order_amount' => (float) $validated['amount'],
                 'order_currency' => $currency,
-                'order_note' => $validated['type'] . ' #' . $validated['reference_id'],
+                'order_note' => $validated['type'].' #'.$validated['reference_id'],
                 'customer_details' => [
-                    'customer_id' => 'cust_' . ($request->user()?->id ?? 0),
+                    'customer_id' => 'cust_'.($request->user()?->id ?? 0),
                     'customer_name' => $customerName,
                     'customer_email' => $customerEmail,
                     'customer_phone' => $customerPhone,
@@ -114,6 +126,13 @@ class PaymentController extends Controller
 
     public function verifyPayment(Request $request)
     {
+        if (! $this->onlinePaymentsEnabled()) {
+            return response()->json([
+                'message' => 'Online payments are not enabled.',
+                'payment_mode' => 'offline',
+            ], 503);
+        }
+
         $validated = $request->validate([
             'gateway' => 'nullable|in:razorpay,cashfree',
             'type' => 'required|in:order,booking,trip',
@@ -178,13 +197,17 @@ class PaymentController extends Controller
 
     public function config(Request $request)
     {
-        $razorpayEnabled = Setting::get('payment_razorpay_enabled', config('services.razorpay.key_id') ? true : false);
-        $cashfreeEnabled = Setting::get('payment_cashfree_enabled', config('services.cashfree.app_id') ? true : false);
-        $codEnabled = Setting::get('payment_cod_enabled', true);
+        $onlineEnabled = $this->onlinePaymentsEnabled();
+        $razorpayEnabled = $onlineEnabled
+            && filter_var(Setting::get('payment_razorpay_enabled', false), FILTER_VALIDATE_BOOL);
+        $cashfreeEnabled = $onlineEnabled
+            && filter_var(Setting::get('payment_cashfree_enabled', false), FILTER_VALIDATE_BOOL);
+        $codEnabled = filter_var(Setting::get('payment_cod_enabled', true), FILTER_VALIDATE_BOOL);
 
         $config = [
             'gateways' => [],
-            'default' => Setting::get('payment_default', 'cod'),
+            'default' => $onlineEnabled ? Setting::get('payment_default', 'cod') : 'cod',
+            'online_enabled' => $onlineEnabled,
         ];
 
         if ($codEnabled) {
@@ -204,17 +227,25 @@ class PaymentController extends Controller
         if ($request->business_id) {
             $business = Business::find($request->business_id);
             if ($business && $business->payment_methods) {
-                $vendorMethods = array_intersect($config['gateways'], $business->payment_methods);
+                $vendorMethods = array_values(array_intersect($config['gateways'], $business->payment_methods));
             }
         }
 
         return response()->json([
+            'payment_mode' => $onlineEnabled ? 'mixed' : 'offline',
+            'message' => $onlineEnabled
+                ? null
+                : 'Payments are handled directly between the customer and business by cash/COD.',
             'razorpay' => [
-                'key_id' => Setting::get('payment_razorpay_key_id', config('services.razorpay.key_id')),
+                'key_id' => $razorpayEnabled
+                    ? Setting::get('payment_razorpay_key_id', config('services.razorpay.key_id'))
+                    : null,
                 'enabled' => $razorpayEnabled,
             ],
             'cashfree' => [
-                'app_id' => Setting::get('payment_cashfree_app_id', config('services.cashfree.app_id')),
+                'app_id' => $cashfreeEnabled
+                    ? Setting::get('payment_cashfree_app_id', config('services.cashfree.app_id'))
+                    : null,
                 'env' => Setting::get('payment_cashfree_env', config('services.cashfree.env', 'TEST')),
                 'enabled' => $cashfreeEnabled,
             ],

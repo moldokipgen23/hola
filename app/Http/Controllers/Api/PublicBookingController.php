@@ -3,204 +3,144 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
 use App\Models\Business;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
-use App\Models\TimeSlot;
+use App\Services\BookingPlacementService;
+use App\Services\OrderPlacementService;
+use App\Services\LaunchControlService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class PublicBookingController extends Controller
 {
-    public function storeBooking(Request $request, $slug)
+    public function storeBooking(Request $request, $slug, BookingPlacementService $bookings, LaunchControlService $launchControl)
     {
-        $business = Business::active()->where('slug', $slug)->firstOrFail();
+        $business = Business::active()->inServiceableArea()->where('slug', $slug)->firstOrFail();
 
         if (! $business->hasBookingsModule()) {
             return response()->json(['message' => 'Bookings not available for this business.'], 422);
         }
+        $businessExperiences = $business->enabled_experiences ?: ['appointment', 'stay', 'turf', 'seat_event'];
+        abort_unless(collect(['appointment', 'stay', 'turf', 'seat_event'])
+            ->contains(fn (string $experience) => in_array($experience, $businessExperiences, true) && $launchControl->experienceEnabled($experience)), 404);
 
         $validated = $request->validate([
             'service_id' => 'required|exists:services,id',
-            'time_slot_id' => 'nullable|exists:time_slots,id',
-            'booking_type' => 'nullable|in:standard,time_slot',
+            'time_slot_id' => 'nullable|integer|exists:time_slots,id',
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
-            'booking_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required',
-            'end_time' => 'required',
-            'duration_minutes' => 'required|integer|min:15',
-            'notes' => 'nullable|string',
+            'booking_date' => 'nullable|required_without:check_in_date|date|after_or_equal:today',
+            'check_in_date' => 'nullable|required_without:booking_date|date|after_or_equal:today',
+            'check_out_date' => 'nullable|date|after:check_in_date',
+            'start_time' => 'nullable|date_format:H:i',
+            'party_size' => 'nullable|integer|min:1|max:100',
+            'reservation_units' => 'nullable|integer|min:1|max:100',
+            'seat_labels' => 'nullable|array|max:100',
+            'seat_labels.*' => 'string|max:20|distinct',
+            'client_reference' => 'nullable|string|max:64',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
-        // Verify service belongs to this business
-        $service = $business->services()->where('id', $validated['service_id'])->first();
-        if (! $service) {
-            return response()->json(['message' => 'Invalid service.'], 422);
-        }
-
-        // For time-slot bookings, check capacity instead of overlapping times
-        if (! empty($validated['time_slot_id'])) {
-            $slot = TimeSlot::where('service_id', $service->id)->find($validated['time_slot_id']);
-            if (! $slot) {
-                return response()->json(['message' => 'Invalid time slot.'], 422);
-            }
-
-            $bookedCount = Booking::where('time_slot_id', $slot->id)
-                ->where('booking_date', $validated['booking_date'])
-                ->whereIn('status', ['pending', 'confirmed'])
-                ->count();
-
-            if ($bookedCount >= $slot->capacity) {
-                return response()->json(['message' => 'This time slot is fully booked. Please choose another.'], 422);
-            }
-
-            $validated['total_price'] = $slot->price_override ?? $service->price;
-        } else {
-            // Check for overlapping bookings (standard booking)
-            $overlap = Booking::where('business_id', $business->id)
-                ->where('booking_date', $validated['booking_date'])
-                ->whereIn('status', ['pending', 'confirmed'])
-                ->where(function ($q) use ($validated) {
-                    $q->where(function ($q2) use ($validated) {
-                        $q2->where('start_time', '<', $validated['end_time'])
-                            ->where('end_time', '>', $validated['start_time']);
-                    });
-                })
-                ->exists();
-
-            if ($overlap) {
-                return response()->json(['message' => 'This time slot is already booked. Please choose another time.'], 422);
-            }
-
-            $validated['total_price'] = $service->price;
-        }
-
-        $validated['business_id'] = $business->id;
-        $validated['status'] = 'pending';
-
-        if ($request->user()) {
-            $validated['user_id'] = $request->user()->id;
-        }
-
-        $booking = Booking::create($validated);
-        $booking->load('service');
+        $result = $bookings->place(
+            $business,
+            (int) $validated['service_id'],
+            [
+                'name' => $validated['customer_name'],
+                'phone' => $validated['customer_phone'],
+                'email' => $validated['customer_email'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ],
+            [
+                'booking_date' => $validated['booking_date'] ?? $validated['check_in_date'],
+                'check_in_date' => $validated['check_in_date'] ?? null,
+                'check_out_date' => $validated['check_out_date'] ?? null,
+                'start_time' => $validated['start_time'] ?? null,
+                'time_slot_id' => $validated['time_slot_id'] ?? null,
+                'party_size' => $validated['party_size'] ?? 1,
+                'reservation_units' => $validated['reservation_units'] ?? 1,
+                'seat_labels' => $validated['seat_labels'] ?? [],
+            ],
+            $request->user()?->id,
+            $validated['client_reference'] ?? null,
+        );
 
         return response()->json([
-            'message' => 'Booking request submitted. Awaiting confirmation.',
-            'booking' => $booking,
-        ], 201);
+            'message' => $result['duplicate']
+                ? 'This booking request was already received.'
+                : 'Booking request sent. Await confirmation and pay the business directly.',
+            'booking' => $result['booking'],
+            'duplicate' => $result['duplicate'],
+            'payment_mode' => 'offline',
+            'business_contact' => [
+                'phone' => $business->phone,
+                'whatsapp' => $business->whatsapp,
+            ],
+        ], $result['duplicate'] ? 200 : 201);
     }
 
-    public function storeOrder(Request $request, $slug)
+    public function storeOrder(Request $request, $slug, OrderPlacementService $orders, LaunchControlService $launchControl)
     {
-        $business = Business::active()->where('slug', $slug)->firstOrFail();
+        $business = Business::active()->inServiceableArea()->where('slug', $slug)->firstOrFail();
 
         if (! $business->hasOrdersModule()) {
             return response()->json(['message' => 'Orders not available for this business.'], 422);
         }
+        $businessExperiences = $business->enabled_experiences ?: ['retail', 'restaurant'];
+        abort_unless(collect(['retail', 'restaurant'])
+            ->contains(fn (string $experience) => in_array($experience, $businessExperiences, true) && $launchControl->experienceEnabled($experience)), 404);
+
+        $request->merge(['delivery_method' => $request->input('delivery_method', 'delivery')]);
 
         $validated = $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.product_id' => 'required|distinct|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1|max:100',
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
-            'delivery_address' => 'nullable|string',
-            'delivery_method' => 'nullable|in:delivery,pickup',
+            'delivery_address' => 'required_if:delivery_method,delivery|nullable|string|max:1000',
+            'delivery_method' => 'required|in:delivery,pickup',
             'delivery_time_slot' => 'nullable|string|max:20',
-            'notes' => 'nullable|string',
+            'pincode' => 'required_if:delivery_method,delivery|nullable|digits:6',
+            'latitude' => 'nullable|required_with:longitude|numeric|between:-90,90',
+            'longitude' => 'nullable|required_with:latitude|numeric|between:-180,180',
+            'area_id' => 'nullable|integer|exists:areas,id',
+            'client_reference' => 'nullable|string|max:64',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
-        // Verify all products belong to this business
-        $productIds = collect($validated['items'])->pluck('product_id');
-        $products = Product::where('business_id', $business->id)
-            ->whereIn('id', $productIds)
-            ->get();
-
-        if ($products->count() !== $productIds->count()) {
-            return response()->json(['message' => 'Invalid products in order.'], 422);
-        }
-
-        $orderNumber = 'ORD-'.strtoupper(Str::random(8));
-
-        $orderData = [
-            'business_id' => $business->id,
-            'order_number' => $orderNumber,
-            'customer_name' => $validated['customer_name'],
-            'customer_phone' => $validated['customer_phone'],
-            'customer_email' => $validated['customer_email'] ?? null,
-            'delivery_address' => $validated['delivery_address'] ?? null,
-            'delivery_method' => $request->delivery_method ?? 'delivery',
-            'delivery_time_slot' => $validated['delivery_time_slot'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'status' => 'pending',
-            'payment_status' => 'unpaid',
-            'subtotal' => 0,
-            'total' => 0,
-        ];
-
-        if ($request->user()) {
-            $orderData['user_id'] = $request->user()->id;
-        }
-
-        $deliveryFee = 0;
-        if ($request->delivery_method === 'delivery') {
-            $deliveryZone = $business->deliveryZones()->where('is_active', true)->first();
-            if (! $deliveryZone) {
-                return response()->json(['message' => 'Delivery is not available for this business.'], 422);
-            }
-            $deliveryFee = $deliveryZone->delivery_fee;
-        }
-        $orderData['delivery_fee'] = $deliveryFee;
-
-        $order = Order::create($orderData);
-
-        $subtotal = 0;
-        foreach ($validated['items'] as $item) {
-            $product = $products->find($item['product_id']);
-
-            if ($product->stock !== null && $product->stock < $item['quantity']) {
-                $order->delete();
-
-                return response()->json([
-                    'message' => "Insufficient stock for {$product->name}. Available: {$product->stock}",
-                ], 422);
-            }
-
-            $totalPrice = $product->price * $item['quantity'];
-            $subtotal += $totalPrice;
-
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $product->id,
-                'name' => $product->name,
-                'description' => $product->description,
-                'quantity' => $item['quantity'],
-                'unit_price' => $product->price,
-                'total_price' => $totalPrice,
-            ]);
-
-            if ($product->stock !== null) {
-                $product->decrement('stock', $item['quantity']);
-            }
-        }
-
-        $order->update([
-            'subtotal' => $subtotal,
-            'delivery_fee' => $deliveryFee,
-            'total' => $subtotal + $deliveryFee,
-        ]);
-
-        $order->load('items');
+        $result = $orders->place(
+            $business,
+            $validated['items'],
+            [
+                'name' => $validated['customer_name'],
+                'phone' => $validated['customer_phone'],
+                'email' => $validated['customer_email'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ],
+            [
+                'delivery_method' => $validated['delivery_method'],
+                'delivery_address' => $validated['delivery_address'] ?? null,
+                'delivery_time_slot' => $validated['delivery_time_slot'] ?? null,
+                'pincode' => $validated['pincode'] ?? null,
+                'latitude' => isset($validated['latitude']) ? (float) $validated['latitude'] : null,
+                'longitude' => isset($validated['longitude']) ? (float) $validated['longitude'] : null,
+                'area_id' => $validated['area_id'] ?? null,
+            ],
+            $request->user()?->id,
+            $validated['client_reference'] ?? null,
+        );
 
         return response()->json([
-            'message' => 'Order placed successfully.',
-            'order' => $order,
-        ], 201);
+            'message' => $result['duplicate']
+                ? 'This order was already received.'
+                : 'Order request sent. Pay the business directly by cash/COD.',
+            'order' => $result['order'],
+            'duplicate' => $result['duplicate'],
+            'payment_mode' => 'offline',
+            'business_contact' => [
+                'phone' => $business->phone,
+                'whatsapp' => $business->whatsapp,
+            ],
+        ], $result['duplicate'] ? 200 : 201);
     }
 }

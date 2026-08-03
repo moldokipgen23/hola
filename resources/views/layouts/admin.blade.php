@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Admin') - Hola</title>
+    <title>@yield('title', 'Admin') - Eiho One</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
@@ -201,7 +201,7 @@
                         <span class="text-white font-bold text-lg">H</span>
                     </div>
                     <div>
-                        <h1 class="text-white font-bold text-lg leading-tight">Hola</h1>
+                        <h1 class="text-white font-bold text-lg leading-tight">Eiho One</h1>
                         <p class="text-slate-500 text-xs">Admin Panel</p>
                     </div>
                 </div>
@@ -209,6 +209,27 @@
 
             <!-- Nav -->
             <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <div>
+                    <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-2">Overview</p>
+                    <a href="{{ route('admin.dashboard') }}" class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}"><span>Dashboard</span></a>
+
+                    <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Business setup</p>
+                    <a href="{{ route('admin.businesses') }}" class="sidebar-link {{ request()->routeIs('admin.businesses*') ? 'active' : '' }}"><span>Businesses</span></a>
+                    <a href="{{ route('admin.business-types') }}" class="sidebar-link {{ request()->routeIs('admin.business-types') || request()->routeIs('admin.categories*') || request()->routeIs('admin.subcategories*') ? 'active' : '' }}"><span>Business Types</span></a>
+                    <a href="{{ route('admin.areas') }}" class="sidebar-link {{ request()->routeIs('admin.areas*') ? 'active' : '' }}"><span>Areas</span></a>
+                    <a href="{{ route('admin.feature-flags') }}" class="sidebar-link {{ request()->routeIs('admin.feature-flags*') ? 'active' : '' }}"><span>Launch Controls</span></a>
+
+                    <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Operations</p>
+                    <a href="{{ route('admin.bookings') }}" class="sidebar-link {{ request()->routeIs('admin.bookings*') ? 'active' : '' }}"><span>Bookings</span></a>
+                    <a href="{{ route('admin.orders') }}" class="sidebar-link {{ request()->routeIs('admin.orders*') ? 'active' : '' }}"><span>Orders</span></a>
+                    <a href="{{ route('admin.claims') }}" class="sidebar-link {{ request()->routeIs('admin.claims*') ? 'active' : '' }}"><span>Business Claims</span></a>
+                    <a href="{{ route('admin.reports') }}" class="sidebar-link {{ request()->routeIs('admin.reports*') ? 'active' : '' }}"><span>Reports</span></a>
+
+                    <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">People</p>
+                    <a href="{{ route('admin.vendors') }}" class="sidebar-link {{ request()->routeIs('admin.vendors*') ? 'active' : '' }}"><span>Vendors</span></a>
+                    <a href="{{ route('admin.users') }}" class="sidebar-link {{ request()->routeIs('admin.users*') ? 'active' : '' }}"><span>Users</span></a>
+                </div>
+                <div class="hidden">
                 <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-2">Main</p>
                 <a href="{{ route('admin.dashboard') }}" class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -240,19 +261,19 @@
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     Businesses
                 </a>
+                <a href="{{ route('admin.feature-flags') }}" class="sidebar-link {{ request()->routeIs('admin.feature-flags*') ? 'active' : '' }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    App Features On/Off
+                </a>
                 <a href="{{ route('admin.areas') }}" class="sidebar-link {{ request()->routeIs('admin.areas*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     Areas
                 </a>
 
-                <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Catalog</p>
-                <a href="{{ route('admin.categories') }}" class="sidebar-link {{ request()->routeIs('admin.categories*') ? 'active' : '' }}">
+                <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Business setup</p>
+                <a href="{{ route('admin.business-types') }}" class="sidebar-link {{ request()->routeIs('admin.business-types') || request()->routeIs('admin.categories*') || request()->routeIs('admin.subcategories*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                    Categories
-                </a>
-                <a href="{{ route('admin.subcategories') }}" class="sidebar-link {{ request()->routeIs('admin.subcategories*') ? 'active' : '' }}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                    Subcategories
+                    Business Types
                 </a>
                 <a href="{{ route('admin.products') }}" class="sidebar-link {{ request()->routeIs('admin.products*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -295,32 +316,38 @@
                     Reviews
                 </a>
 
-                <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">AI Agents</p>
+                <div class="hidden">
+                <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Automation</p>
                 <a href="{{ route('admin.autopilot') }}" class="sidebar-link {{ request()->routeIs('admin.autopilot') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     Autopilot
                 </a>
                 <a href="{{ route('admin.agents') }}" class="sidebar-link {{ request()->routeIs('admin.agents*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    AI Agents
+                    Agent Settings
                 </a>
                 <a href="{{ route('admin.import') }}" class="sidebar-link {{ request()->routeIs('admin.import*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                    Import
+                    AI Imports
                 </a>
                 <a href="{{ route('admin.search-history') }}" class="sidebar-link {{ request()->routeIs('admin.search-history*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Search History
                 </a>
+                </div>
+                <details class="mt-2">
+                    <summary class="cursor-pointer px-4 py-2 text-xs text-slate-500 hover:text-slate-300">Advanced data tools</summary>
+                    <a href="{{ route('admin.homepage') }}" class="sidebar-link ml-2 {{ request()->routeIs('admin.homepage*') ? 'active' : '' }}">Homepage content</a>
+                    <a href="{{ route('admin.capability-templates') }}" class="sidebar-link ml-2 {{ request()->routeIs('admin.capability-templates*') ? 'active' : '' }}">Capability presets</a>
+                    <a href="{{ route('admin.integration-keys') }}" class="sidebar-link ml-2 {{ request()->routeIs('admin.integration-keys*') ? 'active' : '' }}">API keys</a>
+                    <a href="{{ route('admin.area-interests') }}" class="sidebar-link ml-2 {{ request()->routeIs('admin.area-interests*') ? 'active' : '' }}">Coming-soon interest</a>
+                </details>
 
+                <div class="hidden">
                 <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">System</p>
                 <a href="{{ route('admin.pincodes') }}" class="sidebar-link {{ request()->routeIs('admin.pincodes*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     Pincodes
-                </a>
-                <a href="{{ route('admin.area-interests') }}" class="sidebar-link {{ request()->routeIs('admin.area-interests*') ? 'active' : '' }}">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                    Coming Soon Leads
                 </a>
                 <a href="{{ route('admin.settings') }}" class="sidebar-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -330,6 +357,8 @@
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Activity Logs
                 </a>
+                </div>
+                </div>
             </nav>
 
             <!-- User -->

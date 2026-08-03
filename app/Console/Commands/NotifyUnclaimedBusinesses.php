@@ -168,7 +168,7 @@ class NotifyUnclaimedBusinesses extends Command
     private function buildClaimMessage(Business $business, string $claimUrl): string
     {
         $template = Setting::get('template_claim_sms', null);
-        $siteName = Setting::get('site_name', 'Hola');
+        $siteName = Setting::get('site_name', 'Eiho One');
         $district = Setting::get('district', 'Churachandpur');
 
         if ($template) {
@@ -192,7 +192,7 @@ class NotifyUnclaimedBusinesses extends Command
     private function buildEmailSubject(Business $business): string
     {
         $template = Setting::get('template_claim_subject', null);
-        $siteName = Setting::get('site_name', 'Hola');
+        $siteName = Setting::get('site_name', 'Eiho One');
         $district = Setting::get('district', 'Churachandpur');
 
         if ($template) {
@@ -210,7 +210,7 @@ class NotifyUnclaimedBusinesses extends Command
     {
         try {
             $fromAddress = Setting::get('smtp_from_address', config('mail.from.address'));
-            $fromName = Setting::get('smtp_from_name', config('mail.from.name', 'Hola'));
+            $fromName = Setting::get('smtp_from_name', config('mail.from.name', 'Eiho One'));
 
             if (! $fromAddress) {
                 return false;

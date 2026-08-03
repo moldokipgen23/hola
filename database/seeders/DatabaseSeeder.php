@@ -16,13 +16,15 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // ─── Admin User ───
-        User::create([
-            'name' => 'Admin',
-            'email' => 'admin@hola.app',
-            'password' => bcrypt('password'),
-            'role' => 'admin',
-            'email_verified_at' => now(),
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@hola.app'],
+            [
+                'name' => 'Admin',
+                'password' => bcrypt('password'),
+                'role' => 'admin',
+                'email_verified_at' => now(),
+            ]
+        );
 
         // ─── Categories ───
         $categories = [
@@ -40,16 +42,17 @@ class DatabaseSeeder extends Seeder
 
         $catModels = [];
         foreach ($categories as $cat) {
-            $catModels[$cat['name']] = Category::create([
-                ...$cat,
-                'slug' => Str::slug($cat['name']),
-            ]);
+            $slug = Str::slug($cat['name']);
+            $catModels[$cat['name']] = Category::updateOrCreate(
+                ['slug' => $slug],
+                [...$cat, 'is_canonical' => true]
+            );
         }
 
         // ─── Default fallback category (used by imports without a category match) ───
         $catModels['Uncategorized'] = Category::firstOrCreate(
             ['slug' => 'uncategorized'],
-            ['name' => 'Uncategorized', 'icon' => '📁', 'is_featured' => false, 'order' => 999, 'slug' => 'uncategorized']
+            ['name' => 'Uncategorized', 'icon' => '📁', 'is_featured' => false, 'is_canonical' => true, 'order' => 999]
         );
 
         // ─── Subcategories ───
@@ -113,11 +116,11 @@ class DatabaseSeeder extends Seeder
         $subModels = [];
         foreach ($subcategories as $catName => $subs) {
             foreach ($subs as $sub) {
-                $subModels[$sub['name']] = Subcategory::create([
-                    'category_id' => $catModels[$catName]->id,
-                    ...$sub,
-                    'slug' => Str::slug($sub['name']),
-                ]);
+                $slug = Str::slug($sub['name']);
+                $subModels[$sub['name']] = Subcategory::updateOrCreate(
+                    ['category_id' => $catModels[$catName]->id, 'slug' => $slug],
+                    $sub
+                );
             }
         }
 
@@ -260,7 +263,7 @@ class DatabaseSeeder extends Seeder
             'smtp_username' => '',
             'smtp_password' => '',
             'smtp_from_address' => 'noreply@hola.app',
-            'smtp_from_name' => 'Hola',
+            'smtp_from_name' => 'Eiho One',
         ];
 
         foreach ($smtpDefaults as $key => $value) {

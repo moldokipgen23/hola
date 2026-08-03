@@ -51,7 +51,8 @@ class BusinessController extends BaseController
             'website' => 'nullable|url|max:255',
             'is_active' => 'sometimes|boolean',
             'is_verified' => 'sometimes|boolean',
-            'enabled_modules' => 'sometimes|array',
+            'enabled_modules' => 'sometimes|array:catalog,orders,bookings,inventory,transport,turf',
+            'enabled_modules.*' => 'boolean',
         ]);
 
         $business->update($validated);

@@ -4,24 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Business;
 use App\Models\Order;
-use App\Models\OrderItem;
+use App\Services\BookingWorkflowService;
+use App\Services\OrderPlacementService;
+use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CustomerController extends Controller
 {
-    protected const VALID_ORDER_TRANSITIONS = [
-        'pending' => ['confirmed', 'cancelled'],
-        'confirmed' => ['preparing', 'cancelled'],
-        'preparing' => ['ready', 'cancelled'],
-        'ready' => ['out_for_delivery'],
-        'out_for_delivery' => ['delivered'],
-        'delivered' => [],
-        'cancelled' => [],
-        'refunded' => [],
-    ];
-
     public function myOrders(Request $request)
     {
         return response()->json([
@@ -42,7 +34,7 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function cancelOrder(Request $request, $id)
+    public function cancelOrder(Request $request, $id, OrderWorkflowService $workflow)
     {
         $order = Order::with('business')->findOrFail($id);
 
@@ -50,45 +42,27 @@ class CustomerController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        if (! $this->canTransition($order->status, 'cancelled')) {
-            return response()->json(['message' => 'Order cannot be cancelled at this stage.'], 422);
-        }
-
         $request->validate(['reason' => 'nullable|string|max:500']);
-
-        $order->update([
-            'status' => 'cancelled',
-            'cancellation_reason' => $request->reason,
-            'cancelled_at' => now(),
-        ]);
+        $order = $workflow->transition($order, 'cancelled', $request->reason);
 
         return response()->json(['message' => 'Order cancelled.', 'order' => $order]);
     }
 
-    public function cancelBooking(Request $request, $id)
+    public function cancelBooking(Request $request, $id, BookingWorkflowService $workflow)
     {
-        $booking = Booking::with('business')->findOrFail($id);
+        $booking = Booking::with(['business', 'service'])->findOrFail($id);
 
         if ($booking->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        if (! in_array($booking->status, ['pending', 'confirmed'])) {
-            return response()->json(['message' => 'Booking cannot be cancelled at this stage.'], 422);
-        }
-
         $request->validate(['reason' => 'nullable|string|max:500']);
-
-        $booking->update([
-            'status' => 'cancelled',
-            'cancellation_reason' => $request->reason,
-            'cancelled_at' => now(),
-        ]);
+        $booking = $workflow->cancelByCustomer($booking, $request->reason);
 
         return response()->json(['message' => 'Booking cancelled.', 'booking' => $booking]);
     }
 
-    public function reorder(Request $request, $id)
+    public function reorder(Request $request, $id, OrderPlacementService $orders)
     {
         $original = Order::with('items')->findOrFail($id);
 
@@ -100,48 +74,47 @@ class CustomerController extends Controller
             return response()->json(['message' => 'Only delivered orders can be reordered.'], 422);
         }
 
-        $order = Order::create([
-            'business_id' => $original->business_id,
-            'user_id' => $original->user_id,
-            'order_number' => 'ORD-'.strtoupper(Str::random(8)),
-            'customer_name' => $original->customer_name,
-            'customer_phone' => $original->customer_phone,
-            'customer_email' => $original->customer_email,
-            'delivery_address' => $original->delivery_address,
-            'delivery_method' => $original->delivery_method,
-            'delivery_time_slot' => $original->delivery_time_slot,
-            'subtotal' => $original->subtotal,
-            'tax' => $original->tax,
-            'delivery_fee' => $original->delivery_fee,
-            'discount' => $original->discount,
-            'total' => $original->total,
-            'status' => 'pending',
-            'payment_status' => 'pending',
-            'notes' => $original->notes,
-            'metadata' => $original->metadata,
-        ]);
-
-        foreach ($original->items as $item) {
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $item->product_id,
-                'name' => $item->name,
-                'description' => $item->description,
-                'quantity' => $item->quantity,
-                'unit_price' => $item->unit_price,
-                'total_price' => $item->total_price,
-            ]);
+        $business = Business::active()->inServiceableArea()->findOrFail($original->business_id);
+        if (! $business->hasOrdersModule()) {
+            throw ValidationException::withMessages(['order' => 'This business is not accepting orders now.']);
         }
 
-        $order->load('items');
+        if ($original->items->contains(fn ($item) => $item->product_id === null)) {
+            throw ValidationException::withMessages(['items' => 'Some products are no longer available. Build a new cart instead.']);
+        }
 
-        return response()->json(['message' => 'Order recreated.', 'order' => $order], 201);
-    }
+        if ($original->delivery_method === 'delivery' && ! $original->delivery_pincode) {
+            throw ValidationException::withMessages(['pincode' => 'Re-enter your delivery pincode in a new cart.']);
+        }
 
-    protected function canTransition(string $from, string $to): bool
-    {
-        $allowed = self::VALID_ORDER_TRANSITIONS[$from] ?? [];
+        $result = $orders->place(
+            $business,
+            $original->items->map(fn ($item) => [
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+            ])->all(),
+            [
+                'name' => $original->customer_name,
+                'phone' => $original->customer_phone,
+                'email' => $original->customer_email,
+                'notes' => $original->notes,
+            ],
+            [
+                'delivery_method' => $original->delivery_method,
+                'delivery_address' => $original->delivery_address,
+                'delivery_time_slot' => $original->delivery_time_slot,
+                'pincode' => $original->delivery_pincode,
+                'latitude' => $original->customer_latitude !== null ? (float) $original->customer_latitude : null,
+                'longitude' => $original->customer_longitude !== null ? (float) $original->customer_longitude : null,
+            ],
+            $request->user()->id,
+            'reorder-'.$original->id.'-'.$request->user()->id.'-'.now()->format('YmdHis'),
+        );
 
-        return in_array($to, $allowed);
+        return response()->json([
+            'message' => 'Order recreated with current prices and availability. Pay by cash/COD.',
+            'order' => $result['order'],
+            'payment_mode' => 'offline',
+        ], $result['duplicate'] ? 200 : 201);
     }
 }

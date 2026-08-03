@@ -67,6 +67,7 @@ class PincodeController extends Controller
                 'district' => $p->district,
                 'state' => $p->state,
                 'distance_km' => round((float) $p->distance, 2),
+                'transaction_serviceable' => $p->serviceable,
             ]),
         ]);
     }

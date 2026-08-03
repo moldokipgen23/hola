@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Subcategory;
+use App\Observers\SubcategoryObserver;
+use App\Services\LaunchControlService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\View;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,6 +24,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Subcategory::observe(SubcategoryObserver::class);
+
         Paginator::defaultView('partials._pagination');
+
+        View::composer(['layouts.public', 'public.*', 'partials._business-card'], function ($view) {
+            $view->with('launchControl', app(LaunchControlService::class));
+        });
     }
 }

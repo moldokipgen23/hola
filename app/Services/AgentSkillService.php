@@ -12,6 +12,7 @@ use App\Models\ImportBatch;
 use App\Models\ImportItem;
 use App\Models\SearchHistory;
 use App\Models\Setting;
+use App\Models\TaxonomySuggestion;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -27,6 +28,14 @@ class AgentSkillService
 
     public function run(AiAgent $agent, AiAgentTask $task): array
     {
+        if ($agent->status !== 'active' || ! $agent->hasSkill($task->type) || $task->agent_id !== $agent->id) {
+            $task->update([
+                'status' => 'failed',
+                'error' => 'This task is not assigned to an active agent with the required skill.',
+            ]);
+            throw new \RuntimeException('This task is not assigned to an active agent with the required skill.');
+        }
+
         $task->update(['status' => 'running']);
         $startTime = microtime(true);
 
@@ -59,19 +68,20 @@ class AgentSkillService
 
             return $result;
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $duration = (int) ((microtime(true) - $startTime) * 1000);
+            $safeError = $this->safeError($e->getMessage());
 
             $task->update([
                 'status' => 'failed',
-                'error' => $e->getMessage(),
+                'error' => $safeError,
                 'duration_ms' => $duration,
             ]);
 
             $agent->increment('tasks_failed');
             $agent->update(['last_active_at' => now()]);
 
-            throw $e;
+            throw new \RuntimeException($safeError, 0, $e);
         }
     }
 
@@ -240,8 +250,6 @@ class AgentSkillService
         $imported = 0;
         $skipped = 0;
         $duplicates = 0;
-        $categories = Category::pluck('id', 'name')->toArray();
-
         // Pre-load existing ACTIVE businesses for duplicate detection (exclude soft-deleted)
         $existingPlaceIds = Business::withoutTrashed()->whereNotNull('external_id')->pluck('external_id')->toArray();
         $existingNames = Business::withoutTrashed()->pluck('name')->map(fn ($n) => Str::lower($n))->toArray();
@@ -442,10 +450,11 @@ class AgentSkillService
                 'photo_references' => array_map(fn ($p) => $p['photo_reference'] ?? null, $place['photos'] ?? []),
             ];
 
-            // Auto-match category
-            $matchedCategory = $this->matchCategory($place['types'] ?? [], array_keys($categories));
-            if ($matchedCategory) {
-                $placeData['category'] = $matchedCategory;
+            // Resolve only against admin-controlled provider mappings.
+            $taxonomy = app(TaxonomyService::class)
+                ->resolveProviderTypes('google_places', $place['types'] ?? []);
+            if ($taxonomy) {
+                $placeData = array_merge($placeData, $taxonomy);
             }
 
             // Calculate confidence based on data quality
@@ -480,13 +489,30 @@ class AgentSkillService
                 continue;
             }
 
-            ImportItem::create([
+            $importItem = ImportItem::create([
                 'batch_id' => $batch->id,
                 'data' => $placeData,
                 'external_id' => $placeId,
                 'confidence' => $confidence,
                 'status' => 'pending',
             ]);
+
+            if (! $taxonomy && ! empty($place['types'])) {
+                $sourceType = collect($place['types'])
+                    ->first(fn ($type) => ! in_array($type, ['establishment', 'point_of_interest', 'premise'], true));
+
+                if ($sourceType) {
+                    app(TaxonomyService::class)->suggestUnknown(
+                        $sourceType,
+                        agent: $agent,
+                        importItem: $importItem,
+                        evidence: ['name' => $name, 'types' => $place['types']],
+                        sourceProvider: 'google_places',
+                        sourceType: $sourceType,
+                        confidence: $confidence,
+                    );
+                }
+            }
 
             // Track for future duplicate detection
             if ($placeId) {
@@ -771,11 +797,20 @@ EOT;
         }
 
         if ($items->isEmpty() && $existingCategorized->isEmpty()) {
-            return ['count' => 0, 'imported' => 0, 'cost' => 0, 'categories_created' => 0];
+            return [
+                'count' => 0,
+                'imported' => 0,
+                'cost' => 0,
+                'categories_created' => 0,
+                'suggestions_created' => 0,
+            ];
         }
 
-        $existingCategories = Category::pluck('name')->toArray();
-        $catList = ! empty($existingCategories) ? implode("\n- ", $existingCategories) : 'No categories exist yet. Create new ones.';
+        $existingCategories = Category::active()->where('is_canonical', true)->pluck('name')->toArray();
+        $canonicalCategories = collect($existingCategories)->mapWithKeys(
+            fn (string $name) => [Str::lower(trim($name)) => $name]
+        );
+        $catList = implode("\n- ", $existingCategories);
 
         $businessList = [];
 
@@ -815,11 +850,12 @@ EXISTING CATEGORIES:
 - {$catList}
 
 RULES:
-1. Pick the BEST existing category that fits
-2. If NO existing category fits, suggest a NEW category name (concise, e.g., "Tuition Center", "Hardware Store", "Church", "NGO")
-3. For businesses with "current_category" field — only change it if the current one is WRONG
+1. category MUST be one of the existing categories above, or null when none fits
+2. Never invent a category in the category field
+3. When category is null, provide suggested_category with a concise suggestion for admin review
+4. For businesses with "current_category" field — only change it if the current one is WRONG
 
-Return ONLY a JSON array with: source, source_id, category (the category name), is_new (true if you created a new category), changed (true if category was changed).
+Return ONLY a JSON array with: source, source_id, category, suggested_category, changed.
 
 Businesses:
 {$json}
@@ -851,30 +887,39 @@ EOT;
         }
 
         $categorized = 0;
-        $created = [];
+        $suggestionsCreated = 0;
         $changed = 0;
 
         foreach ($mappings as $map) {
             $source = $map['source'] ?? null;
             $sourceId = $map['source_id'] ?? null;
             $catName = $map['category'] ?? null;
-            $isNew = $map['is_new'] ?? false;
+            $suggestedCategory = $map['suggested_category'] ?? null;
             $wasChanged = $map['changed'] ?? false;
 
-            if (! $sourceId || ! $catName) {
+            if (! $sourceId) {
                 continue;
             }
 
-            // Create category if new
-            if ($isNew && ! in_array($catName, $existingCategories) && ! in_array($catName, $created)) {
-                Category::create([
-                    'name' => $catName,
-                    'slug' => Str::slug($catName),
-                    'icon' => '📂',
-                    'is_active' => true,
-                ]);
-                $created[] = $catName;
-                $existingCategories[] = $catName;
+            $catName = $catName ? $canonicalCategories->get(Str::lower(trim((string) $catName))) : null;
+            if (! $catName) {
+                if ($suggestedCategory) {
+                    $item = $source === 'import' ? $items->firstWhere('id', $sourceId) : null;
+                    $business = $source === 'business' ? $existingCategorized->firstWhere('id', $sourceId) : null;
+                    $suggestion = app(TaxonomyService::class)->suggestUnknown(
+                        $suggestedCategory,
+                        agent: $agent,
+                        importItem: $item,
+                        business: $business,
+                        evidence: ['ai_mapping' => $map],
+                        sourceProvider: 'ai_classifier',
+                        confidence: 0.5,
+                    );
+
+                    $suggestionsCreated += $suggestion->wasRecentlyCreated ? 1 : 0;
+                }
+
+                continue;
             }
 
             if ($source === 'import') {
@@ -882,6 +927,7 @@ EOT;
                 if ($item) {
                     $data = $item->data;
                     $data['category'] = $catName;
+                    $data['category_id'] = Category::where('name', $catName)->value('id');
                     $item->update([
                         'data' => $data,
                         'confidence' => min(($item->confidence ?? 0.5) + 0.15, 1.0),
@@ -893,9 +939,26 @@ EOT;
                 if ($biz) {
                     $cat = Category::where('name', $catName)->first();
                     if ($cat) {
-                        $biz->update(['category_id' => $cat->id]);
+                        $suggestion = TaxonomySuggestion::firstOrCreate(
+                            [
+                                'business_id' => $biz->id,
+                                'suggestion_type' => 'business_reclassification',
+                                'suggested_name' => $cat->name,
+                                'status' => 'pending',
+                            ],
+                            [
+                                'agent_id' => $agent->id,
+                                'suggested_parent_id' => $cat->id,
+                                'source_provider' => 'ai_classifier',
+                                'evidence' => [
+                                    'previous_category' => $biz->category?->name,
+                                    'ai_mapping' => $map,
+                                ],
+                                'confidence' => 0.5,
+                            ]
+                        );
+                        $suggestionsCreated += $suggestion->wasRecentlyCreated ? 1 : 0;
                         $changed++;
-                        $categorized++;
                     }
                 }
             }
@@ -904,7 +967,8 @@ EOT;
         return [
             'count' => count($businessList),
             'imported' => $categorized,
-            'categories_created' => count($created),
+            'categories_created' => 0,
+            'suggestions_created' => $suggestionsCreated,
             'existing_reorganized' => $changed,
             'cost' => round(($result['usage']['total_tokens'] ?? 0) * 0.00000014, 4),
         ];
@@ -953,7 +1017,9 @@ EOT;
         $batchId = $input['batch_id'] ?? null;
         $items = ImportItem::where('status', 'pending')
             ->when($batchId, fn ($q) => $q->where('batch_id', $batchId))
-            ->whereNull('data->description')
+            ->where(function ($query) {
+                $query->whereNull('data->description')->orWhere('data->description', '');
+            })
             ->limit($maxResults)
             ->get();
 
@@ -976,6 +1042,9 @@ EOT;
 
             if ($response->successful()) {
                 $desc = trim($response->json('choices.0.message.content', ''));
+                if ($desc === '') {
+                    continue;
+                }
                 $data = $item->data;
                 $data['description'] = $desc;
                 $item->update(['data' => $data]);
@@ -1108,124 +1177,12 @@ EOT;
         return is_array($decoded) ? $decoded : null;
     }
 
-    private function matchCategory(array $placeTypes, array $categoryNames): ?string
+    private function safeError(string $message): string
     {
-        // Priority-ordered mapping: Google Place type → best category match
-        // Order matters — more specific types first
-        $typeMap = [
-            // Education (specific first)
-            'preschool' => 'Preschool',
-            'primary_school' => 'Education',
-            'secondary_school' => 'Education',
-            'university' => 'Education',
-            'college' => 'Education',
-            'school' => 'Education',
-            'library' => 'Education',
-            // Food
-            'restaurant' => 'Food & Restaurants',
-            'cafe' => 'Food & Restaurants',
-            'bakery' => 'Food & Restaurants',
-            'bar' => 'Food & Restaurants',
-            'meal_takeaway' => 'Food & Restaurants',
-            'meal_delivery' => 'Food & Restaurants',
-            'food' => 'Food & Restaurants',
-            // Health
-            'hospital' => 'Healthcare',
-            'doctor' => 'Healthcare',
-            'dentist' => 'Healthcare',
-            'pharmacy' => 'Healthcare',
-            'drugstore' => 'Healthcare',
-            'physiotherapist' => 'Healthcare',
-            'health' => 'Healthcare',
-            // Lodging
-            'hotel' => 'Hotels & Lodges',
-            'lodging' => 'Hotels & Lodges',
-            'guest_house' => 'Hotels & Lodges',
-            'motel' => 'Hotels & Lodges',
-            'resort' => 'Hotels & Lodges',
-            // Shopping
-            'store' => 'Shopping & Retail',
-            'shopping_mall' => 'Shopping & Retail',
-            'supermarket' => 'Shopping & Retail',
-            'grocery_or_supermarket' => 'Shopping & Retail',
-            'clothing_store' => 'Shopping & Retail',
-            'electronics_store' => 'Electronics & Tech',
-            'hardware_store' => 'Shopping & Retail',
-            'furniture_store' => 'Shopping & Retail',
-            'jewelry_store' => 'Shopping & Retail',
-            'shoe_store' => 'Shopping & Retail',
-            'book_store' => 'Education',
-            'department_store' => 'Shopping & Retail',
-            'home_goods_store' => 'Shopping & Retail',
-            // Finance
-            'bank' => 'Professional Services',
-            'atm' => 'Professional Services',
-            'finance' => 'Professional Services',
-            'insurance_agency' => 'Professional Services',
-            // Auto
-            'car_repair' => 'Automobiles',
-            'car_dealer' => 'Automobiles',
-            'car_wash' => 'Automobiles',
-            'auto_parts_store' => 'Automobiles',
-            // Beauty
-            'beauty_salon' => 'Beauty & Wellness',
-            'hair_care' => 'Beauty & Wellness',
-            'spa' => 'Beauty & Wellness',
-            'nail_salon' => 'Beauty & Wellness',
-            // Fitness
-            'gym' => 'Sports & Fitness',
-            'fitness_center' => 'Sports & Fitness',
-            'stadium' => 'Sports & Fitness',
-            // Worship
-            'church' => 'Professional Services',
-            'place_of_worship' => 'Professional Services',
-            // Gov
-            'local_government_office' => 'Professional Services',
-            'police' => 'Professional Services',
-            'fire_station' => 'Professional Services',
-            'post_office' => 'Professional Services',
-            // Travel
-            'real_estate_agency' => 'Professional Services',
-            'travel_agency' => 'Professional Services',
-            // Other
-            'gas_station' => 'Automobiles',
-            'petrol_station' => 'Automobiles',
-            'park' => 'Sports & Fitness',
-            'tourist_attraction' => 'Sports & Fitness',
-            'museum' => 'Sports & Fitness',
-            'art_gallery' => 'Sports & Fitness',
-        ];
+        $message = preg_replace('/Bearer\s+[A-Za-z0-9._~+\/-]+/i', 'Bearer [redacted]', $message) ?? $message;
+        $message = preg_replace('/([?&](?:key|api_key|token)=)[^&\s]+/i', '$1[redacted]', $message) ?? $message;
 
-        // Pass 1: Direct type match (most specific)
-        foreach ($placeTypes as $type) {
-            if (isset($typeMap[$type])) {
-                $targetName = $typeMap[$type];
-                $match = collect($categoryNames)->first(fn ($cn) => strtolower(trim($cn)) === strtolower($targetName));
-                if ($match) {
-                    return $match;
-                }
-            }
-        }
-
-        // Pass 2: Fuzzy contains match (fallback)
-        foreach ($placeTypes as $type) {
-            if (isset($typeMap[$type])) {
-                $targetName = $typeMap[$type];
-                $match = collect($categoryNames)->first(fn ($cn) => Str::contains(Str::lower($cn), Str::lower($targetName)));
-                if ($match) {
-                    return $match;
-                }
-            }
-        }
-
-        // Pass 3: No match found — create a new category from the first Google type
-        $newCatName = ucfirst(str_replace('_', ' ', $placeTypes[0] ?? 'general'));
-        $newCat = Category::firstOrCreate(
-            ['name' => $newCatName, 'slug' => Str::slug($newCatName)],
-            ['icon' => '📂', 'is_active' => true]
-        );
-
-        return $newCat->name;
+        return Str::limit($message, 2000, '…');
     }
 
     private function serpapiBusinessSearch(AiAgent $agent, AiAgentTask $task): array

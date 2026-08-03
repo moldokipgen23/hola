@@ -9,6 +9,59 @@
         <div class="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded">{{ session('success') }}</div>
     @endif
 
+    @if($currentBiz)
+    <!-- Business Health -->
+    @php
+        $modules = $currentBiz->effectiveModules();
+        $readiness = $currentBiz->moduleReadiness();
+        $hasPhoto = $currentBiz->photos && count($currentBiz->photos) > 0;
+        $hasHours = $currentBiz->working_hours && count((array)$currentBiz->working_hours) > 0;
+        $hasDesc = $currentBiz->description && strlen($currentBiz->description) > 20;
+        $hasWhatsApp = !empty($currentBiz->whatsapp);
+        $checks = [
+            ['label' => 'Business name', 'done' => !empty($currentBiz->name)],
+            ['label' => 'Description', 'done' => $hasDesc],
+            ['label' => 'Phone number', 'done' => !empty($currentBiz->phone)],
+            ['label' => 'WhatsApp', 'done' => $hasWhatsApp],
+            ['label' => 'Working hours', 'done' => $hasHours],
+            ['label' => 'Business photos', 'done' => $hasPhoto],
+        ];
+        foreach ($modules as $mod => $enabled) {
+            if ($enabled && isset($readiness[$mod]) && !$readiness[$mod]['ready']) {
+                $checks[] = ['label' => $readiness[$mod]['next_step'], 'done' => false];
+            }
+        }
+        $done = collect($checks)->where('done', true)->count();
+        $total = count($checks);
+        $percent = $total > 0 ? round(($done / $total) * 100) : 0;
+    @endphp
+    <div class="glass-card p-6 rounded-lg">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-semibold text-lg">Business Health</h3>
+            <span class="text-2xl font-bold {{ $percent >= 80 ? 'text-green-400' : ($percent >= 50 ? 'text-amber-400' : 'text-red-400') }}">{{ $percent }}%</span>
+        </div>
+        <div class="w-full bg-white/5 rounded-full h-2 mb-4">
+            <div class="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all" style="width: {{ $percent }}%"></div>
+        </div>
+        <div class="space-y-2">
+            @foreach($checks as $check)
+            <div class="flex items-center gap-2 text-sm">
+                @if($check['done'])
+                    <svg class="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span class="text-slate-400">{{ $check['label'] }}</span>
+                @else
+                    <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span class="text-red-400">{{ $check['label'] }}</span>
+                @endif
+            </div>
+            @endforeach
+        </div>
+        <div class="mt-4 pt-4 border-t border-white/5">
+            <a href="{{ route('vendor.businesses.setup', $currentBiz->id) }}" class="text-purple-400 text-sm font-medium hover:text-purple-300">Reconfigure business type →</a>
+        </div>
+    </div>
+    @endif
+
     <form method="POST" action="{{ route('vendor.settings.update') }}" class="glass-card p-6 rounded-lg space-y-4">
         @csrf @method('PUT')
         <h3 class="text-white font-semibold text-lg mb-4">Profile</h3>

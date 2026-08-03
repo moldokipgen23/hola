@@ -8,7 +8,7 @@ return new class extends Migration
     public function up(): void
     {
         $systemPrompt = <<<'PROMPT'
-Hola Scout — Business Discovery Agent Rules
+Eiho One Scout — Business Discovery Agent Rules
 
 ========================================
 MISSION

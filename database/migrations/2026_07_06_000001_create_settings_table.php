@@ -18,7 +18,7 @@ return new class extends Migration
 
         $settings = [
             // General
-            ['key' => 'site_name', 'value' => 'Hola - Lamka Directory', 'group' => 'general'],
+            ['key' => 'site_name', 'value' => 'Eiho One - Lamka Directory', 'group' => 'general'],
             ['key' => 'site_tagline', 'value' => 'Your Local Guide for Lamka / Churachandpur', 'group' => 'general'],
             ['key' => 'site_description', 'value' => 'Discover businesses, services, and products in Lamka. Find restaurants, hotels, shops, and more.', 'group' => 'general'],
             ['key' => 'site_logo', 'value' => null, 'group' => 'general'],
@@ -29,7 +29,7 @@ return new class extends Migration
             ['key' => 'site_currency', 'value' => '₹', 'group' => 'general'],
 
             // SEO
-            ['key' => 'seo_title', 'value' => 'Hola - Lamka Directory | Find Local Businesses in Churachandpur', 'group' => 'seo'],
+            ['key' => 'seo_title', 'value' => 'Eiho One - Lamka Directory | Find Local Businesses in Churachandpur', 'group' => 'seo'],
             ['key' => 'seo_description', 'value' => 'Discover the best businesses in Lamka, Churachandpur. Search restaurants, hotels, shops, services and more. Your complete local business directory.', 'group' => 'seo'],
             ['key' => 'seo_keywords', 'value' => 'Lamka directory, Churachandpur businesses, local guide, restaurants Lamka, hotels Churachandpur, shops Lamka, Manipur business directory', 'group' => 'seo'],
             ['key' => 'seo_og_image', 'value' => null, 'group' => 'seo'],
@@ -46,8 +46,8 @@ return new class extends Migration
             ['key' => 'social_linkedin', 'value' => null, 'group' => 'social'],
 
             // Footer
-            ['key' => 'footer_text', 'value' => '© 2026 Hola. All rights reserved.', 'group' => 'footer'],
-            ['key' => 'footer_about', 'value' => 'Hola is the most trusted local business directory for Lamka / Churachandpur district.', 'group' => 'footer'],
+            ['key' => 'footer_text', 'value' => '© 2026 Eiho One. All rights reserved.', 'group' => 'footer'],
+            ['key' => 'footer_about', 'value' => 'Eiho One is the most trusted local business directory for Lamka / Churachandpur district.', 'group' => 'footer'],
             ['key' => 'footer_links', 'value' => json_encode([
                 ['label' => 'About Us', 'url' => '/about'],
                 ['label' => 'Contact', 'url' => '/contact'],

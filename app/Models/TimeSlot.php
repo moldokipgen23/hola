@@ -37,10 +37,11 @@ class TimeSlot extends Model
 
     public function availableSlots(string $date): int
     {
+        $column = $this->service?->booking_mode === 'slot' ? 'reservation_units' : 'party_size';
         $booked = Booking::where('time_slot_id', $this->id)
             ->where('booking_date', $date)
             ->whereIn('status', ['pending', 'confirmed'])
-            ->count();
+            ->sum($column);
 
         return max(0, $this->capacity - $booked);
     }

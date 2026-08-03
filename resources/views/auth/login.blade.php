@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Hola Admin</title>
+    <title>Eiho One Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -282,7 +282,7 @@
                         <span class="text-3xl font-bold text-white">H</span>
                     </div>
                 </div>
-                <h1 class="text-2xl font-bold text-white mb-1">Hola Admin</h1>
+                <h1 class="text-2xl font-bold text-white mb-1">Eiho One Admin</h1>
                 <p class="text-sm text-white/40">Lamka Directory Management</p>
             </div>
 
@@ -302,7 +302,7 @@
                     <label class="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">Email</label>
                     <input type="email" name="email" value="{{ old('email') }}" required
                         class="input-glow w-full px-4 py-3.5 rounded-xl text-white text-sm placeholder-white/20"
-                        placeholder="admin@hola.app"
+                        placeholder="admin@eiho.one"
                         autocomplete="email">
                 </div>
 
@@ -324,7 +324,6 @@
 
             <!-- Demo -->
             <div class="mt-6 pt-5 border-t border-white/5 text-center">
-                <p class="text-xs text-white/30">Demo: <span class="text-white/50">admin@hola.app</span> / <span class="text-white/50">password</span></p>
             </div>
         </div>
     </div>

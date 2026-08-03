@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Search History — Hola Admin')
+@section('title', 'Search History — Eiho One Admin')
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-8">

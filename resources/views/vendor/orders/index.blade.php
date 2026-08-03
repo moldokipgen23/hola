@@ -20,13 +20,14 @@
                 <option value="ready" {{ request('status') == 'ready' ? 'selected' : '' }}>Ready</option>
                 <option value="out_for_delivery" {{ request('status') == 'out_for_delivery' ? 'selected' : '' }}>Out for Delivery</option>
                 <option value="delivered" {{ request('status') == 'delivered' ? 'selected' : '' }}>Delivered</option>
+                <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Rejected</option>
                 <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
             </select>
         </div>
         <div>
             <select name="payment_status" class="input-dark w-full">
                 <option value="">All Payment</option>
-                <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+                <option value="pending" {{ request('payment_status') == 'pending' ? 'selected' : '' }}>Awaiting Cash</option>
                 <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid</option>
                 <option value="refunded" {{ request('payment_status') == 'refunded' ? 'selected' : '' }}>Refunded</option>
             </select>
@@ -86,6 +87,7 @@
                             'out_for_delivery' => 'bg-indigo-500/20 text-indigo-400',
                             'delivered' => 'badge-green',
                             'cancelled' => 'badge-red',
+                            'rejected' => 'badge-red',
                         ];
                         $statusLabels = [
                             'pending' => 'Pending',
@@ -95,6 +97,7 @@
                             'out_for_delivery' => 'Out for Delivery',
                             'delivered' => 'Delivered',
                             'cancelled' => 'Cancelled',
+                            'rejected' => 'Rejected',
                         ];
                     @endphp
                     <span class="badge {{ $statusClasses[$order->status] ?? 'badge-yellow' }}">
@@ -103,10 +106,10 @@
                 </td>
                 <td>
                     @php
-                        $paymentClasses = ['unpaid' => 'badge-red', 'paid' => 'badge-green', 'refunded' => 'bg-orange-500/20 text-orange-400'];
+                        $paymentClasses = ['pending' => 'badge-red', 'paid' => 'badge-green', 'refunded' => 'bg-orange-500/20 text-orange-400'];
                     @endphp
                     <span class="badge {{ $paymentClasses[$order->payment_status] ?? 'badge-yellow' }}">
-                        {{ ucfirst($order->payment_status) }}
+                        {{ $order->payment_status === 'pending' ? 'Awaiting Cash' : ucfirst($order->payment_status) }}
                     </span>
                 </td>
                 <td class="text-slate-400 text-xs">{{ $order->created_at->format('M d, Y') }}</td>
@@ -124,6 +127,12 @@
                                     <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20">Prepare</button>
                                 @endif
                             </form>
+                            <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="status" value="rejected">
+                                <input type="hidden" name="cancellation_reason" value="Rejected by vendor">
+                                <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20" onclick="return confirm('Reject this order?')">Reject</button>
+                            </form>
                         @endif
                         @if($order->status === 'preparing')
                             <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
@@ -135,8 +144,10 @@
                         @if($order->status === 'ready')
                             <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
                                 @csrf @method('PUT')
-                                <input type="hidden" name="status" value="out_for_delivery">
-                                <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20">Deliver</button>
+                                <input type="hidden" name="status" value="{{ $order->delivery_method === 'pickup' ? 'delivered' : 'out_for_delivery' }}">
+                                <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20">
+                                    {{ $order->delivery_method === 'pickup' ? 'Picked Up' : 'Deliver' }}
+                                </button>
                             </form>
                         @endif
                         @if($order->status === 'out_for_delivery')
@@ -146,16 +157,32 @@
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20">Delivered</button>
                             </form>
                         @endif
-                        @if(!in_array($order->status, ['delivered', 'cancelled']))
+                        @if(in_array($order->status, ['pending', 'confirmed', 'preparing', 'ready']))
                             <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
                                 @csrf @method('PUT')
                                 <input type="hidden" name="status" value="cancelled">
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20">Cancel</button>
                             </form>
                         @endif
+                        @if($order->payment_status !== 'paid' && !in_array($order->status, ['cancelled', 'refunded', 'rejected']))
+                            <form method="POST" action="{{ route('vendor.orders.payment-status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="payment_status" value="paid">
+                                <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">Cash Collected</button>
+                            </form>
+                        @endif
+                        @if($order->customer_phone)
+                            <a href="tel:{{ $order->customer_phone }}" class="px-2 py-1 text-xs rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20">Call</a>
+                            <a href="https://wa.me/{{ ltrim($order->customer_phone, '0') }}" target="_blank" class="px-2 py-1 text-xs rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20">WhatsApp</a>
+                        @endif
                     </div>
                 </td>
             </tr>
+            @if($order->status === 'rejected' && $order->rejection_reason)
+            <tr class="bg-red-500/5">
+                <td colspan="11" class="text-xs text-red-400 py-2">Rejected: {{ $order->rejection_reason }}</td>
+            </tr>
+            @endif
             @empty
             <tr>
                 <td colspan="11" class="text-center text-slate-500 py-12">No orders found.</td>

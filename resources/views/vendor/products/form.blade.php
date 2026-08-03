@@ -36,7 +36,7 @@
                 <textarea name="description" rows="3" class="input-dark">{{ old('description', $product->description ?? '') }}</textarea>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Price ($)</label>
                     <input type="number" step="0.01" name="price" value="{{ old('price', $product->price ?? '') }}" class="input-dark">
@@ -44,6 +44,49 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Stock</label>
                     <input type="number" name="stock" value="{{ old('stock', $product->stock ?? '') }}" class="input-dark">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Availability</label>
+                    <select name="availability" class="input-dark">
+                        <option value="in_stock" {{ old('availability', $product->availability ?? 'in_stock') === 'in_stock' ? 'selected' : '' }}>Available</option>
+                        <option value="limited" {{ old('availability', $product->availability ?? '') === 'limited' ? 'selected' : '' }}>Limited</option>
+                        <option value="out_of_stock" {{ old('availability', $product->availability ?? '') === 'out_of_stock' ? 'selected' : '' }}>Sold out</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Menu section</label>
+                    <input type="text" name="menu_section" value="{{ old('menu_section', $product->menu_section ?? '') }}" class="input-dark" placeholder="Breakfast, Main Course…">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Food type</label>
+                    <select name="food_type" class="input-dark">
+                        <option value="">Not specified</option>
+                        @foreach(['veg' => 'Vegetarian', 'non_veg' => 'Non-vegetarian', 'egg' => 'Egg', 'vegan' => 'Vegan', 'other' => 'Other'] as $value => $label)
+                            <option value="{{ $value }}" {{ old('food_type', $product->food_type ?? '') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Preparation (minutes)</label>
+                    <input type="number" name="preparation_minutes" min="1" max="1440" value="{{ old('preparation_minutes', $product->preparation_minutes ?? '') }}" class="input-dark">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Available from</label>
+                    <input type="time" name="available_from" value="{{ old('available_from', isset($product) && $product->available_from ? substr($product->available_from, 0, 5) : '') }}" class="input-dark">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Available until</label>
+                    <input type="time" name="available_until" value="{{ old('available_until', isset($product) && $product->available_until ? substr($product->available_until, 0, 5) : '') }}" class="input-dark">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Temporarily sold out until</label>
+                    <input type="datetime-local" name="sold_out_until" value="{{ old('sold_out_until', isset($product) && $product->sold_out_until ? $product->sold_out_until->format('Y-m-d\\TH:i') : '') }}" class="input-dark">
                 </div>
             </div>
 

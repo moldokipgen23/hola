@@ -1,12 +1,12 @@
 @extends('layouts.admin')
 
-@section('title', 'Subcategories')
-@section('header', 'Subcategories')
+@section('title', 'Business Types')
+@section('header', 'Business Types')
 
 @section('content')
 <div class="flex justify-between items-center mb-6">
-    <h3 class="text-white font-semibold text-lg">All Subcategories</h3>
-    <a href="{{ route('admin.subcategories.create') }}" class="btn-primary">+ Add Subcategory</a>
+    <h3 class="text-white font-semibold text-lg">Business types</h3>
+    <a href="{{ route('admin.subcategories.create') }}" class="btn-primary">+ Add business type</a>
 </div>
 
 <div class="glass-card rounded-lg overflow-hidden">

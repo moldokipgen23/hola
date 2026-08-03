@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Hola - Churachandpur Business Directory')</title>
+    <title>@yield('title', 'Eiho One - Churachandpur Business Directory')</title>
     <meta name="description" content="@yield('description', 'Discover local businesses in Lamka, Churachandpur, Manipur. Find restaurants, shops, services, and more.')">
     <meta name="keywords" content="Churachandpur, Lamka, business directory, Manipur, local businesses, shops, restaurants">
 
     {{-- Open Graph --}}
-    <meta property="og:title" content="@yield('og_title', 'Hola - Churachandpur Business Directory')">
+    <meta property="og:title" content="@yield('og_title', 'Eiho One - Churachandpur Business Directory')">
     <meta property="og:description" content="@yield('og_description', 'Discover local businesses in Lamka, Churachandpur, Manipur.')">
     <meta property="og:image" content="@yield('og_image', '')">
     <meta property="og:type" content="website">
@@ -16,7 +16,7 @@
 
     {{-- Twitter Card --}}
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="@yield('og_title', 'Hola - Churachandpur Business Directory')">
+    <meta name="twitter:title" content="@yield('og_title', 'Eiho One - Churachandpur Business Directory')">
     <meta name="twitter:description" content="@yield('og_description', 'Discover local businesses in Lamka, Churachandpur, Manipur.')">
 
     {{-- Tailwind CSS CDN --}}
@@ -81,7 +81,7 @@
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-sm shadow-md group-hover:shadow-lg transition-shadow">
                         H
                     </div>
-                    <span class="text-lg font-bold text-slate-900">Hola</span>
+                    <span class="text-lg font-bold text-slate-900">Eiho One</span>
                 </a>
 
                 {{-- Desktop Nav --}}
@@ -127,7 +127,7 @@
                 <div class="md:col-span-1">
                     <a href="/" class="flex items-center gap-2.5 mb-3">
                         <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-xs">H</div>
-                        <span class="text-base font-bold text-slate-900">Hola</span>
+                        <span class="text-base font-bold text-slate-900">Eiho One</span>
                     </a>
                     <p class="text-sm text-slate-500">Discover local businesses in Lamka, Churachandpur, Manipur, India.</p>
                 </div>
@@ -166,7 +166,7 @@
             </div>
 
             <div class="border-t border-slate-100 mt-8 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
-                <p class="text-xs text-slate-400">&copy; {{ date('Y') }} Hola. All rights reserved.</p>
+                <p class="text-xs text-slate-400">&copy; {{ date('Y') }} Eiho One. All rights reserved.</p>
                 <p class="text-xs text-slate-400">Made with care for Churachandpur</p>
             </div>
         </div>

@@ -6,6 +6,7 @@ use App\Models\AiAgent;
 use App\Models\AiAgentTask;
 use App\Models\Business;
 use App\Models\Setting;
+use App\Services\AgentTaskMaintenanceService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -215,6 +216,8 @@ class GoogleSyncBusinesses extends Command
                 'result_count' => $updated,
                 'imported_count' => $changed,
             ]);
+
+            app(AgentTaskMaintenanceService::class)->reconcileAgent($agent);
         }
 
         $this->info('');

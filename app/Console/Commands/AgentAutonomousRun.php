@@ -7,6 +7,7 @@ use App\Models\AiAgentTask;
 use App\Models\Business;
 use App\Models\ImportItem;
 use App\Models\Setting;
+use App\Services\AgentAssignmentService;
 use App\Services\AgentSkillService;
 use Illuminate\Console\Command;
 
@@ -21,8 +22,8 @@ class AgentAutonomousRun extends Command
     {
         $district = Setting::get('search_district', 'Churachandpur');
         $state = Setting::get('search_state', 'Manipur');
-        $zipcodes = array_map('trim', explode(',', Setting::get('search_zipcodes', '795128')));
-        $areas = array_map('trim', explode(',', Setting::get('search_areas', 'Lamka')));
+        $zipcodes = array_values(array_filter(array_map('trim', explode(',', Setting::get('search_zipcodes', '795128'))))) ?: ['795128'];
+        $areas = array_values(array_filter(array_map('trim', explode(',', Setting::get('search_areas', 'Lamka'))))) ?: ['Lamka'];
 
         // Priority: Only these categories — real bookable businesses first
         $priority = [
@@ -45,22 +46,27 @@ class AgentAutonomousRun extends Command
         return $searchQueries;
     }
 
-    public function handle(): int
+    public function handle(AgentAssignmentService $assignments, AgentSkillService $service): int
     {
         $dryRun = $this->option('dry-run');
         $skillFilter = $this->option('skill');
 
-        $agent = AiAgent::where('status', 'active')->first();
-        if (! $agent) {
+        if (! AiAgent::active()->exists()) {
             $this->error('No active agent found.');
 
             return 1;
         }
 
-        $this->info("🤖 Running autonomous pipeline for: {$agent->name}");
+        $supportedSkills = ['google_places_import', 'auto_categorize', 'quality_checker', 'description_writer', 'google_sync'];
+        if ($skillFilter && ! in_array($skillFilter, $supportedSkills, true)) {
+            $this->error('Unsupported Autopilot skill: '.$skillFilter);
 
-        $service = app(AgentSkillService::class);
+            return self::FAILURE;
+        }
+
+        $this->info('🤖 Running autonomous pipeline with skill-aware assignment');
         $results = [];
+        $failures = 0;
         $searchQueries = $this->getSearchQueries();
 
         // STEP 1: Search & Import (search 3 priority categories per run for faster coverage)
@@ -78,6 +84,13 @@ class AgentAutonomousRun extends Command
                 $this->info("  🔍 Searching: {$query['query']} in {$query['area']}");
 
                 if (! $dryRun) {
+                    $agent = $assignments->forSkill('google_places_import');
+                    if (! $agent) {
+                        $this->error('  ❌ No active agent supports google_places_import');
+                        $failures++;
+
+                        continue;
+                    }
                     $task = AiAgentTask::create([
                         'agent_id' => $agent->id,
                         'type' => 'google_places_import',
@@ -89,11 +102,16 @@ class AgentAutonomousRun extends Command
                         $result = $service->run($agent, $task);
                         $results[] = $result;
                         $this->info("  ✅ Found {$result['count']} | Imported {$result['imported']} | Duplicates {$result['duplicates']}");
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
+                        $failures++;
                         $this->error("  ❌ Search failed: {$e->getMessage()}");
                     }
                 } else {
-                    $this->info("  [DRY RUN] Would search: {$query['query']}");
+                    $agent = $assignments->forSkill('google_places_import');
+                    if (! $agent) {
+                        $failures++;
+                    }
+                    $this->info("  [DRY RUN] Would assign {$query['query']} to ".($agent?->name ?? 'NO ELIGIBLE AGENT'));
                 }
             }
         }
@@ -105,22 +123,33 @@ class AgentAutonomousRun extends Command
                 $this->info("  📂 Categorizing {$pendingCount} pending items...");
 
                 if (! $dryRun) {
-                    $task = AiAgentTask::create([
-                        'agent_id' => $agent->id,
-                        'type' => 'auto_categorize',
-                        'input' => ['scope' => 'all', 'max_results' => 30],
-                        'status' => 'pending',
-                    ]);
+                    $agent = $assignments->forSkill('auto_categorize');
+                    if (! $agent) {
+                        $this->error('  ❌ No active agent supports auto_categorize');
+                        $failures++;
+                    } else {
+                        $task = AiAgentTask::create([
+                            'agent_id' => $agent->id,
+                            'type' => 'auto_categorize',
+                            'input' => ['scope' => 'pending', 'max_results' => 30],
+                            'status' => 'pending',
+                        ]);
 
-                    try {
-                        $result = $service->run($agent, $task);
-                        $results['categorize'] = $result;
-                        $this->info("  ✅ Categorized {$result['imported']} | Created {$result['categories_created']} categories");
-                    } catch (\Exception $e) {
-                        $this->error("  ❌ Categorize failed: {$e->getMessage()}");
+                        try {
+                            $result = $service->run($agent, $task);
+                            $results['categorize'] = $result;
+                            $this->info("  ✅ Categorized {$result['imported']} | Suggested {$result['suggestions_created']} taxonomy changes");
+                        } catch (\Throwable $e) {
+                            $failures++;
+                            $this->error("  ❌ Categorize failed: {$e->getMessage()}");
+                        }
                     }
                 } else {
-                    $this->info("  [DRY RUN] Would categorize {$pendingCount} items");
+                    $agent = $assignments->forSkill('auto_categorize');
+                    if (! $agent) {
+                        $failures++;
+                    }
+                    $this->info("  [DRY RUN] Would assign {$pendingCount} items to ".($agent?->name ?? 'NO ELIGIBLE AGENT'));
                 }
             } else {
                 $this->info('  📂 No pending items to categorize');
@@ -134,22 +163,33 @@ class AgentAutonomousRun extends Command
                 $this->info('  🔎 Running quality check...');
 
                 if (! $dryRun) {
-                    $task = AiAgentTask::create([
-                        'agent_id' => $agent->id,
-                        'type' => 'quality_checker',
-                        'input' => ['max_results' => 30],
-                        'status' => 'pending',
-                    ]);
+                    $agent = $assignments->forSkill('quality_checker');
+                    if (! $agent) {
+                        $this->error('  ❌ No active agent supports quality_checker');
+                        $failures++;
+                    } else {
+                        $task = AiAgentTask::create([
+                            'agent_id' => $agent->id,
+                            'type' => 'quality_checker',
+                            'input' => ['max_results' => 30],
+                            'status' => 'pending',
+                        ]);
 
-                    try {
-                        $result = $service->run($agent, $task);
-                        $results['quality'] = $result;
-                        $this->info("  ✅ Checked {$result['count']} | Passed {$result['imported']}");
-                    } catch (\Exception $e) {
-                        $this->error("  ❌ Quality check failed: {$e->getMessage()}");
+                        try {
+                            $result = $service->run($agent, $task);
+                            $results['quality'] = $result;
+                            $this->info("  ✅ Checked {$result['count']} | Passed {$result['imported']}");
+                        } catch (\Throwable $e) {
+                            $failures++;
+                            $this->error("  ❌ Quality check failed: {$e->getMessage()}");
+                        }
                     }
                 } else {
-                    $this->info("  [DRY RUN] Would quality check {$pendingForQuality} items");
+                    $agent = $assignments->forSkill('quality_checker');
+                    if (! $agent) {
+                        $failures++;
+                    }
+                    $this->info('  [DRY RUN] Would assign quality check to '.($agent?->name ?? 'NO ELIGIBLE AGENT'));
                 }
             } else {
                 $this->info('  🔎 No pending items for quality check');
@@ -159,30 +199,42 @@ class AgentAutonomousRun extends Command
         // STEP 4: Write descriptions for items without them
         if (! $skillFilter || $skillFilter === 'description_writer') {
             $noDesc = ImportItem::where('status', 'pending')
-                ->whereNull('data->description')
-                ->orWhere('data->description', '')
+                ->where(function ($query) {
+                    $query->whereNull('data->description')->orWhere('data->description', '');
+                })
                 ->count();
 
             if ($noDesc > 0) {
                 $this->info("  ✍️ Writing descriptions for {$noDesc} items...");
 
                 if (! $dryRun) {
-                    $task = AiAgentTask::create([
-                        'agent_id' => $agent->id,
-                        'type' => 'description_writer',
-                        'input' => ['max_results' => 10],
-                        'status' => 'pending',
-                    ]);
+                    $agent = $assignments->forSkill('description_writer');
+                    if (! $agent) {
+                        $this->error('  ❌ No active agent supports description_writer');
+                        $failures++;
+                    } else {
+                        $task = AiAgentTask::create([
+                            'agent_id' => $agent->id,
+                            'type' => 'description_writer',
+                            'input' => ['max_results' => 10],
+                            'status' => 'pending',
+                        ]);
 
-                    try {
-                        $result = $service->run($agent, $task);
-                        $results['descriptions'] = $result;
-                        $this->info("  ✅ Wrote {$result['imported']} descriptions");
-                    } catch (\Exception $e) {
-                        $this->error("  ❌ Description writing failed: {$e->getMessage()}");
+                        try {
+                            $result = $service->run($agent, $task);
+                            $results['descriptions'] = $result;
+                            $this->info("  ✅ Wrote {$result['imported']} descriptions");
+                        } catch (\Throwable $e) {
+                            $failures++;
+                            $this->error("  ❌ Description writing failed: {$e->getMessage()}");
+                        }
                     }
                 } else {
-                    $this->info("  [DRY RUN] Would write {$noDesc} descriptions");
+                    $agent = $assignments->forSkill('description_writer');
+                    if (! $agent) {
+                        $failures++;
+                    }
+                    $this->info('  [DRY RUN] Would assign descriptions to '.($agent?->name ?? 'NO ELIGIBLE AGENT'));
                 }
             } else {
                 $this->info('  ✍️ All items have descriptions');
@@ -200,19 +252,17 @@ class AgentAutonomousRun extends Command
                 $this->info("  🔄 Syncing {$importedCount} businesses with Google...");
 
                 if (! $dryRun) {
-                    $task = AiAgentTask::create([
-                        'agent_id' => $agent->id,
-                        'type' => 'google_sync',
-                        'input' => ['limit' => 20],
-                        'status' => 'pending',
-                    ]);
-
                     try {
-                        \Artisan::call('google:sync', ['--limit' => 20]);
+                        $exitCode = \Artisan::call('google:sync', ['--limit' => 20]);
                         $output = \Artisan::output();
-                        $task->update(['status' => 'completed', 'output' => ['raw' => $output]]);
+
+                        if ($exitCode !== self::SUCCESS) {
+                            throw new \RuntimeException(trim($output) ?: 'Google sync failed.');
+                        }
+
                         $this->info('  ✅ Google sync complete');
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
+                        $failures++;
                         $this->error("  ❌ Google sync failed: {$e->getMessage()}");
                     }
                 } else {
@@ -227,6 +277,12 @@ class AgentAutonomousRun extends Command
         $this->info('');
         $this->info("📊 Pipeline complete. Pending items for review: {$pending}");
 
-        return 0;
+        if ($failures > 0) {
+            $this->error("Pipeline completed with {$failures} failure(s).");
+
+            return self::FAILURE;
+        }
+
+        return self::SUCCESS;
     }
 }

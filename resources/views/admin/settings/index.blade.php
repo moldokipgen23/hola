@@ -62,7 +62,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Site Name</label>
-                    <input type="text" name="settings[site_name]" value="{{ $settings['site_name'] ?? 'Hola' }}" class="input-dark">
+                    <input type="text" name="settings[site_name]" value="{{ $settings['site_name'] ?? 'Eiho One' }}" class="input-dark">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Tagline</label>
@@ -190,7 +190,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">From Name</label>
-                    <input type="text" name="settings[smtp_from_name]" value="{{ $settings['smtp_from_name'] ?? 'Hola' }}" class="input-dark" placeholder="Hola">
+                    <input type="text" name="settings[smtp_from_name]" value="{{ $settings['smtp_from_name'] ?? 'Eiho One' }}" class="input-dark" placeholder="Eiho One">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">SMTP Host</label>
@@ -448,7 +448,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-400 mb-2">Claim Invitation Subject</label>
-                            <input type="text" name="settings[notify_email_subject]" value="{{ $settings['notify_email_subject'] ?? 'Your business is on Hola - Claim it now!' }}" class="input-dark">
+                            <input type="text" name="settings[notify_email_subject]" value="{{ $settings['notify_email_subject'] ?? 'Your business is on Eiho One - Claim it now!' }}" class="input-dark">
                         </div>
                     </div>
                 </div>
@@ -492,7 +492,7 @@
                     </div>
                     <!-- Test Telegram -->
                     <div class="mt-4 flex gap-3">
-                        <input type="text" id="testTelegramMsg" value="Hola! This is a test notification." class="input-dark flex-1">
+                        <input type="text" id="testTelegramMsg" value="Eiho One: this is a test notification." class="input-dark flex-1">
                         <button type="button" onclick="sendTestTelegram()" class="btn-primary px-6">Send Test</button>
                     </div>
                 </div>
@@ -702,6 +702,20 @@
             </div>
 
             <div class="space-y-6">
+                <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <h4 class="text-amber-300 font-medium">Future online-payment launch switch</h4>
+                            <p class="text-amber-200/70 text-xs mt-1">Keep this off during the free offline/COD launch. Razorpay and Cashfree configuration remains preserved below.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                            <input type="hidden" name="settings[payment_online_enabled]" value="0">
+                            <input type="checkbox" name="settings[payment_online_enabled]" value="1" class="sr-only peer" {{ ($settings['payment_online_enabled'] ?? '0') == '1' ? 'checked' : '' }}>
+                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- COD -->
                 <div class="p-4 rounded-xl bg-white/5 border border-white/10">
                     <div class="flex items-center justify-between mb-3">

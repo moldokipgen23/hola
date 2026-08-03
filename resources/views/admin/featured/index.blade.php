@@ -26,7 +26,7 @@
                     <td class="text-sm">{{ $business->category->name ?? '-' }}</td>
                     <td class="text-sm">{{ number_format($business->views_count) }}</td>
                     <td class="text-sm">
-                        <form method="POST" action="{{ route('admin.businesses.toggle', $business->id) }}" class="inline">
+                        <form method="POST" action="{{ route('admin.featured.remove', $business->id) }}" class="inline">
                             @csrf @method('PATCH')
                             <input type="hidden" name="is_featured" value="0">
                             <button type="submit" class="text-red-400 hover:text-red-300">Remove Featured</button>

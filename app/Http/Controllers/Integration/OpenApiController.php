@@ -10,7 +10,7 @@ class OpenApiController extends BaseController
             'openapi' => '3.1.0',
             'info' => [
                 'title' => 'Ehlom Integration API',
-                'description' => 'Central integration API for Ehlom ecosystem. Connect Hola directory, AI agents, restaurant ERP, school ERP, shopping systems, and portfolio websites.',
+                'description' => 'Central integration API for Ehlom ecosystem. Connect Eiho One directory, AI agents, restaurant ERP, school ERP, shopping systems, and portfolio websites.',
                 'version' => '1.0.0',
                 'contact' => [
                     'name' => 'Ehlom API Support',

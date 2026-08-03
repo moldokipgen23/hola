@@ -2,7 +2,6 @@
 
 use App\Models\Category;
 use App\Models\Subcategory;
-use Illuminate\Support\Str;
 
 if (! function_exists('matchImportCategory')) {
     /**
@@ -13,8 +12,7 @@ if (! function_exists('matchImportCategory')) {
     function matchImportCategory(?string $rawCategory, array $categories): int
     {
         if (! $rawCategory) {
-            return Category::where('slug', 'general')->value('id')
-                ?? Category::firstOrCreate(['name' => 'General', 'slug' => 'general'])->id;
+            return resolveFallbackImportCategoryId();
         }
 
         $rawLower = strtolower(trim($rawCategory));
@@ -93,14 +91,79 @@ if (! function_exists('matchImportCategory')) {
             }
         }
 
-        // 5. No match — create new category
-        $slug = Str::slug($rawCategory);
-        $cat = Category::firstOrCreate(
-            ['name' => $rawCategory, 'slug' => $slug],
-            ['description' => 'Auto-created from import']
-        );
+        // 5. No match — never mutate taxonomy during import.
+        return resolveFallbackImportCategoryId();
+    }
+}
 
-        return $cat->id;
+if (! function_exists('resolveFallbackImportCategoryId')) {
+    function resolveFallbackImportCategoryId(): int
+    {
+        $categoryId = Category::where('slug', 'uncategorized')->value('id')
+            ?? Category::where('slug', 'general')->value('id')
+            ?? Category::active()->where('is_canonical', true)->orderBy('id')->value('id')
+            ?? Category::orderBy('id')->value('id');
+
+        if (! $categoryId) {
+            throw new RuntimeException('No admin-approved category exists for this import.');
+        }
+
+        return (int) $categoryId;
+    }
+}
+
+if (! function_exists('resolveApprovedImportTaxonomy')) {
+    /**
+     * Resolve an import only to an active, admin-approved category. AI agents
+     * store category_id/subcategory_id after matching source types; approval
+     * must use those IDs rather than guess again from a display label.
+     *
+     * Unknown records deliberately return null and stay in review. They must
+     * never silently become "General", "Establishment", or another unrelated
+     * customer journey.
+     */
+    function resolveApprovedImportTaxonomy(array $data): ?array
+    {
+        $category = null;
+        $categoryId = $data['category_id'] ?? null;
+
+        if ($categoryId) {
+            $category = Category::active()->where('is_canonical', true)->find($categoryId);
+        }
+
+        if (! $category && ! empty($data['category_slug'])) {
+            $category = Category::active()->where('is_canonical', true)
+                ->where('slug', $data['category_slug'])->first();
+        }
+
+        if (! $category && ! empty($data['category'])) {
+            $category = Category::active()->where('is_canonical', true)
+                ->whereRaw('LOWER(name) = ?', [strtolower(trim((string) $data['category']))])
+                ->first();
+        }
+
+        if (! $category) {
+            return null;
+        }
+
+        $subcategory = null;
+        if (! empty($data['subcategory_id'])) {
+            $subcategory = Subcategory::active()
+                ->where('category_id', $category->id)
+                ->find($data['subcategory_id']);
+        }
+
+        if (! $subcategory && ! empty($data['subcategory_slug'])) {
+            $subcategory = Subcategory::active()
+                ->where('category_id', $category->id)
+                ->where('slug', $data['subcategory_slug'])
+                ->first();
+        }
+
+        return [
+            'category_id' => $category->id,
+            'subcategory_id' => $subcategory?->id,
+        ];
     }
 }
 
@@ -113,6 +176,7 @@ if (! function_exists('matchImportSubcategory')) {
     {
         $rawLower = strtolower(trim($rawCategory ?? ''));
         $nameLower = strtolower(trim($businessName ?? ''));
+        $categorySlug = Category::whereKey($categoryId)->value('slug');
 
         // Load subcategories for this category
         $subcategories = Subcategory::where('category_id', $categoryId)
@@ -125,11 +189,11 @@ if (! function_exists('matchImportSubcategory')) {
         }
 
         // Pharmacy matching
-        if ($categoryId === 3) { // Healthcare
+        if ($categorySlug === 'healthcare') {
             foreach (['pharmacy', 'pharmacies', 'medical store', 'drugstore', 'chemist', 'medicine'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
                     return $subcategories->get('pharmacies')?->id
-                        ?? $subcategories->keys()->first(fn ($k) => str_contains($k, 'pharm')) ? $subcategories->first(fn ($s) => str_contains(strtolower($s->name), 'pharm'))?->id : null;
+                        ?? $subcategories->first(fn ($subcategory) => str_contains(strtolower($subcategory->name), 'pharm'))?->id;
                 }
             }
             foreach (['hospital'] as $kw) {
@@ -149,13 +213,14 @@ if (! function_exists('matchImportSubcategory')) {
             }
             foreach (['diagnostic', 'lab', 'pathology', 'test'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
-                    return $subcategories->get('diagnostic lab')?->id ?? null;
+                    return $subcategories->get('diagnostic centres')?->id
+                        ?? $subcategories->get('diagnostic lab')?->id;
                 }
             }
         }
 
         // Hotels matching
-        if ($categoryId === 2) {
+        if ($categorySlug === 'hotels-lodges') {
             foreach (['resort'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
                     return $subcategories->get('resorts')?->id ?? null;
@@ -177,7 +242,7 @@ if (! function_exists('matchImportSubcategory')) {
         }
 
         // Food matching
-        if ($categoryId === 1) {
+        if ($categorySlug === 'food-restaurants') {
             foreach (['cafe', 'coffee'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
                     return $subcategories->get('cafes')?->id ?? null;
@@ -204,7 +269,7 @@ if (! function_exists('matchImportSubcategory')) {
         }
 
         // Education matching
-        if ($categoryId === 4) {
+        if ($categorySlug === 'education') {
             foreach (['college'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
                     return $subcategories->get('colleges')?->id ?? null;
@@ -221,7 +286,7 @@ if (! function_exists('matchImportSubcategory')) {
         }
 
         // Shopping matching
-        if ($categoryId === 5) {
+        if ($categorySlug === 'shopping-retail') {
             foreach (['mall', 'shopping mall'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
                     return $subcategories->get('shopping mall')?->id ?? null;
@@ -255,15 +320,17 @@ if (! function_exists('matchImportSubcategory')) {
         }
 
         // Sports matching
-        if ($categoryId === 10) {
+        if ($categorySlug === 'sports-fitness') {
             foreach (['football', 'turf', 'soccer'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
-                    return $subcategories->get('football turf')?->id ?? null;
+                    return $subcategories->get('turfs & sports grounds')?->id
+                        ?? $subcategories->get('football turf')?->id;
                 }
             }
             foreach (['swimming', 'pool', 'aquatic'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
-                    return $subcategories->get('swimming pool')?->id ?? null;
+                    return $subcategories->get('swimming pools')?->id
+                        ?? $subcategories->get('swimming pool')?->id;
                 }
             }
             foreach (['picnic', 'park', 'amusement'] as $kw) {
@@ -279,7 +346,7 @@ if (! function_exists('matchImportSubcategory')) {
         }
 
         // Electronics matching
-        if ($categoryId === 6) {
+        if ($categorySlug === 'electronics-tech') {
             foreach (['mobile', 'phone', 'smartphone'] as $kw) {
                 if (str_contains($rawLower, $kw) || str_contains($nameLower, $kw)) {
                     return $subcategories->get('mobile shops')?->id ?? null;
