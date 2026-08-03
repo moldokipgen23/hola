@@ -63,6 +63,16 @@ class WorldSeeder extends Seeder
                 'fulfilment_options' => ['visit_venue', 'pay_at_venue'],
             ],
             [
+                'name' => 'Bookings (generic)',
+                'slug' => 'bookings',
+                'business_type' => 'book',
+                'description' => 'Accept booking requests for services, rooms, slots or seats.',
+                'enabled_modules' => ['bookings' => true],
+                'enabled_experiences' => ['directory'],
+                'default_availability' => ['mode' => 'request'],
+                'fulfilment_options' => ['visit_venue', 'pay_at_venue'],
+            ],
+            [
                 'name' => 'Hotel & Stay',
                 'slug' => 'hotel',
                 'business_type' => 'book',

@@ -2879,228 +2879,77 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $business = Business::where('created_by', $user->id)->findOrFail($id);
             $moduleService = app(BusinessModuleService::class);
             $modules = $moduleService->effectiveFor($business);
+            $templates = \App\Models\CapabilityTemplate::active()->get()->keyBy('slug');
 
-            return view('vendor.businesses.setup', compact('business', 'modules'));
+            return view('vendor.businesses.setup', compact('business', 'modules', 'templates'));
         })->name('businesses.setup');
 
         Route::post('/businesses/{id}/setup', function (Request $request, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($id);
             $validated = $request->validate([
-                'business_type' => 'required|in:restaurant,retail,salon,hotel,turf,taxi,event,other',
+                'offer' => 'required|in:sell,book,list',
             ]);
 
-            $moduleMap = [
-                'restaurant' => ['catalog', 'orders'],
-                'retail'     => ['catalog', 'orders', 'inventory'],
-                'salon'      => ['bookings'],
-                'hotel'      => ['bookings'],
-                'turf'       => ['bookings', 'turf'],
-                'taxi'       => ['transport'],
-                'event'      => ['bookings', 'turf'],
-                'other'      => ['catalog'],
-            ];
+            $templateSlug = match ($validated['offer']) {
+                'sell' => 'retail',
+                'book' => 'bookings',
+                'list' => 'general',
+            };
 
-            $modules = $moduleMap[$validated['business_type']] ?? ['catalog'];
-            $moduleService = app(BusinessModuleService::class);
-            $moduleService->update($business, $modules);
+            $template = \App\Models\CapabilityTemplate::where('slug', $templateSlug)->first();
+            if ($template) {
+                $template->applyTo($business);
+            } else {
+                // Templates are seeded in production; this fallback mirrors the
+                // seeded templates so the offer screen works on any database state.
+                $presets = [
+                    'sell' => [
+                        'modules' => ['catalog' => true, 'orders' => true, 'inventory' => true],
+                        'experiences' => ['retail', 'directory'],
+                        'availability' => 'request',
+                    ],
+                    'book' => [
+                        'modules' => ['bookings' => true],
+                        'experiences' => ['directory'],
+                        'availability' => 'request',
+                    ],
+                    'list' => [
+                        'modules' => [],
+                        'experiences' => ['directory'],
+                        'availability' => 'contact',
+                    ],
+                ];
+                $preset = $presets[$validated['offer']];
+                app(BusinessModuleService::class)->update($business, $preset['modules']);
+                $business->forceFill([
+                    'enabled_experiences' => $preset['experiences'],
+                    'primary_experience' => collect($preset['experiences'])->first(fn ($experience) => $experience !== 'directory') ?? 'directory',
+                ])->save();
+                $experienceService = app(\App\Services\Experience\BusinessExperienceService::class);
+                foreach ($preset['experiences'] as $exp) {
+                    $experienceService->setAvailabilityMode($business, $exp, $preset['availability']);
+                }
+            }
 
             return redirect()->route('vendor.dashboard')
                 ->with('success', 'Your business is set up! You can customize features anytime in Business Features.');
         })->name('businesses.setup.post');
 
-        // 9-Step Onboarding Wizard
-        Route::get('/onboarding/{id}/step/{step}', function ($id, $step) {
+        // The 9-step wizard is retired — one "What do you offer?" screen
+        // replaces it. Any leftover links land on that screen.
+        Route::get('/onboarding/{id}/step/{step}', function ($id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($id);
-            $step = max(1, min(9, (int) $step));
 
-            $stepLabels = [
-                'Find Business', 'Business Type', 'Category', 'Customer Actions',
-                'Confirmation', 'Fulfilment', 'Business Info', 'Operating Hours', 'Review',
-            ];
-
-            $businessTypes = [
-                ['key' => 'shop', 'icon' => '🛒', 'label' => 'Shop / Retail', 'desc' => 'Products, grocery, clothing'],
-                ['key' => 'restaurant', 'icon' => '🍽️', 'label' => 'Restaurant / Food', 'desc' => 'Menu, orders, delivery'],
-                ['key' => 'pharmacy', 'icon' => '💊', 'label' => 'Pharmacy / Healthcare', 'desc' => 'Medicines, prescriptions'],
-                ['key' => 'hotel', 'icon' => '🏨', 'label' => 'Hotel / Stay', 'desc' => 'Rooms, reservations'],
-                ['key' => 'taxi', 'icon' => '🚕', 'label' => 'Taxi / Transport', 'desc' => 'Rides, delivery, rental'],
-                ['key' => 'salon', 'icon' => '💇', 'label' => 'Salon / Beauty', 'desc' => 'Appointments, services'],
-                ['key' => 'sports', 'icon' => '⚽', 'label' => 'Turf / Sports', 'desc' => 'Courts, slots, events'],
-                ['key' => 'other', 'icon' => '📋', 'label' => 'Other / General', 'desc' => 'Basic listing, contact'],
-            ];
-
-            $typeCategoryMap = [
-                'shop' => 'ordering',
-                'restaurant' => 'catalog',
-                'pharmacy' => 'catalog',
-                'hotel' => 'booking',
-                'taxi' => 'transport',
-                'salon' => 'booking',
-                'sports' => 'turf',
-                'other' => 'directory',
-            ];
-
-            $selectedType = old('business_type', session('onboarding_business_type', 'shop'));
-            $moduleType = $typeCategoryMap[$selectedType] ?? 'directory';
-            $categories = \App\Models\Category::where('module_type', $moduleType)
-                ->where('world_id', '!=', null)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get();
-
-            $capabilities = [
-                ['key' => 'view_info', 'icon' => '👁️', 'label' => 'View my information', 'desc' => 'Customers can see your profile', 'color' => 'blue'],
-                ['key' => 'call_whatsapp', 'icon' => '💬', 'label' => 'Call or WhatsApp me', 'desc' => 'Customers can contact you directly', 'color' => 'green'],
-                ['key' => 'browse_products', 'icon' => '🛍️', 'label' => 'Browse products', 'desc' => 'Customers can view your catalog', 'color' => 'purple'],
-                ['key' => 'place_orders', 'icon' => '📦', 'label' => 'Place orders', 'desc' => 'Customers can order for pickup/delivery', 'color' => 'amber'],
-                ['key' => 'book_appointments', 'icon' => '📅', 'label' => 'Book appointments', 'desc' => 'Customers can book time slots', 'color' => 'pink'],
-                ['key' => 'reserve_rooms', 'icon' => '🛏️', 'label' => 'Reserve rooms', 'desc' => 'Customers can book rooms', 'color' => 'teal'],
-                ['key' => 'book_slots', 'icon' => '⏱️', 'label' => 'Book time slots', 'desc' => 'Customers can book courts/venues', 'color' => 'cyan'],
-                ['key' => 'request_transport', 'icon' => '🚗', 'label' => 'Request transport', 'desc' => 'Customers can request rides', 'color' => 'yellow'],
-            ];
-
-            $confirmationOptions = [
-                ['key' => 'auto', 'icon' => '⚡', 'label' => 'Confirm automatically', 'desc' => 'Orders and bookings are confirmed instantly', 'color' => 'green'],
-                ['key' => 'manual', 'icon' => '✋', 'label' => 'I will confirm each request', 'desc' => 'You review and accept/decline each request', 'color' => 'amber'],
-                ['key' => 'contact', 'icon' => '📞', 'label' => 'Customers should contact me', 'desc' => 'No online confirmation, just call/WhatsApp', 'color' => 'blue'],
-            ];
-
-            $fulfilmentOptions = [
-                ['key' => 'pickup', 'icon' => '🏃', 'label' => 'Customer pickup', 'desc' => 'Customers collect from your location', 'color' => 'blue'],
-                ['key' => 'delivery', 'icon' => '🚚', 'label' => 'I deliver', 'desc' => 'You deliver to customers', 'color' => 'green'],
-                ['key' => 'visit', 'icon' => '🏪', 'label' => 'Customer visits venue', 'desc' => 'Customers come to you (hotel, salon, etc.)', 'color' => 'purple'],
-                ['key' => 'cod', 'icon' => '💵', 'label' => 'Cash on delivery', 'desc' => 'Customers pay when they receive', 'color' => 'amber'],
-            ];
-
-            $existingHours = $business->working_hours ?? [];
-            $selectedCategory = $step >= 3 ? \App\Models\Category::find(old('category_id')) : null;
-            $selectedCapabilities = old('capabilities', []);
-            $selectedConfirmation = old('confirmation_mode', 'manual');
-
-            $capDescriptions = [
-                'view_info' => 'See your profile and contact info',
-                'call_whatsapp' => 'Contact you directly',
-                'browse_products' => 'Browse your products or menu',
-                'place_orders' => 'Send pickup or delivery orders',
-                'book_appointments' => 'Book appointment slots',
-                'reserve_rooms' => 'Reserve rooms',
-                'book_slots' => 'Book time slots',
-                'request_transport' => 'Request rides',
-            ];
-
-            return view('vendor.onboarding.wizard', compact(
-                'business', 'currentStep', 'stepLabels', 'businessTypes',
-                'categories', 'capabilities', 'confirmationOptions',
-                'fulfilmentOptions', 'existingHours', 'selectedCategory',
-                'selectedCapabilities', 'selectedConfirmation', 'capDescriptions'
-            ));
+            return redirect()->route('vendor.businesses.setup', $business->id);
         })->name('onboarding.step');
 
-        Route::post('/onboarding/{id}/step/{step}', function (Request $request, $id, $step) {
+        Route::post('/onboarding/{id}/step/{step}', function ($id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($id);
-            $step = max(1, min(9, (int) $step));
 
-            if ($step === 1) {
-                session(['onboarding_has_listing' => $request->has_listing]);
-            } elseif ($step === 2) {
-                $request->validate(['business_type' => 'required']);
-                session(['onboarding_business_type' => $request->business_type]);
-            } elseif ($step === 3) {
-                $request->validate(['category_id' => 'required|exists:categories,id']);
-                session(['onboarding_category_id' => $request->category_id]);
-            } elseif ($step === 4) {
-                session(['onboarding_capabilities' => $request->capabilities ?? []]);
-            } elseif ($step === 5) {
-                $request->validate(['confirmation_mode' => 'required']);
-                session(['onboarding_confirmation' => $request->confirmation_mode]);
-            } elseif ($step === 6) {
-                session(['onboarding_fulfilment' => $request->fulfilment ?? []]);
-            } elseif ($step === 7) {
-                $validated = $request->validate([
-                    'name' => 'required|string|max:255',
-                    'phone' => 'required|string|max:20',
-                    'whatsapp' => 'nullable|string|max:20',
-                    'address' => 'required|string',
-                    'description' => 'nullable|string',
-                ]);
-                $business->update($validated);
-            } elseif ($step === 8) {
-                $hours = $request->hours ?? [];
-                $workingHours = [];
-                foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $day) {
-                    if (isset($hours[$day]['open'])) {
-                        $workingHours[$day] = $hours[$day]['open_time'] . '-' . $hours[$day]['close_time'];
-                    }
-                }
-                $business->update(['working_hours' => $workingHours]);
-            } elseif ($step === 9) {
-                // Apply everything
-                $categoryId = session('onboarding_category_id');
-                $capabilities = session('onboarding_capabilities', []);
-                $confirmation = session('onboarding_confirmation', 'manual');
-
-                $business->update(['category_id' => $categoryId]);
-
-                $moduleMap = [
-                    'view_info' => [],
-                    'call_whatsapp' => [],
-                    'browse_products' => ['catalog'],
-                    'place_orders' => ['catalog', 'orders'],
-                    'book_appointments' => ['bookings'],
-                    'reserve_rooms' => ['bookings'],
-                    'book_slots' => ['bookings', 'turf'],
-                    'request_transport' => ['transport'],
-                ];
-
-                $modules = ['catalog' => false, 'orders' => false, 'bookings' => false, 'inventory' => false, 'transport' => false, 'turf' => false];
-                foreach ($capabilities as $cap) {
-                    foreach ($moduleMap[$cap] ?? [] as $mod) {
-                        $modules[$mod] = true;
-                    }
-                }
-
-                app(BusinessModuleService::class)->update($business, $modules);
-
-                $experienceMap = [
-                    'browse_products' => 'retail',
-                    'place_orders' => 'retail',
-                    'book_appointments' => 'appointment',
-                    'reserve_rooms' => 'stay',
-                    'book_slots' => 'turf',
-                    'request_transport' => 'taxi',
-                ];
-
-                $experiences = ['directory'];
-                foreach ($capabilities as $cap) {
-                    if (isset($experienceMap[$cap]) && !in_array($experienceMap[$cap], $experiences)) {
-                        $experiences[] = $experienceMap[$cap];
-                    }
-                }
-
-                $business->update([
-                    'enabled_experiences' => array_fill_keys($experiences, true),
-                    'primary_experience' => $experiences[0] ?? 'directory',
-                ]);
-
-                // Create classification
-                if ($categoryId && !$business->classifications()->where('category_id', $categoryId)->exists()) {
-                    $business->classifications()->create([
-                        'category_id' => $categoryId,
-                        'is_primary' => true,
-                        'source' => 'vendor_selected',
-                    ]);
-                }
-
-                session()->forget(['onboarding_has_listing', 'onboarding_business_type', 'onboarding_category_id', 'onboarding_capabilities', 'onboarding_confirmation', 'onboarding_fulfilment']);
-
-                return redirect()->route('vendor.dashboard')
-                    ->with('success', 'Your business is published! Customers can now find you on Eiho One.');
-            }
-
-            return redirect()->route('vendor.onboarding.step', ['id' => $business->id, 'step' => $step + 1]);
+            return redirect()->route('vendor.businesses.setup', $business->id);
         })->name('onboarding.store');
 
         // Products
