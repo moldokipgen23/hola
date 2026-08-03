@@ -280,7 +280,7 @@
                 @if($currentBizId)
                 @if(($mods['turf'] ?? false) || ($mods['bookings'] ?? false) || ($mods['catalog'] ?? false))
                 <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 mt-6">Inventory</p>
-                @if($mods['catalog'] ?? false)
+                @if(($mods['bookings'] ?? false) && ($mods['turf'] ?? false))
                 <a href="{{ route('vendor.businesses.turf', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.turf*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
                     Turf / Sports

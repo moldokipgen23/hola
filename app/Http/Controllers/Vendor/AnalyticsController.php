@@ -43,6 +43,8 @@ class AnalyticsController extends Controller
             ->limit(20)
             ->get();
 
+        $businesses = $business ? collect([$business]) : collect();
+
         return view('vendor.analytics.index', compact('stats', 'popularProducts', 'recentOrders', 'businesses'));
     }
 
