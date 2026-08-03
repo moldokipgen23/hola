@@ -65,6 +65,7 @@ class AdminController extends Controller
         }
 
         $business = Business::create($data);
+        $business->syncPrimaryClassification($business->category_id, 'admin_created');
 
         return response()->json(['business' => $business], 201);
     }
@@ -127,6 +128,7 @@ class AdminController extends Controller
         }
 
         $business->update($data);
+        $business->syncPrimaryClassification($business->category_id, 'admin_updated');
 
         return response()->json(['business' => $business]);
     }

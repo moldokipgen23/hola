@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Category extends Model
 {
@@ -126,9 +127,19 @@ class Category extends Model
         return $this->metadata['recommended_modules'] ?? null;
     }
 
-    public function businesses(): HasMany
+    public function businesses(): HasManyThrough
     {
-        return $this->hasMany(Business::class);
+        // Source of truth is business_classifications (Phase 2.5), so
+        // withCount('businesses') and ->businesses() always agree with the
+        // classification table.
+        return $this->hasManyThrough(
+            Business::class,
+            BusinessClassification::class,
+            'category_id',
+            'id',
+            'id',
+            'business_id'
+        )->where('business_classifications.is_active', true);
     }
 
     // Scopes

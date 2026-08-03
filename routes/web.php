@@ -180,7 +180,7 @@ Route::get('/map', function () {
 
 Route::get('/category/{slug}', function ($slug) {
     $category = Category::where('slug', $slug)->firstOrFail();
-    $businesses = $category->businesses()->where('is_active', true)->latest()->paginate(12);
+    $businesses = $category->businesses()->where('businesses.is_active', true)->latest()->paginate(12);
 
     return view('public.category', compact('category', 'businesses'));
 })->name('public.category');
@@ -780,7 +780,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['created_by'] = Auth::id();
         $validated['payment_methods'] = collect($request->input('payment_methods', []))->filter(fn ($v) => $v)->values()->toArray();
 
-        Business::create($validated);
+        $business = Business::create($validated);
+        $business->syncPrimaryClassification($business->category_id, 'admin_created');
         ActivityLogService::log('business_created', null, ['name' => $validated['name']]);
 
         return redirect()->route('admin.businesses')->with('success', 'Business created.');
@@ -860,6 +861,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['payment_methods'] = collect($request->input('payment_methods', []))->filter(fn ($v) => $v)->values()->toArray();
 
         $business->update($validated);
+        $business->syncPrimaryClassification($business->category_id, 'admin_updated');
         ActivityLogService::log('business_updated', $business);
 
         return redirect()->route('admin.businesses')->with('success', 'Business updated.');

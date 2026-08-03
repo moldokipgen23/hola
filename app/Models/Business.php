@@ -275,6 +275,30 @@ class Business extends Model
         return $this->classifications()->where('category_id', $categoryId)->exists();
     }
 
+    /**
+     * Single write-path for the primary classification (Phase 2.5: the
+     * classification table is the source of truth for business↔category).
+     * Every business-creating route (admin form, API, vendor) must go through
+     * here so category counts never drift from classification counts.
+     */
+    public function syncPrimaryClassification(int $categoryId, string $source = 'system'): void
+    {
+        $primary = $this->primaryClassification()->first();
+
+        if ($primary) {
+            if ((int) $primary->category_id !== $categoryId) {
+                $primary->update(['category_id' => $categoryId, 'source' => $source]);
+            }
+
+            return;
+        }
+
+        $this->classifications()->updateOrCreate(
+            ['business_id' => $this->id, 'category_id' => $categoryId],
+            ['is_primary' => true, 'is_active' => true, 'source' => $source],
+        );
+    }
+
     public function classificationsInWorld(int $worldId)
     {
         return $this->classifications()
