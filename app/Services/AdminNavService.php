@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\ClaimRequest;
 use App\Models\FeatureFlag;
 use App\Models\ImportItem;
+use App\Models\Order;
 use App\Models\Report;
 
 class AdminNavService
@@ -15,6 +16,7 @@ class AdminNavService
         return [
             'pending_claims' => ClaimRequest::where('status', 'pending')->count(),
             'pending_bookings' => Booking::where('status', 'pending')->count(),
+            'pending_orders' => Order::where('status', 'pending')->count(),
             'pending_reports' => Report::where('status', 'pending')->count(),
             'pending_imports' => ImportItem::where('status', 'pending')->count(),
             'enabled_flags' => FeatureFlag::where('is_enabled', true)->count(),

@@ -512,6 +512,53 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return view('admin.business-types.index', compact('groups'));
     })->name('business-types');
 
+    // Business Types — browse businesses by type (like Flutter tabs but admin)
+    $typeRoutes = [
+        'shopping' => ['experiences' => ['retail', 'restaurant'], 'modules' => ['catalog'], 'label' => 'Shopping'],
+        'booking' => ['experiences' => ['appointment', 'stay'], 'modules' => ['bookings'], 'label' => 'Booking'],
+        'taxi' => ['experiences' => [], 'modules' => ['transport'], 'label' => 'Taxi / Transport'],
+    ];
+
+    foreach ($typeRoutes as $typeSlug => $typeConfig) {
+        Route::get("/businesses-type/{$typeSlug}", function () use ($typeSlug, $typeConfig) {
+            $query = Business::with('category')
+                ->where(function ($q) use ($typeConfig) {
+                    if (! empty($typeConfig['experiences'])) {
+                        $q->whereJsonContains('enabled_experiences', $typeConfig['experiences'][0]);
+                        foreach (array_slice($typeConfig['experiences'], 1) as $exp) {
+                            $q->orWhereJsonContains('enabled_experiences', $exp);
+                        }
+                    }
+                    if (! empty($typeConfig['modules'])) {
+                        foreach ($typeConfig['modules'] as $module) {
+                            $q->orWhere("enabled_modules->{$module}", true);
+                        }
+                    }
+                });
+
+            if ($search = request('search')) {
+                $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+                $query->where(function ($q) use ($safe) {
+                    $q->where('name', 'like', $safe)
+                        ->orWhere('address', 'like', $safe)
+                        ->orWhere('locality', 'like', $safe);
+                });
+            }
+
+            if ($status = request('status')) {
+                $query->where('is_active', $status === 'active');
+            }
+
+            $businesses = $query->latest()->paginate(20)->withQueryString();
+
+            return view('admin.businesses.index', [
+                'businesses' => $businesses,
+                'typeFilter' => $typeSlug,
+                'typeLabel' => $typeConfig['label'],
+            ]);
+        })->name("businesses-type.{$typeSlug}");
+    }
+
 
     // Dashboard
     Route::get('/dashboard', function () {

@@ -1,12 +1,15 @@
 @extends('layouts.admin')
 
-@section('title', 'Businesses')
-@section('header', 'Businesses')
+@section('title', $typeLabel ?? 'Businesses')
+@section('header', ($typeLabel ? $typeLabel . ' Businesses' : 'All Businesses'))
 
 @section('content')
 <div class="flex justify-between items-center mb-6">
-    <h3 class="text-white font-semibold text-lg">All Businesses</h3>
+    <h3 class="text-white font-semibold text-lg">{{ $typeLabel ? $typeLabel . ' Businesses' : 'All Businesses' }}</h3>
     <div class="flex gap-2">
+        @if($typeFilter ?? null)
+        <a href="{{ route('admin.businesses') }}" class="px-4 py-2 text-sm rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 transition">View All</a>
+        @endif
         <button onclick="detectChanges()" class="px-4 py-2 text-sm rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition">Detect Changes</button>
         <a href="{{ route('admin.businesses.create') }}" class="btn-primary">+ Add Business</a>
     </div>
