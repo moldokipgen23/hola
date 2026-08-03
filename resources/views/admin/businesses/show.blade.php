@@ -121,11 +121,16 @@
 
         <!-- Enabled Modules -->
         <div class="glass-card p-6">
-            <h3 class="text-white font-semibold mb-4">Modules & Features</h3>
+            <div class="flex items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="text-white font-semibold">Business Modules</h3>
+                    <p class="text-xs text-slate-500 mt-1">Choose how this business can serve customers.</p>
+                </div>
+                <a href="{{ route('admin.businesses.modules', $business->id) }}" class="btn-primary text-sm">Manage modules</a>
+            </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 @php
-                    $modules = $business->enabled_modules ?? [];
-                    $moduleLabels = ['catalog' => 'Catalog', 'bookings' => 'Bookings', 'orders' => 'Orders', 'inventory' => 'Inventory'];
+                    $moduleLabels = ['catalog' => 'Catalog', 'bookings' => 'Bookings', 'orders' => 'COD Orders', 'inventory' => 'Inventory', 'transport' => 'Transport', 'turf' => 'Slots & Capacity'];
                 @endphp
                 @foreach($moduleLabels as $key => $label)
                     <div class="bg-white/5 rounded-xl p-3 text-center">
@@ -301,7 +306,7 @@
         <div class="glass-card p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-white font-semibold">Delivery Zones ({{ $business->deliveryZones->count() }})</h3>
-                <a href="{{ route('owner.businesses.delivery-zones', $business->id) }}" target="_blank" class="btn-ghost text-xs">Manage in Vendor Dashboard</a>
+                <span class="text-slate-500 text-xs">Managed by the business owner</span>
             </div>
             @if($business->deliveryZones->count())
                 <div class="space-y-2">

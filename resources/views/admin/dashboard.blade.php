@@ -4,6 +4,20 @@
 @section('header', 'Dashboard')
 
 @section('content')
+<div class="glass-card p-5 mb-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h3 class="text-white font-semibold">Run Eiho One from these three places</h3>
+            <p class="text-slate-400 text-sm mt-1">Keep the technical tools out of your daily workflow.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ route('admin.businesses') }}" class="btn-ghost text-sm">1. Businesses & modules</a>
+            <a href="{{ route('admin.feature-flags') }}" class="btn-ghost text-sm">2. App Features On/Off</a>
+            <a href="{{ route('admin.autopilot') }}" class="btn-ghost text-sm">3. Autopilot</a>
+        </div>
+    </div>
+</div>
+
 <!-- Stats -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
     <div class="stat-card">

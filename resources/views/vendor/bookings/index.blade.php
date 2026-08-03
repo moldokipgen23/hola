@@ -42,6 +42,7 @@
                 <th>Service</th>
                 <th>Date</th>
                 <th>Time</th>
+                <th>Payment</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -55,9 +56,22 @@
                         <div class="text-xs text-slate-500">{{ $booking->customer_phone ?? '' }}</div>
                     </td>
                     <td class="text-sm">{{ $booking->service->name ?? '-' }}</td>
-                    <td class="text-sm text-slate-400">{{ $booking->booking_date->format('M d, Y') }}</td>
                     <td class="text-sm text-slate-400">
-                        {{ $booking->start_time ? \Carbon\Carbon::parse($booking->start_time)->format('h:i A') : '-' }}
+                        @if($booking->booking_type === 'stay')
+                            {{ $booking->check_in_date?->format('M d') }} → {{ $booking->check_out_date?->format('M d, Y') }}
+                            <div class="text-xs text-slate-500">{{ $booking->reservation_units }} unit(s) · {{ $booking->party_size }} guest(s)</div>
+                        @else
+                            {{ $booking->booking_date->format('M d, Y') }}
+                            @if($booking->booking_type === 'seat')<div class="text-xs text-slate-500">{{ $booking->party_size }} seat(s){{ $booking->seat_labels ? ': '.implode(', ', $booking->seat_labels) : '' }}</div>@endif
+                        @endif
+                    </td>
+                    <td class="text-sm text-slate-400">
+                        {{ $booking->booking_type === 'stay' ? 'Overnight' : ($booking->start_time ? \Carbon\Carbon::parse($booking->start_time)->format('h:i A') : '-') }}
+                    </td>
+                    <td>
+                        <span class="badge {{ $booking->payment_status === 'paid' ? 'badge-green' : 'badge-yellow' }}">
+                            {{ $booking->payment_status === 'paid' ? 'Cash collected' : 'Awaiting cash' }}
+                        </span>
                     </td>
                     <td>
                         @php
@@ -96,11 +110,18 @@
                                     <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20">Cancel</button>
                                 </form>
                             @endif
+                            @if($booking->payment_status !== 'paid' && $booking->status !== 'cancelled')
+                                <form method="POST" action="{{ route('vendor.bookings.payment-status', $booking->id) }}" class="inline">
+                                    @csrf @method('PUT')
+                                    <input type="hidden" name="payment_status" value="paid">
+                                    <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">Cash Collected</button>
+                                </form>
+                            @endif
                         </div>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="text-center text-slate-500 py-8">No bookings found.</td></tr>
+                <tr><td colspan="8" class="text-center text-slate-500 py-8">No bookings found.</td></tr>
             @endforelse
         </tbody>
     </table>

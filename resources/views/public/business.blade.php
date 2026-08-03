@@ -4,7 +4,7 @@
     $metaDescription = $business->description ?: "Find {$business->name} at {$business->address}. Call " . ($business->phone ?: 'now') . ".";
     $ogDescription = $business->description ?: "Find {$business->name} at {$business->address}";
 @endphp
-@section('title', $business->name . ' | Hola - Churachandpur Directory')
+@section('title', $business->name . ' | Eiho One - Churachandpur Directory')
 @section('description', \Illuminate\Support\Str::limit($metaDescription, 160))
 @section('og_title', $business->name)
 @section('og_description', $ogDescription)
@@ -111,7 +111,7 @@
                     <span>{{ $business->address }}</span>
                 </div>
                 {{-- Book Now CTA for bookable businesses --}}
-                @if($business->is_bookable)
+                @if($business->is_bookable && $launchControl->moduleEnabled('bookings') && $launchControl->worldEnabled('book'))
                     @if($business->phone)
                         <a href="tel:{{ $business->phone }}" class="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white text-sm font-bold hover:from-primary-600 hover:to-primary-700 transition-all shadow-md">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -205,7 +205,7 @@
             @endif
 
             {{-- Services (UC-style service packages) --}}
-            @if($business->services && $business->services->count())
+            @if($launchControl->moduleEnabled('bookings') && $business->services && $business->services->count())
                 <div class="bg-white rounded-xl border border-slate-100 p-6">
                     <h2 class="text-base font-semibold text-slate-900 mb-4">Services</h2>
                     <div class="space-y-3">
@@ -228,7 +228,7 @@
                                     @else
                                         <p class="text-xs text-slate-400">Get Quote</p>
                                     @endif
-                                    @if($business->is_bookable)
+                                    @if($business->is_bookable && $launchControl->worldEnabled('book'))
                                         <button class="mt-1 px-3 py-1 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 transition-colors">Book</button>
                                     @endif
                                 </div>
@@ -340,7 +340,7 @@
             </div>
 
             {{-- Products --}}
-            @if($business->products->count())
+            @if($launchControl->moduleEnabled('catalog') && $business->products->count())
                 <div class="bg-white rounded-xl border border-slate-100 p-6">
                     <h2 class="text-base font-semibold text-slate-900 mb-4">Products ({{ $business->products->count() }})</h2>
                     <div class="space-y-2">

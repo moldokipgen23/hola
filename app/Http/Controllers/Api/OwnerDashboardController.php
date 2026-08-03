@@ -8,7 +8,6 @@ use App\Models\Business;
 use App\Models\Conversation;
 use App\Models\DeliveryZone;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Pincode;
 use App\Models\Product;
 use App\Models\Review;
@@ -16,32 +15,18 @@ use App\Models\Service;
 use App\Models\TimeSlot;
 use App\Models\Trip;
 use App\Models\Vehicle;
+use App\Services\BookingPlacementService;
+use App\Services\BookingWorkflowService;
+use App\Services\BusinessModuleService;
+use App\Services\OrderPlacementService;
+use App\Services\OrderWorkflowService;
+use App\Services\TripWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class OwnerDashboardController extends Controller
 {
-    // Default module configuration per business type
-    protected const DEFAULT_MODULES = [
-        'catalog' => true,
-        'bookings' => false,
-        'orders' => false,
-        'inventory' => false,
-        'transport' => false,
-        'turf' => false,
-    ];
-
-    // Module defaults by service_type
-    protected const SERVICE_TYPE_MODULES = [
-        'directory' => ['catalog' => true],
-        'bookable' => ['catalog' => true, 'bookings' => true],
-        'buyable' => ['catalog' => true, 'orders' => true, 'inventory' => true],
-        'hybrid' => ['catalog' => true, 'bookings' => true, 'orders' => true],
-        'transport' => ['catalog' => true, 'transport' => true],
-        'turf' => ['catalog' => true, 'turf' => true],
-    ];
-
     public function dashboard(Request $request)
     {
         $businesses = Business::where('created_by', $request->user()->id)
@@ -101,7 +86,8 @@ class OwnerDashboardController extends Controller
             ])
             ->findOrFail($id);
 
-        $enabledModules = $business->enabled_modules ?? self::getDefaultModules($business->service_type);
+        $moduleService = app(BusinessModuleService::class);
+        $enabledModules = $moduleService->effectiveFor($business);
 
         $modules = [
             'catalog' => [
@@ -151,6 +137,9 @@ class OwnerDashboardController extends Controller
         return response()->json([
             'business' => $business,
             'enabled_modules' => $enabledModules,
+            'module_definitions' => BusinessModuleService::DEFINITIONS,
+            'module_readiness' => $moduleService->readiness($business),
+            'recommended_modules' => $moduleService->recommendedFor($business),
             'modules' => $modules,
         ]);
     }
@@ -170,55 +159,22 @@ class OwnerDashboardController extends Controller
             'module_config' => 'sometimes|array',
         ]);
 
-        $currentModules = $business->enabled_modules ?? self::getDefaultModules($business->service_type);
-        $updatedModules = array_merge($currentModules, $validated);
-
-        // If enabling bookings, ensure services exist
-        if (($validated['bookings'] ?? false) && ! $business->services()->exists()) {
-            return response()->json([
-                'message' => 'Cannot enable bookings: no services configured. Add services first.',
-            ], 422);
-        }
-
-        $business->update([
-            'enabled_modules' => $updatedModules,
-            'module_config' => $validated['module_config'] ?? $business->module_config,
-        ]);
-
-        // Update service_type based on enabled modules
-        $business->update(['service_type' => self::determineServiceType($updatedModules)]);
+        $moduleService = app(BusinessModuleService::class);
+        $currentModules = $moduleService->effectiveFor($business);
+        $moduleInput = array_intersect_key($validated, array_flip($moduleService->keys()));
+        $business = $moduleService->update(
+            $business,
+            array_merge($currentModules, $moduleInput),
+            $validated['module_config'] ?? null,
+        );
 
         return response()->json([
             'message' => 'Modules updated.',
-            'enabled_modules' => $updatedModules,
+            'enabled_modules' => $business->effectiveModules(),
             'service_type' => $business->service_type,
+            'readiness' => $moduleService->readiness($business),
+            'recommended_modules' => $moduleService->recommendedFor($business),
         ]);
-    }
-
-    protected function getDefaultModules(string $serviceType): array
-    {
-        return array_merge(self::DEFAULT_MODULES, self::SERVICE_TYPE_MODULES[$serviceType] ?? []);
-    }
-
-    protected function determineServiceType(array $modules): string
-    {
-        if (($modules['transport'] ?? false)) {
-            return 'transport';
-        }
-        if (($modules['turf'] ?? false)) {
-            return 'turf';
-        }
-        if ($modules['orders'] && $modules['bookings']) {
-            return 'hybrid';
-        }
-        if ($modules['orders']) {
-            return 'buyable';
-        }
-        if ($modules['bookings']) {
-            return 'bookable';
-        }
-
-        return 'directory';
     }
 
     public function businesses(Request $request)
@@ -265,11 +221,6 @@ class OwnerDashboardController extends Controller
             $pincode = Pincode::lookup($validated['pincode']);
             if (! $pincode) {
                 return response()->json(['message' => 'Invalid pincode.'], 422);
-            }
-            if (! $pincode->serviceable) {
-                return response()->json([
-                    'message' => "We're not in {$pincode->district}, {$pincode->state} yet. This area is not serviceable.",
-                ], 422);
             }
             $validated['state'] = $pincode->state;
             $validated['district'] = $pincode->district;
@@ -331,12 +282,21 @@ class OwnerDashboardController extends Controller
     public function storeProduct(Request $request, $businessId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('catalog'), 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'menu_section' => 'nullable|string|max:100',
+            'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
+            'preparation_minutes' => 'nullable|integer|min:1|max:1440',
+            'available_from' => 'nullable|required_with:available_until|date_format:H:i',
+            'available_until' => 'nullable|required_with:available_from|date_format:H:i',
+            'sold_out_until' => 'nullable|date|after:now',
             'price' => 'nullable|numeric|min:0',
-            'is_available' => 'boolean',
+            'availability' => 'sometimes|in:in_stock,out_of_stock,limited',
+            'stock' => 'nullable|integer|min:0',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         $validated['business_id'] = $business->id;
@@ -359,13 +319,22 @@ class OwnerDashboardController extends Controller
     public function updateProduct(Request $request, $businessId, $productId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('catalog'), 404);
         $product = Product::where('business_id', $business->id)->findOrFail($productId);
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
+            'menu_section' => 'nullable|string|max:100',
+            'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
+            'preparation_minutes' => 'nullable|integer|min:1|max:1440',
+            'available_from' => 'nullable|required_with:available_until|date_format:H:i',
+            'available_until' => 'nullable|required_with:available_from|date_format:H:i',
+            'sold_out_until' => 'nullable|date|after:now',
             'price' => 'nullable|numeric|min:0',
-            'is_available' => 'boolean',
+            'availability' => 'sometimes|in:in_stock,out_of_stock,limited',
+            'stock' => 'nullable|integer|min:0',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         if ($request->hasFile('image')) {
@@ -385,6 +354,7 @@ class OwnerDashboardController extends Controller
     public function destroyProduct($businessId, $productId)
     {
         $business = Business::where('created_by', request()->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('catalog'), 404);
         $product = Product::where('business_id', $business->id)->findOrFail($productId);
 
         if ($product->image) {
@@ -469,6 +439,7 @@ class OwnerDashboardController extends Controller
     public function services(Request $request, $businessId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
 
         $services = $business->services()->orderBy('sort_order')->get();
 
@@ -478,13 +449,23 @@ class OwnerDashboardController extends Controller
     public function storeService(Request $request, $businessId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
-            'duration' => 'required|integer|min:15|max:1440',
+            'price_unit' => 'nullable|in:booking,hour,night,person,seat',
+            'booking_mode' => 'nullable|in:appointment,slot,stay,seat',
+            'duration' => 'nullable|integer|min:15|max:1440',
             'capacity' => 'nullable|integer|min:1',
+            'inventory_units' => 'nullable|integer|min:1|max:10000',
+            'unit_label' => 'nullable|string|max:40',
+            'check_in_time' => 'nullable|date_format:H:i',
+            'check_out_time' => 'nullable|date_format:H:i',
+            'min_stay_nights' => 'nullable|integer|min:1|max:365',
+            'max_stay_nights' => 'nullable|integer|min:1|max:365|gte:min_stay_nights',
+            'has_fixed_slots' => 'sometimes|boolean',
             'advance_booking_days' => 'nullable|integer|min:1|max:365',
             'cancellation_hours' => 'nullable|integer|min:0|max:72',
             'is_active' => 'boolean',
@@ -492,6 +473,14 @@ class OwnerDashboardController extends Controller
         ]);
 
         $validated['business_id'] = $business->id;
+        $validated['booking_mode'] = $validated['booking_mode'] ?? 'appointment';
+        $validated['has_fixed_slots'] = in_array($validated['booking_mode'], ['slot', 'seat'], true)
+            ? true
+            : ($validated['has_fixed_slots'] ?? false);
+        $validated['duration'] = $validated['duration'] ?? 60;
+        $validated['inventory_units'] = $validated['inventory_units'] ?? 1;
+        $validated['price_unit'] = $validated['price_unit']
+            ?? ($validated['booking_mode'] === 'stay' ? 'night' : 'booking');
         $validated['slug'] = Str::slug($validated['name']).'-'.Str::random(5);
 
         $service = Service::create($validated);
@@ -505,20 +494,33 @@ class OwnerDashboardController extends Controller
     public function updateService(Request $request, $businessId, $serviceId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
         $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|numeric|min:0',
+            'price_unit' => 'sometimes|in:booking,hour,night,person,seat',
+            'booking_mode' => 'sometimes|in:appointment,slot,stay,seat',
             'duration' => 'sometimes|integer|min:15|max:1440',
             'capacity' => 'nullable|integer|min:1',
+            'inventory_units' => 'sometimes|integer|min:1|max:10000',
+            'unit_label' => 'nullable|string|max:40',
+            'check_in_time' => 'nullable|date_format:H:i',
+            'check_out_time' => 'nullable|date_format:H:i',
+            'min_stay_nights' => 'sometimes|integer|min:1|max:365',
+            'max_stay_nights' => 'nullable|integer|min:1|max:365|gte:min_stay_nights',
+            'has_fixed_slots' => 'sometimes|boolean',
             'advance_booking_days' => 'nullable|integer|min:1|max:365',
             'cancellation_hours' => 'nullable|integer|min:0|max:72',
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer',
         ]);
 
+        if (isset($validated['booking_mode']) && in_array($validated['booking_mode'], ['slot', 'seat'], true)) {
+            $validated['has_fixed_slots'] = true;
+        }
         $service->update($validated);
 
         return response()->json([
@@ -530,6 +532,7 @@ class OwnerDashboardController extends Controller
     public function destroyService(Request $request, $businessId, $serviceId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
         $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
 
         // Check if service has active bookings
@@ -568,37 +571,52 @@ class OwnerDashboardController extends Controller
         return response()->json($bookings);
     }
 
-    public function storeBooking(Request $request, $businessId)
+    public function storeBooking(Request $request, $businessId, BookingPlacementService $bookings)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
 
-        // Verify service belongs to business
-        $service = Service::where('business_id', $business->id)->findOrFail($request->service_id);
-
         $validated = $request->validate([
             'service_id' => 'required|exists:services,id',
+            'time_slot_id' => 'nullable|integer|exists:time_slots,id',
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
-            'booking_date' => 'required|date',
-            'start_time' => 'required',
-            'end_time' => 'required',
-            'duration_minutes' => 'required|integer|min:15',
-            'total_price' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string',
+            'booking_date' => 'nullable|required_without:check_in_date|date|after_or_equal:today',
+            'check_in_date' => 'nullable|required_without:booking_date|date|after_or_equal:today',
+            'check_out_date' => 'nullable|date|after:check_in_date',
+            'start_time' => 'nullable|date_format:H:i',
+            'party_size' => 'nullable|integer|min:1|max:100',
+            'reservation_units' => 'nullable|integer|min:1|max:100',
+            'seat_labels' => 'nullable|array|max:100',
+            'seat_labels.*' => 'string|max:20|distinct',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
-        $validated['business_id'] = $business->id;
-        $validated['status'] = 'pending';
-
-        $booking = Booking::create($validated);
-
-        // Load service relationship
-        $booking->load('service');
+        $result = $bookings->place(
+            $business,
+            (int) $validated['service_id'],
+            [
+                'name' => $validated['customer_name'],
+                'phone' => $validated['customer_phone'],
+                'email' => $validated['customer_email'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ],
+            [
+                'booking_date' => $validated['booking_date'] ?? $validated['check_in_date'],
+                'check_in_date' => $validated['check_in_date'] ?? null,
+                'check_out_date' => $validated['check_out_date'] ?? null,
+                'start_time' => $validated['start_time'] ?? null,
+                'time_slot_id' => $validated['time_slot_id'] ?? null,
+                'party_size' => $validated['party_size'] ?? 1,
+                'reservation_units' => $validated['reservation_units'] ?? 1,
+                'seat_labels' => $validated['seat_labels'] ?? [],
+            ],
+            $request->user()->id,
+        );
 
         return response()->json([
             'message' => 'Booking created.',
-            'booking' => $booking,
+            'booking' => $result['booking'],
         ], 201);
     }
 
@@ -619,12 +637,7 @@ class OwnerDashboardController extends Controller
             'customer_name' => 'sometimes|string|max:255',
             'customer_phone' => 'sometimes|string|max:20',
             'customer_email' => 'nullable|email|max:255',
-            'booking_date' => 'sometimes|date',
-            'start_time' => 'sometimes',
-            'end_time' => 'sometimes',
-            'duration_minutes' => 'sometimes|integer|min:15',
-            'total_price' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         $booking->update($validated);
@@ -636,31 +649,33 @@ class OwnerDashboardController extends Controller
         ]);
     }
 
-    public function updateBookingStatus(Request $request, $businessId, $bookingId)
+    public function updateBookingStatus(Request $request, $businessId, $bookingId, BookingWorkflowService $workflow)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
         $booking = $business->bookings()->findOrFail($bookingId);
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,confirmed,cancelled,completed,no_show',
-            'cancellation_reason' => 'nullable|string',
+            'status' => 'required|in:confirmed,cancelled,completed,no_show',
+            'cancellation_reason' => 'nullable|string|max:500',
         ]);
 
-        $oldStatus = $booking->status;
-        $booking->update($validated);
-
-        // Set timestamps based on status
-        if ($validated['status'] === 'confirmed' && $oldStatus !== 'confirmed') {
-            $booking->update(['confirmed_at' => now()]);
-        } elseif ($validated['status'] === 'completed' && $oldStatus !== 'completed') {
-            $booking->update(['completed_at' => now()]);
-        } elseif ($validated['status'] === 'cancelled' && $oldStatus !== 'cancelled') {
-            $booking->update(['cancelled_at' => now()]);
-        }
+        $booking = $workflow->transition($booking, $validated['status'], $validated['cancellation_reason'] ?? null);
 
         return response()->json([
             'message' => 'Status updated.',
-            'booking' => $booking->fresh(),
+            'booking' => $booking,
+        ]);
+    }
+
+    public function updateBookingPaymentStatus(Request $request, $businessId, $bookingId, BookingWorkflowService $workflow)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $booking = $business->bookings()->findOrFail($bookingId);
+        $request->validate(['payment_status' => 'required|in:paid']);
+
+        return response()->json([
+            'message' => 'Cash payment marked as collected.',
+            'booking' => $workflow->markCashCollected($booking)->load('service'),
         ]);
     }
 
@@ -669,7 +684,7 @@ class OwnerDashboardController extends Controller
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
         $booking = $business->bookings()->findOrFail($bookingId);
 
-        if (in_array($booking->status, ['confirmed', 'completed'])) {
+        if (! in_array($booking->status, ['pending', 'cancelled'], true)) {
             return response()->json([
                 'message' => 'Cannot delete confirmed or completed booking.',
             ], 422);
@@ -708,150 +723,93 @@ class OwnerDashboardController extends Controller
         return response()->json(compact('order'));
     }
 
-    public function storeOrder(Request $request, $businessId)
+    public function storeOrder(Request $request, $businessId, OrderPlacementService $orders)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
 
         $validated = $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.product_id' => 'required|distinct|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1|max:100',
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
-            'delivery_address' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'delivery_method' => 'nullable|in:delivery,pickup',
+            'delivery_address' => 'required_if:delivery_method,delivery|nullable|string|max:1000',
+            'pincode' => 'required_if:delivery_method,delivery|nullable|digits:6',
+            'latitude' => 'nullable|required_with:longitude|numeric|between:-90,90',
+            'longitude' => 'nullable|required_with:latitude|numeric|between:-180,180',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
-        $productIds = collect($validated['items'])->pluck('product_id');
-        $products = Product::where('business_id', $business->id)
-            ->whereIn('id', $productIds)
-            ->get();
-
-        if ($products->count() !== $productIds->count()) {
-            return response()->json(['message' => 'Invalid products in order.'], 422);
-        }
-
-        $orderNumber = 'ORD-'.strtoupper(Str::random(8));
-
-        $orderData = [
-            'business_id' => $business->id,
-            'order_number' => $orderNumber,
-            'customer_name' => $validated['customer_name'],
-            'customer_phone' => $validated['customer_phone'],
-            'customer_email' => $validated['customer_email'] ?? null,
-            'delivery_address' => $validated['delivery_address'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'status' => 'pending',
-            'payment_status' => 'unpaid',
-            'subtotal' => 0,
-            'total' => 0,
-            'user_id' => $request->user()->id,
-        ];
-
-        $order = Order::create($orderData);
-
-        $subtotal = 0;
-        foreach ($validated['items'] as $item) {
-            $product = $products->find($item['product_id']);
-
-            if ($product->stock !== null && $product->stock < $item['quantity']) {
-                $order->delete();
-
-                return response()->json([
-                    'message' => "Insufficient stock for {$product->name}. Available: {$product->stock}",
-                ], 422);
-            }
-
-            $totalPrice = $product->price * $item['quantity'];
-            $subtotal += $totalPrice;
-
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $product->id,
-                'name' => $product->name,
-                'description' => $product->description,
-                'quantity' => $item['quantity'],
-                'unit_price' => $product->price,
-                'total_price' => $totalPrice,
-            ]);
-
-            if ($product->stock !== null) {
-                $product->decrement('stock', $item['quantity']);
-            }
-        }
-
-        $order->update([
-            'subtotal' => $subtotal,
-            'total' => $subtotal,
-        ]);
-
-        $order->load('items');
+        $result = $orders->place(
+            $business,
+            $validated['items'],
+            [
+                'name' => $validated['customer_name'],
+                'phone' => $validated['customer_phone'],
+                'email' => $validated['customer_email'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ],
+            [
+                'delivery_method' => $validated['delivery_method'] ?? 'pickup',
+                'delivery_address' => $validated['delivery_address'] ?? null,
+                'pincode' => $validated['pincode'] ?? null,
+                'latitude' => isset($validated['latitude']) ? (float) $validated['latitude'] : null,
+                'longitude' => isset($validated['longitude']) ? (float) $validated['longitude'] : null,
+            ],
+            $request->user()->id,
+        );
 
         return response()->json([
             'message' => 'Order created.',
-            'order' => $order,
+            'order' => $result['order'],
         ], 201);
     }
 
-    protected const VALID_ORDER_TRANSITIONS = [
-        'pending' => ['confirmed', 'cancelled'],
-        'confirmed' => ['preparing', 'cancelled'],
-        'preparing' => ['ready', 'cancelled'],
-        'ready' => ['out_for_delivery'],
-        'out_for_delivery' => ['delivered'],
-        'delivered' => [],
-        'cancelled' => [],
-        'refunded' => [],
-    ];
-
-    public function updateOrderStatus(Request $request, $businessId, $orderId)
+    public function updateOrderStatus(Request $request, $businessId, $orderId, OrderWorkflowService $workflow)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
         $order = $business->orders()->findOrFail($orderId);
 
         $validated = $request->validate([
             'status' => 'required|in:pending,confirmed,preparing,ready,out_for_delivery,delivered,cancelled',
-            'cancellation_reason' => 'nullable|string',
+            'cancellation_reason' => 'nullable|string|max:500',
         ]);
 
-        $allowed = self::VALID_ORDER_TRANSITIONS[$order->status] ?? [];
-        if (! in_array($validated['status'], $allowed)) {
-            return response()->json([
-                'message' => "Cannot transition from '{$order->status}' to '{$validated['status']}'.",
-            ], 422);
-        }
-
-        $order->update($validated);
-
-        $statusTimestamps = [
-            'confirmed' => 'confirmed_at',
-            'ready' => 'ready_at',
-            'delivered' => 'delivered_at',
-            'cancelled' => 'cancelled_at',
-        ];
-
-        if (isset($statusTimestamps[$validated['status']])) {
-            $order->update([$statusTimestamps[$validated['status']] => now()]);
-        }
+        $order = $workflow->transition($order, $validated['status'], $validated['cancellation_reason'] ?? null);
 
         return response()->json([
             'message' => 'Order status updated.',
-            'order' => $order->fresh()->load('items'),
+            'order' => $order,
         ]);
     }
 
-    public function destroyOrder(Request $request, $businessId, $orderId)
+    public function updateOrderPaymentStatus(Request $request, $businessId, $orderId, OrderWorkflowService $workflow)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $order = $business->orders()->findOrFail($orderId);
+        $request->validate(['payment_status' => 'required|in:paid']);
+
+        return response()->json([
+            'message' => 'Cash payment marked as collected.',
+            'order' => $workflow->markCashCollected($order)->load('items'),
+        ]);
+    }
+
+    public function destroyOrder(Request $request, $businessId, $orderId, OrderWorkflowService $workflow)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
         $order = $business->orders()->findOrFail($orderId);
 
-        if (in_array($order->status, ['confirmed', 'preparing', 'out_for_delivery', 'delivered'])) {
+        if (! in_array($order->status, ['pending', 'cancelled'], true)) {
             return response()->json([
                 'message' => 'Cannot delete an active or completed order.',
             ], 422);
         }
 
+        $order->load('items');
+        $workflow->releaseInventory($order);
         $order->items()->delete();
         $order->delete();
 
@@ -863,6 +821,7 @@ class OwnerDashboardController extends Controller
     public function vehicles(Request $request, $businessId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('transport'), 404);
         $vehicles = $business->vehicles()->orderBy('sort_order')->get();
 
         return response()->json(compact('vehicles'));
@@ -871,21 +830,31 @@ class OwnerDashboardController extends Controller
     public function storeVehicle(Request $request, $businessId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('transport'), 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:car,bolero,suv,van,auto,bike',
+            'type' => 'required|in:car,bolero,suv,van,auto,bike,bus,truck,pickup,tempo',
+            'service_mode' => 'sometimes|in:taxi,shared,rental,goods',
             'seats' => 'required|integer|min:1|max:50',
+            'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
+            'capacity_unit' => 'nullable|in:seats,kg,tons,vehicle',
             'base_fare' => 'required|numeric|min:0',
             'fare_per_km' => 'required|numeric|min:0',
+            'requires_quote' => 'sometimes|boolean',
             'min_km' => 'nullable|integer|min:1',
             'registration_number' => 'nullable|string|max:50',
             'description' => 'nullable|string|max:1000',
+            'availability_status' => 'nullable|in:available,busy,offline',
+            'next_available_at' => 'nullable|date|after:now',
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer',
         ]);
 
         $validated['business_id'] = $business->id;
+        $validated['service_mode'] = $validated['service_mode'] ?? 'taxi';
+        $validated['capacity_unit'] = $validated['capacity_unit']
+            ?? ($validated['service_mode'] === 'goods' ? 'kg' : 'seats');
         $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
 
@@ -906,17 +875,24 @@ class OwnerDashboardController extends Controller
     public function updateVehicle(Request $request, $businessId, $vehicleId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('transport'), 404);
         $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'type' => 'sometimes|in:car,bolero,suv,van,auto,bike',
+            'type' => 'sometimes|in:car,bolero,suv,van,auto,bike,bus,truck,pickup,tempo',
+            'service_mode' => 'sometimes|in:taxi,shared,rental,goods',
             'seats' => 'sometimes|integer|min:1|max:50',
+            'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
+            'capacity_unit' => 'nullable|in:seats,kg,tons,vehicle',
             'base_fare' => 'sometimes|numeric|min:0',
             'fare_per_km' => 'sometimes|numeric|min:0',
+            'requires_quote' => 'sometimes|boolean',
             'min_km' => 'nullable|integer|min:1',
             'registration_number' => 'nullable|string|max:50',
             'description' => 'nullable|string|max:1000',
+            'availability_status' => 'nullable|in:available,busy,offline',
+            'next_available_at' => 'nullable|date|after:now',
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer',
         ]);
@@ -932,6 +908,7 @@ class OwnerDashboardController extends Controller
     public function destroyVehicle($businessId, $vehicleId)
     {
         $business = Business::where('created_by', request()->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('transport'), 404);
         $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
 
         if ($vehicle->trips()->whereIn('status', ['pending', 'confirmed'])->exists()) {
@@ -948,6 +925,7 @@ class OwnerDashboardController extends Controller
     public function trips(Request $request, $businessId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('transport'), 404);
 
         $query = $business->trips()->with('vehicle');
 
@@ -966,38 +944,62 @@ class OwnerDashboardController extends Controller
     public function showTrip(Request $request, $businessId, $tripId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('transport'), 404);
         $trip = $business->trips()->with('vehicle')->findOrFail($tripId);
 
         return response()->json(compact('trip'));
     }
 
-    public function updateTripStatus(Request $request, $businessId, $tripId)
+    public function updateTripStatus(Request $request, $businessId, $tripId, TripWorkflowService $workflow)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('transport'), 404);
         $trip = $business->trips()->findOrFail($tripId);
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,confirmed,started,completed,cancelled',
+            'status' => 'required|in:confirmed,started,completed,cancelled',
             'driver_name' => 'nullable|string|max:255',
             'driver_phone' => 'nullable|string|max:20',
             'cancellation_reason' => 'nullable|string|max:500',
         ]);
 
-        $trip->update($validated);
-
-        if ($validated['status'] === 'confirmed') {
-            $trip->update(['booked_at' => now()]);
-        } elseif ($validated['status'] === 'started') {
-            $trip->update(['started_at' => now()]);
-        } elseif ($validated['status'] === 'completed') {
-            $trip->update(['completed_at' => now()]);
-        } elseif ($validated['status'] === 'cancelled') {
-            $trip->update(['cancelled_at' => now()]);
-        }
+        $trip = $workflow->transition(
+            $trip,
+            $validated['status'],
+            $validated['cancellation_reason'] ?? null,
+            ['name' => $validated['driver_name'] ?? null, 'phone' => $validated['driver_phone'] ?? null],
+        );
 
         return response()->json([
             'message' => 'Trip status updated.',
-            'trip' => $trip->fresh()->load('vehicle'),
+            'trip' => $trip,
+        ]);
+    }
+
+    public function updateTripQuote(Request $request, $businessId, $tripId, TripWorkflowService $workflow)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $trip = $business->trips()->findOrFail($tripId);
+        $validated = $request->validate([
+            'fare' => 'required|numeric|min:0|max:10000000',
+            'quote_notes' => 'nullable|string|max:1000',
+        ]);
+
+        return response()->json([
+            'message' => 'Fare quote updated. Confirm it directly with the customer.',
+            'trip' => $workflow->quote($trip, (float) $validated['fare'], $validated['quote_notes'] ?? null),
+        ]);
+    }
+
+    public function updateTripPaymentStatus(Request $request, $businessId, $tripId, TripWorkflowService $workflow)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $trip = $business->trips()->findOrFail($tripId);
+        $request->validate(['payment_status' => 'required|in:paid']);
+
+        return response()->json([
+            'message' => 'Cash payment marked as collected.',
+            'trip' => $workflow->markCashCollected($trip)->load('vehicle'),
         ]);
     }
 
@@ -1006,6 +1008,7 @@ class OwnerDashboardController extends Controller
     public function timeSlots(Request $request, $businessId, $serviceId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
         $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
 
         $slots = $service->timeSlots()->orderBy('day_of_week')->orderBy('start_time')->get();
@@ -1016,6 +1019,7 @@ class OwnerDashboardController extends Controller
     public function storeTimeSlot(Request $request, $businessId, $serviceId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
         $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
 
         $validated = $request->validate([
@@ -1039,6 +1043,7 @@ class OwnerDashboardController extends Controller
     public function updateTimeSlot(Request $request, $businessId, $serviceId, $slotId)
     {
         $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
         $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
         $slot = TimeSlot::where('service_id', $service->id)->findOrFail($slotId);
 
@@ -1062,6 +1067,7 @@ class OwnerDashboardController extends Controller
     public function destroyTimeSlot($businessId, $serviceId, $slotId)
     {
         $business = Business::where('created_by', request()->user()->id)->findOrFail($businessId);
+        abort_unless($business->hasModule('bookings'), 404);
         $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
         $slot = TimeSlot::where('service_id', $service->id)->findOrFail($slotId);
 

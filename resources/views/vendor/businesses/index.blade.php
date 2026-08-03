@@ -41,7 +41,13 @@
                         @endif
                     </td>
                     <td class="text-sm">
-                        <a href="{{ route('vendor.businesses.edit', $business->id) }}" class="text-purple-400 hover:text-purple-300 font-medium">Edit</a>
+                        <div class="flex gap-3 flex-wrap">
+                            <a href="{{ route('vendor.businesses.edit', $business->id) }}" class="text-purple-400 hover:text-purple-300 font-medium">Edit</a>
+                            <a href="{{ route('vendor.businesses.modules', $business->id) }}" class="text-sky-400 hover:text-sky-300 font-medium">Features</a>
+                            @if($business->hasModule('catalog'))<a href="{{ route('vendor.products', $business->id) }}" class="text-emerald-400 hover:text-emerald-300 font-medium">Products</a>@endif
+                            @if($business->hasModule('bookings'))<a href="{{ route('vendor.services', $business->id) }}" class="text-amber-400 hover:text-amber-300 font-medium">Bookable Items</a>@endif
+                            @if($business->hasModule('transport'))<a href="{{ route('vendor.vehicles', $business->id) }}" class="text-cyan-400 hover:text-cyan-300 font-medium">Transport</a>@endif
+                        </div>
                     </td>
                 </tr>
             @empty

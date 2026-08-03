@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Admin\TaxonomySuggestionController;
 use App\Http\Controllers\Api\AiAgentController;
 use App\Models\ActivityLog;
 use App\Models\AgentImportedBusiness;
 use App\Models\AiAgent;
 use App\Models\Area;
+use App\Models\AreaInterest;
 use App\Models\Booking;
 use App\Models\Business;
 use App\Models\Category;
@@ -12,7 +14,9 @@ use App\Models\ClaimRequest;
 use App\Models\ClaimVerification;
 use App\Models\ImportBatch;
 use App\Models\ImportItem;
+use App\Models\IntegrationApiKey;
 use App\Models\Order;
+use App\Models\Pincode;
 use App\Models\Product;
 use App\Models\Report;
 use App\Models\Review;
@@ -20,10 +24,19 @@ use App\Models\SearchHistory;
 use App\Models\Service;
 use App\Models\Setting;
 use App\Models\Subcategory;
+use App\Models\TimeSlot;
 use App\Models\Transaction;
+use App\Models\Trip;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Services\ActivityLogService;
+use App\Services\BookingWorkflowService;
+use App\Services\BusinessModuleService;
 use App\Services\NotificationService;
+use App\Services\OperationalHealthService;
+use App\Services\OrderWorkflowService;
+use App\Services\TripWorkflowService;
+use App\Services\LaunchControlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
@@ -39,7 +52,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/businesses', function () {
-    $query = Business::where('is_active', true)->inServiceableArea()->with('category', 'area');
+    $query = Business::where('is_active', true)->with('category', 'subcategory', 'area');
 
     if ($search = request('q') ?: request('search')) {
         $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
@@ -71,11 +84,21 @@ Route::get('/businesses', function () {
 })->name('public.businesses');
 
 Route::get('/explore', function () {
-    $query = Business::where('is_active', true)->inServiceableArea()->with('category', 'area');
+    $launchControl = app(LaunchControlService::class);
+    $query = Business::where('is_active', true)->with('category', 'subcategory', 'area');
 
     if ($module = request('module')) {
-        $module = in_array($module, ['ordering', 'booking', 'directory']) ? $module : null;
-        $query->whereHas('category', fn ($q) => $q->whereIn('module_type', [$module, 'both']));
+        $required = match ($module) {
+            'ordering' => ['world.shop', 'module.catalog'],
+            'booking' => ['world.book', 'module.bookings'],
+            'transport' => ['world.ride', 'module.transport'],
+            'directory' => ['world.discover', 'experience.directory'],
+            default => [],
+        };
+        foreach ($required as $feature) {
+            abort_unless($launchControl->enabled($feature), 404);
+        }
+        $query->ofModule($module);
     }
 
     if ($search = request('q')) {
@@ -95,6 +118,13 @@ Route::get('/explore', function () {
         $query->whereHas('area', fn ($q) => $q->where('slug', $area));
     }
 
+    $mapBusinesses = (clone $query)
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->select(['id', 'category_id', 'area_id', 'name', 'slug', 'address', 'latitude', 'longitude'])
+        ->limit(500)
+        ->get();
+
     $sort = request('sort', 'latest');
     $query = match ($sort) {
         'rating' => $query->orderByDesc('average_rating'),
@@ -103,8 +133,16 @@ Route::get('/explore', function () {
     };
 
     $businesses = $query->paginate(12)->withQueryString();
+    $categories = Category::active()->orderBy('name')->get(['id', 'name', 'slug']);
+    $areas = Area::active()
+        ->where('slug', '!=', 'other')
+        ->withCount(['businesses' => fn ($businessQuery) => $businessQuery->active()])
+        ->orderBy('name')
+        ->get(['id', 'name', 'slug'])
+        ->filter(fn ($area) => $area->businesses_count > 0)
+        ->values();
 
-    return view('public.explore', compact('businesses'));
+    return view('public.explore', compact('areas', 'businesses', 'categories', 'mapBusinesses'));
 })->name('explore');
 
 Route::get('/categories', function () {
@@ -119,7 +157,7 @@ Route::get('/areas', function () {
 
 Route::get('/area/{slug}', function ($slug) {
     $area = Area::where('slug', $slug)->firstOrFail();
-    $query = $area->businesses()->active()->inServiceableArea()->with('category');
+    $query = $area->businesses()->active()->with('category');
 
     if ($category = request('category')) {
         $query->whereHas('category', fn ($q) => $q->where('slug', $category));
@@ -132,7 +170,6 @@ Route::get('/area/{slug}', function ($slug) {
 
 Route::get('/map', function () {
     $businesses = Business::where('is_active', true)
-        ->inServiceableArea()
         ->whereNotNull('latitude')
         ->whereNotNull('longitude')
         ->with('category')
@@ -143,7 +180,7 @@ Route::get('/map', function () {
 
 Route::get('/category/{slug}', function ($slug) {
     $category = Category::where('slug', $slug)->firstOrFail();
-    $businesses = $category->businesses()->where('is_active', true)->inServiceableArea()->latest()->paginate(12);
+    $businesses = $category->businesses()->where('is_active', true)->latest()->paginate(12);
 
     return view('public.category', compact('category', 'businesses'));
 })->name('public.category');
@@ -151,7 +188,6 @@ Route::get('/category/{slug}', function ($slug) {
 Route::get('/business/{slug}', function ($slug) {
     $business = Business::where('slug', $slug)
         ->where('is_active', true)
-        ->inServiceableArea()
         ->with(['category', 'products', 'reviews' => fn ($q) => $q->with('user:id,name')->latest()])
         ->firstOrFail();
 
@@ -380,7 +416,7 @@ Route::post('/claim/{id}/resend-otp', function ($id) {
 })->name('public.claim.resend-otp');
 
 // Login redirect (for auth middleware)
-Route::get('/login', fn () => redirect()->route('admin.login'))->name('public.login');
+Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
 
 // robots.txt
 Route::get('/robots.txt', function () {
@@ -439,6 +475,43 @@ Route::post('/admin/logout', function () {
 
 // Admin Routes (protected)
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(function () {
+    // One simple home for the business taxonomy. Categories are grouped by the
+    // customer journey they create, while subcategories describe the business type.
+    Route::get('/business-types', function () {
+        $categories = Category::with([
+            'subcategories' => fn ($query) => $query->orderBy('order')->orderBy('name'),
+        ])->withCount('businesses')->orderBy('order')->orderBy('name')->get();
+
+        $groups = [
+            'directory' => [
+                'title' => 'Directory',
+                'description' => 'Listings people can explore, locate, call, or message.',
+                'types' => ['directory'],
+                'empty' => 'Add public services, professional services, community places, or local attractions here.',
+            ],
+            'booking' => [
+                'title' => 'Booking',
+                'description' => 'Businesses customers request, reserve, or book: taxi, turf, stays, and appointments.',
+                'types' => ['booking', 'both'],
+                'empty' => 'Add taxi, turf, hotel, appointment, or event types here.',
+            ],
+            'shopping' => [
+                'title' => 'Shopping',
+                'description' => 'Businesses with menus or products and offline/COD order requests.',
+                'types' => ['ordering'],
+                'empty' => 'Add restaurants, grocery stores, pharmacies, or retail types here.',
+            ],
+        ];
+
+        foreach ($groups as $key => $group) {
+            $groups[$key]['categories'] = $categories
+                ->whereIn('module_type', $group['types'])
+                ->values();
+        }
+
+        return view('admin.business-types.index', compact('groups'));
+    })->name('business-types');
+
 
     // Dashboard
     Route::get('/dashboard', function () {
@@ -695,21 +768,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         ]);
 
         // Validate pincode
-        $pincode = App\Models\Pincode::lookup($validated['pincode']);
+        $pincode = Pincode::lookup($validated['pincode']);
         if (! $pincode) {
             return back()->withErrors(['pincode' => 'Invalid pincode.'])->withInput();
         }
-        if (! $pincode->serviceable) {
-            return back()->withErrors(['pincode' => "{$pincode->district}, {$pincode->state} is not yet serviceable."])->withInput();
-        }
-
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_featured'] = $request->boolean('is_featured');
         $validated['district'] = $pincode->district;
         $validated['state'] = $pincode->state;
         $validated['created_by'] = Auth::id();
-        $validated['payment_methods'] = collect($request->input('payment_methods', []))->filter(fn($v) => $v)->values()->toArray();
+        $validated['payment_methods'] = collect($request->input('payment_methods', []))->filter(fn ($v) => $v)->values()->toArray();
 
         Business::create($validated);
         ActivityLogService::log('business_created', null, ['name' => $validated['name']]);
@@ -719,8 +788,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     Route::get('/businesses/{id}', function ($id) {
         $business = Business::with(['category', 'subcategory', 'products', 'reviews.user', 'user', 'createdBy', 'deliveryZones.area'])->findOrFail($id);
+        $modules = app(BusinessModuleService::class)->effectiveFor($business);
 
-        return view('admin.businesses.show', compact('business'));
+        return view('admin.businesses.show', compact('business', 'modules'));
     })->name('businesses.show');
 
     Route::get('/businesses/{id}/edit', function ($id) {
@@ -730,6 +800,32 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         return view('admin.businesses.form', compact('business', 'categories', 'subcategories'));
     })->name('businesses.edit');
+
+    Route::get('/businesses/{id}/modules', function ($id) {
+        $business = Business::with(['category', 'subcategory'])->findOrFail($id);
+        $moduleService = app(BusinessModuleService::class);
+
+        return view('admin.businesses.modules', [
+            'business' => $business,
+            'definitions' => BusinessModuleService::DEFINITIONS,
+            'modules' => $moduleService->effectiveFor($business),
+            'recommended' => $moduleService->recommendedFor($business),
+            'readiness' => $moduleService->readiness($business),
+        ]);
+    })->name('businesses.modules');
+
+    Route::put('/businesses/{id}/modules', function (Request $request, $id) {
+        $business = Business::findOrFail($id);
+        $validated = $request->validate([
+            'modules' => 'nullable|array',
+            'modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
+        ]);
+
+        app(BusinessModuleService::class)->update($business, $validated['modules'] ?? []);
+
+        return redirect()->route('admin.businesses.modules', $business->id)
+            ->with('success', 'Business modules updated. Required dependencies were enabled automatically.');
+    })->name('businesses.modules.update');
 
     Route::put('/businesses/{id}', function (Request $request, $id) {
         $business = Business::findOrFail($id);
@@ -750,12 +846,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         // Handle pincode update
         if ($request->has('pincode')) {
-            $pincode = App\Models\Pincode::lookup($validated['pincode']);
+            $pincode = Pincode::lookup($validated['pincode']);
             if (! $pincode) {
                 return back()->withErrors(['pincode' => 'Invalid pincode.'])->withInput();
-            }
-            if (! $pincode->serviceable) {
-                return back()->withErrors(['pincode' => "{$pincode->district}, {$pincode->state} is not yet serviceable."])->withInput();
             }
             $validated['state'] = $pincode->state;
             $validated['district'] = $pincode->district;
@@ -764,7 +857,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_featured'] = $request->boolean('is_featured');
-        $validated['payment_methods'] = collect($request->input('payment_methods', []))->filter(fn($v) => $v)->values()->toArray();
+        $validated['payment_methods'] = collect($request->input('payment_methods', []))->filter(fn ($v) => $v)->values()->toArray();
 
         $business->update($validated);
         ActivityLogService::log('business_updated', $business);
@@ -835,6 +928,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['is_canonical'] = $request->boolean('is_canonical', true);
         $validated['order'] = $request->order ?? 0;
 
         Category::create($validated);
@@ -860,6 +954,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['is_canonical'] = $request->boolean('is_canonical');
         $validated['order'] = $request->order ?? 0;
 
         $category->update($validated);
@@ -890,6 +985,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|max:255',
+            'recommended_modules' => 'nullable|array',
+            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
         ]);
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
         $validated['is_active'] = $request->boolean('is_active');
@@ -912,6 +1009,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|max:255',
+            'recommended_modules' => 'nullable|array',
+            'recommended_modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
         ]);
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
         $validated['is_active'] = $request->boolean('is_active');
@@ -945,7 +1044,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated = $request->validate([
             'business_id' => 'required|exists:businesses,id',
             'name' => 'required|max:255',
+            'menu_section' => 'nullable|string|max:100',
+            'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
+            'preparation_minutes' => 'nullable|integer|min:1|max:1440',
+            'available_from' => 'nullable|required_with:available_until|date_format:H:i',
+            'available_until' => 'nullable|required_with:available_from|date_format:H:i',
+            'sold_out_until' => 'nullable|date|after:now',
             'price' => 'nullable|numeric|min:0',
+            'stock' => 'nullable|integer|min:0',
             'availability' => 'nullable|in:in_stock,out_of_stock,limited',
         ]);
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
@@ -969,7 +1075,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated = $request->validate([
             'business_id' => 'required|exists:businesses,id',
             'name' => 'required|max:255',
+            'menu_section' => 'nullable|string|max:100',
+            'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
+            'preparation_minutes' => 'nullable|integer|min:1|max:1440',
+            'available_from' => 'nullable|required_with:available_until|date_format:H:i',
+            'available_until' => 'nullable|required_with:available_from|date_format:H:i',
+            'sold_out_until' => 'nullable|date|after:now',
             'price' => 'nullable|numeric|min:0',
+            'stock' => 'nullable|integer|min:0',
             'availability' => 'nullable|in:in_stock,out_of_stock,limited',
         ]);
         $validated['slug'] = $request->slug ?: Str::slug($request->name);
@@ -1207,6 +1320,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return view('admin.featured.index', compact('featured'));
     })->name('featured');
 
+    Route::patch('/featured/{id}/remove', function ($id) {
+        $business = Business::findOrFail($id);
+        $business->update(['is_featured' => false]);
+        ActivityLogService::log('business_unfeatured', $business);
+
+        return back()->with('success', 'Business removed from featured listings.');
+    })->name('featured.remove');
+
     // ─── AI Agents ───
     $agentCtrl = AiAgentController::class;
 
@@ -1220,10 +1341,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $todaysImports = $agent ? $agent->tasks()->where('created_at', '>=', now()->startOfDay())->sum('imported_count') : 0;
         $lastRun = $agent ? $agent->tasks()->latest()->first() : null;
         $nextRun = now()->addMinutes(240 - (now()->timestamp % 240));
+        $operations = app(OperationalHealthService::class)->snapshot();
 
         return view('admin.autopilot', compact(
             'agent', 'recentTasks', 'pendingImports', 'totalBusinesses',
-            'totalCategories', 'todaysTasks', 'todaysImports', 'lastRun', 'nextRun'
+            'totalCategories', 'todaysTasks', 'todaysImports', 'lastRun', 'nextRun',
+            'operations'
         ));
     })->name('autopilot');
 
@@ -1281,6 +1404,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         return view('admin.agents.index', compact('agents'));
     })->name('agents');
+
+    Route::get('/taxonomy/suggestions', [TaxonomySuggestionController::class, 'index'])
+        ->name('taxonomy.suggestions');
+    Route::patch('/taxonomy/suggestions/{suggestion}', [TaxonomySuggestionController::class, 'resolve'])
+        ->name('taxonomy.suggestions.resolve');
 
     Route::get('/agents/create', function () {
         return view('admin.agents.create');
@@ -1401,11 +1529,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             return back()->with('error', "Skipped: Business already exists ({$existingBusiness->name})");
         }
 
-        $categories = Category::pluck('id', 'name')->toArray();
+        $taxonomy = resolveApprovedImportTaxonomy($data);
+        if (! $taxonomy) {
+            $item->update(['notes' => 'Needs Business Types review: no approved category mapping.']);
 
-        $categoryName = $data['category'] ?? $data['type'] ?? null;
-        $categoryId = matchImportCategory($categoryName, $categories);
-        $subcategoryId = matchImportSubcategory($categoryName, $data['name'] ?? null, $categoryId);
+            return back()->with('error', 'This import has no approved Business Type yet. Map it in Business Types / Taxonomy Review before approving.');
+        }
+        $categoryId = $taxonomy['category_id'];
+        $subcategoryId = $taxonomy['subcategory_id'];
 
         // Detect area
         $areaId = $data['area_id'] ?? null;
@@ -1541,9 +1672,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     continue;
                 }
 
-                $categories = Category::pluck('id', 'name')->toArray();
-                $categoryName = $data['category'] ?? $data['type'] ?? null;
-                $categoryId = matchImportCategory($categoryName, $categories);
+                $taxonomy = resolveApprovedImportTaxonomy($data);
+                if (! $taxonomy) {
+                    $item->update(['notes' => 'Needs Business Types review: no approved category mapping.']);
+                    $skipped++;
+
+                    continue;
+                }
+                $categoryId = $taxonomy['category_id'];
+                $subcategoryId = $taxonomy['subcategory_id'];
 
                 // Detect area
                 $areaId = $data['area_id'] ?? null;
@@ -1570,6 +1707,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'name' => $data['name'] ?? 'Unknown Business',
                     'slug' => $slug,
                     'category_id' => $categoryId,
+                    'subcategory_id' => $subcategoryId,
                     'area_id' => $areaId,
                     'description' => $data['description'] ?? null,
                     'address' => $data['address'] ?? $data['location'] ?? '',
@@ -1657,7 +1795,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $skipped = 0;
 
         // Pre-load categories and existing businesses for fast matching
-        $categories = Category::pluck('id', 'name')->toArray();
         $existingPlaceIds = Business::withoutTrashed()->whereNotNull('external_id')->pluck('external_id')->toArray();
         $existingNames = Business::withoutTrashed()->pluck('name')->map(fn ($n) => strtolower($n))->toArray();
 
@@ -1688,9 +1825,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     continue;
                 }
 
-                $categoryName = $data['category'] ?? $data['type'] ?? null;
-                $categoryId = matchImportCategory($categoryName, $categories);
-                $subcategoryId = matchImportSubcategory($categoryName, $data['name'] ?? null, $categoryId);
+                $taxonomy = resolveApprovedImportTaxonomy($data);
+                if (! $taxonomy) {
+                    $item->update(['notes' => 'Needs Business Types review: no approved category mapping.']);
+                    $skipped++;
+
+                    continue;
+                }
+                $categoryId = $taxonomy['category_id'];
+                $subcategoryId = $taxonomy['subcategory_id'];
 
                 $areaId = $data['area_id'] ?? null;
                 if (! $areaId && ! empty($data['latitude']) && ! empty($data['longitude'])) {
@@ -1715,6 +1858,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
                     'name' => $data['name'] ?? 'Unknown Business',
                     'slug' => $slug,
                     'category_id' => $categoryId,
+                    'subcategory_id' => $subcategoryId,
                     'area_id' => $areaId,
                     'description' => $data['description'] ?? null,
                     'address' => $data['address'] ?? $data['location'] ?? '',
@@ -2110,10 +2254,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Pincode Management ───
     Route::get('/pincodes', function () {
-        $pinned = \App\Models\Setting::get('pinned_states', []);
-        if (is_string($pinned)) $pinned = json_decode($pinned, true) ?? [];
+        $pinned = Setting::get('pinned_states', []);
+        if (is_string($pinned)) {
+            $pinned = json_decode($pinned, true) ?? [];
+        }
 
-        $states = \App\Models\Pincode::selectRaw('state, COUNT(*) as total, SUM(serviceable) as serviceable')
+        $states = Pincode::selectRaw('state, COUNT(*) as total, SUM(serviceable) as serviceable')
             ->groupBy('state')
             ->orderBy('state')
             ->get()
@@ -2131,7 +2277,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('pincodes');
 
     Route::get('/pincodes/{state}', function ($state) {
-        $districts = App\Models\Pincode::selectRaw('district, COUNT(*) as total, SUM(serviceable) as serviceable')
+        $districts = Pincode::selectRaw('district, COUNT(*) as total, SUM(serviceable) as serviceable')
             ->where('state', $state)
             ->groupBy('district')
             ->orderBy('district')
@@ -2148,48 +2294,50 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('pincodes.districts');
 
     Route::get('/pincodes/{state}/{district}', function ($state, $district) {
-        $pincodes = App\Models\Pincode::where('state', $state)
+        $pincodes = Pincode::where('state', $state)
             ->where('district', $district)
             ->orderBy('pincode')
             ->paginate(50);
         $serviceableCount = $pincodes->total() > 0
-            ? App\Models\Pincode::where('state', $state)->where('district', $district)->where('serviceable', true)->count()
+            ? Pincode::where('state', $state)->where('district', $district)->where('serviceable', true)->count()
             : 0;
 
         return view('admin.pincodes.localities', compact('state', 'district', 'pincodes', 'serviceableCount'));
     })->name('pincodes.localities');
 
-    Route::post('/pincodes/toggle-state', function (\Illuminate\Http\Request $request) {
+    Route::post('/pincodes/toggle-state', function (Request $request) {
         $state = $request->input('state');
         $enable = $request->boolean('enable');
-        App\Models\Pincode::where('state', $state)->update(['serviceable' => $enable]);
+        Pincode::where('state', $state)->update(['serviceable' => $enable]);
 
-        return redirect()->route('admin.pincodes')->with('success', ($enable ? 'Enabled' : 'Disabled') . " all pincodes in {$state}.");
+        return redirect()->route('admin.pincodes')->with('success', ($enable ? 'Enabled' : 'Disabled')." all pincodes in {$state}.");
     })->name('pincodes.toggle-state');
 
-    Route::post('/pincodes/toggle-district', function (\Illuminate\Http\Request $request) {
+    Route::post('/pincodes/toggle-district', function (Request $request) {
         $state = $request->input('state');
         $district = $request->input('district');
         $enable = $request->boolean('enable');
-        App\Models\Pincode::where('state', $state)->where('district', $district)->update(['serviceable' => $enable]);
+        Pincode::where('state', $state)->where('district', $district)->update(['serviceable' => $enable]);
 
-        return redirect()->back()->with('success', ($enable ? 'Enabled' : 'Disabled') . " all pincodes in {$district}, {$state}.");
+        return redirect()->back()->with('success', ($enable ? 'Enabled' : 'Disabled')." all pincodes in {$district}, {$state}.");
     })->name('pincodes.toggle-district');
 
-    Route::post('/pincodes/toggle-pincode', function (\Illuminate\Http\Request $request) {
+    Route::post('/pincodes/toggle-pincode', function (Request $request) {
         $id = $request->input('id');
         $state = $request->input('state');
         $district = $request->input('district');
-        $pincode = App\Models\Pincode::findOrFail($id);
+        $pincode = Pincode::findOrFail($id);
         $pincode->update(['serviceable' => ! $pincode->serviceable]);
 
-        return redirect()->route('admin.pincodes.localities', [$state, $district])->with('success', "Pincode {$pincode->pincode} " . ($pincode->serviceable ? 'enabled' : 'disabled') . ".");
+        return redirect()->route('admin.pincodes.localities', [$state, $district])->with('success', "Pincode {$pincode->pincode} ".($pincode->serviceable ? 'enabled' : 'disabled').'.');
     })->name('pincodes.toggle-pincode');
 
-    Route::post('/pincodes/toggle-pin', function (\Illuminate\Http\Request $request) {
+    Route::post('/pincodes/toggle-pin', function (Request $request) {
         $state = $request->input('state');
-        $pinned = \App\Models\Setting::get('pinned_states', []);
-        if (is_string($pinned)) $pinned = json_decode($pinned, true) ?? [];
+        $pinned = Setting::get('pinned_states', []);
+        if (is_string($pinned)) {
+            $pinned = json_decode($pinned, true) ?? [];
+        }
 
         if (in_array($state, $pinned)) {
             $pinned = array_values(array_filter($pinned, fn ($s) => $s !== $state));
@@ -2199,14 +2347,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             $message = "{$state} pinned.";
         }
 
-        \App\Models\Setting::set('pinned_states', json_encode(array_values($pinned)), 'general');
+        Setting::set('pinned_states', json_encode(array_values($pinned)), 'general');
 
         return redirect()->route('admin.pincodes')->with('success', $message);
     })->name('pincodes.toggle-pin');
 
     // ─── Area Interest / Coming Soon Leads ───
     Route::get('/area-interests', function () {
-        $interests = \App\Models\AreaInterest::latest()->paginate(50);
+        $interests = AreaInterest::latest()->paginate(50);
 
         return view('admin.area-interests', compact('interests'));
     })->name('area-interests');
@@ -2369,6 +2517,163 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
         return view('admin.transactions.index', compact('transactions'));
     })->name('transactions');
+
+    // ─── Integration API Keys ───
+    Route::get('/integration-keys', function () {
+        $keys = IntegrationApiKey::orderBy('created_at', 'desc')->paginate(20);
+
+        return view('admin.integration-keys.index', compact('keys'));
+    })->name('integration-keys');
+
+    Route::post('/integration-keys/generate', function (Request $request) {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'tenant_type' => 'nullable|string|max:50',
+            'scopes' => 'nullable|string|max:500',
+        ]);
+
+        $scopes = $validated['scopes'] ?? '*';
+        $scopes = $scopes === '*' ? ['*'] : explode(',', $scopes);
+
+        $rawKey = 'ehl_'.Str::random(48);
+        $hash = hash('sha256', $rawKey);
+
+        $key = IntegrationApiKey::create([
+            'name' => $validated['name'],
+            'key_hash' => $hash,
+            'key_prefix' => substr($rawKey, 0, 10),
+            'tenant_type' => $validated['tenant_type'] ?? 'hola',
+            'scopes' => $scopes,
+            'is_revoked' => false,
+        ]);
+
+        return redirect()->route('admin.integration-keys')
+            ->with('new_key', $rawKey)
+            ->with('success', 'API key generated successfully.');
+    })->name('integration-keys.generate');
+
+    Route::post('/integration-keys/{id}/revoke', function ($id) {
+        $key = IntegrationApiKey::findOrFail($id);
+        $key->update(['is_revoked' => true, 'revoked_at' => now()]);
+
+        return redirect()->route('admin.integration-keys')
+            ->with('success', 'API key revoked.');
+    })->name('integration-keys.revoke');
+
+    // Customer-facing app features: intentionally limited to the five umbrella switches.
+    Route::get('/feature-flags', function () {
+        $masterFeatures = [
+            'world.shop' => ['name' => 'Shopping', 'description' => 'All shops, menus, products, and COD order requests.'],
+            'world.book' => ['name' => 'Bookings', 'description' => 'All appointments, hotels, turfs, and other booking requests.'],
+            'world.ride' => ['name' => 'Transport', 'description' => 'All taxi, shared ride, vehicle rental, and goods transport requests.'],
+            'world.discover' => ['name' => 'Directory', 'description' => 'Business listings, contact details, and map discovery.'],
+            'payments.online' => ['name' => 'Future online payments', 'description' => 'Keep off until Hola is ready to take online payments.'],
+        ];
+        $flags = \App\Models\FeatureFlag::whereIn('key', array_keys($masterFeatures))
+            ->get()
+            ->sortBy(fn ($flag) => array_search($flag->key, array_keys($masterFeatures), true))
+            ->values();
+
+        return view('admin.feature-flags.index', compact('flags', 'masterFeatures'));
+    })->name('feature-flags');
+
+    Route::post('/feature-flags', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'key' => 'required|string|unique:feature_flags,key',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'group' => 'required|string',
+            'launch_phase' => 'nullable|string',
+            'is_enabled' => 'boolean',
+            'is_visible_to_customers' => 'boolean',
+        ]);
+
+        $validated['is_enabled'] = $request->boolean('is_enabled');
+        $validated['is_visible_to_customers'] = $request->boolean('is_visible_to_customers');
+
+        \App\Models\FeatureFlag::create($validated);
+
+        return redirect()->route('admin.feature-flags')->with('success', 'Feature flag created.');
+    })->name('feature-flags.store');
+
+    Route::patch('/feature-flags/{id}/toggle', function ($id) {
+        $flag = \App\Models\FeatureFlag::findOrFail($id);
+        $flag->update(['is_enabled' => !$flag->is_enabled]);
+
+        return redirect()->route('admin.feature-flags')
+            ->with('success', $flag->name . ' ' . ($flag->is_enabled ? 'enabled' : 'disabled') . '.');
+    })->name('feature-flags.toggle');
+
+    Route::delete('/feature-flags/{id}', function ($id) {
+        $flag = \App\Models\FeatureFlag::findOrFail($id);
+        abort_if((bool) data_get($flag->metadata, 'system'), 422, 'Platform launch controls cannot be deleted.');
+        $flag->delete();
+
+        return redirect()->route('admin.feature-flags')->with('success', 'Feature flag deleted.');
+    })->name('feature-flags.destroy');
+
+    // Category Tree Manager
+    Route::get('/category-tree', function () {
+        $worlds = \App\Models\World::active()->ordered()->with(['categories' => function ($q) {
+            $q->whereNull('parent_id')->with('children');
+        }])->get();
+
+        return view('admin.categories.tree', compact('worlds'));
+    })->name('category-tree');
+
+    Route::post('/category-tree', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'world_id' => 'required|exists:worlds,id',
+            'parent_id' => 'nullable|exists:categories,id',
+            'name' => 'required|string|max:255',
+            'module_type' => 'required|string',
+            'launch_phase' => 'required|string',
+            'is_active' => 'boolean',
+            'show_on_home' => 'boolean',
+            'is_featured' => 'boolean',
+        ]);
+
+        $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
+        $validated['is_active'] = $request->boolean('is_active');
+        $validated['show_on_home'] = $request->boolean('show_on_home');
+        $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['level'] = $validated['parent_id'] ? (\App\Models\Category::find($validated['parent_id'])?->level ?? 0) + 1 : 0;
+
+        \App\Models\Category::create($validated);
+
+        return redirect()->route('admin.category-tree')->with('success', 'Category created.');
+    })->name('category-tree.store');
+
+    Route::patch('/category-tree/{id}/toggle', function ($id) {
+        $cat = \App\Models\Category::findOrFail($id);
+        $cat->update(['is_active' => !$cat->is_active]);
+
+        return redirect()->route('admin.category-tree')
+            ->with('success', $cat->name . ' ' . ($cat->is_active ? 'activated' : 'deactivated') . '.');
+    })->name('category-tree.toggle');
+
+    // Homepage CMS
+    Route::get('/homepage', [\App\Http\Controllers\Admin\HomepageContentController::class, 'index'])->name('homepage');
+    Route::get('/homepage/create', [\App\Http\Controllers\Admin\HomepageContentController::class, 'create'])->name('homepage.create');
+    Route::post('/homepage', [\App\Http\Controllers\Admin\HomepageContentController::class, 'store'])->name('homepage.store');
+    Route::get('/homepage/{content}/edit', [\App\Http\Controllers\Admin\HomepageContentController::class, 'edit'])->name('homepage.edit');
+    Route::put('/homepage/{content}', [\App\Http\Controllers\Admin\HomepageContentController::class, 'update'])->name('homepage.update');
+    Route::delete('/homepage/{content}', [\App\Http\Controllers\Admin\HomepageContentController::class, 'destroy'])->name('homepage.destroy');
+    Route::post('/homepage/reorder', [\App\Http\Controllers\Admin\HomepageContentController::class, 'reorder'])->name('homepage.reorder');
+
+    // Capability Templates
+    Route::get('/capability-templates', [\App\Http\Controllers\Admin\CapabilityTemplateController::class, 'index'])->name('capability-templates');
+    Route::post('/capability-templates', [\App\Http\Controllers\Admin\CapabilityTemplateController::class, 'store'])->name('capability-templates.store');
+    Route::get('/capability-templates/{template}', [\App\Http\Controllers\Admin\CapabilityTemplateController::class, 'show'])->name('capability-templates.show');
+    Route::put('/capability-templates/{template}', [\App\Http\Controllers\Admin\CapabilityTemplateController::class, 'update'])->name('capability-templates.update');
+    Route::delete('/capability-templates/{template}', [\App\Http\Controllers\Admin\CapabilityTemplateController::class, 'destroy'])->name('capability-templates.destroy');
+    Route::post('/capability-templates/{template}/assign', [\App\Http\Controllers\Admin\CapabilityTemplateController::class, 'assign'])->name('capability-templates.assign');
+    Route::post('/capability-templates/{template}/revoke', [\App\Http\Controllers\Admin\CapabilityTemplateController::class, 'revoke'])->name('capability-templates.revoke');
+
+    // Classification Audit
+    Route::get('/classification-audit', [\App\Http\Controllers\Admin\ClassificationAuditController::class, 'index'])->name('classification-audit');
+    Route::post('/classification-audit/fix', [\App\Http\Controllers\Admin\ClassificationAuditController::class, 'fix'])->name('classification-audit.fix');
+    Route::get('/classification-audit/stats', [\App\Http\Controllers\Admin\ClassificationAuditController::class, 'stats'])->name('classification-audit.stats');
 });
 
 // ─── Vendor / Owner Web Dashboard ───
@@ -2419,8 +2724,8 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 ->with('business:id,name')->latest()->take(5)->get();
 
             $defaultBusinessId = $businesses->first()->id ?? null;
-            $hasOrders = $businesses->contains(fn ($b) => ($b->enabled_modules['orders'] ?? false));
-            $hasBookings = $businesses->contains(fn ($b) => ($b->enabled_modules['bookings'] ?? false));
+            $hasOrders = $businesses->contains(fn ($business) => $business->hasModule('orders'));
+            $hasBookings = $businesses->contains(fn ($business) => $business->hasModule('bookings'));
             $hasProducts = $hasOrders;
             $stats = [
                 'businesses' => $businesses->count(),
@@ -2435,6 +2740,22 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 'hasOrders', 'hasBookings', 'hasProducts'
             ));
         })->name('dashboard');
+
+        // Setup wizard redirect — first business with no modules configured
+        Route::middleware('auth')->group(function () {
+            Route::get('/setup', function () {
+                $user = Auth::user();
+                $business = Business::where('created_by', $user->id)
+                    ->whereNull('enabled_modules')
+                    ->first();
+
+                if (! $business) {
+                    return redirect()->route('vendor.dashboard');
+                }
+
+                return redirect()->route('vendor.businesses.setup', $business->id);
+            })->name('setup.redirect');
+        });
 
         // My Businesses
         Route::get('/businesses', function () {
@@ -2475,11 +2796,269 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             return redirect()->route('vendor.businesses')->with('success', 'Business updated.');
         })->name('businesses.update');
 
+        Route::get('/businesses/{id}/modules', function ($id) {
+            $business = Business::where('created_by', Auth::id())
+                ->with(['category', 'subcategory'])
+                ->findOrFail($id);
+            $moduleService = app(BusinessModuleService::class);
+
+            return view('vendor.businesses.modules', [
+                'business' => $business,
+                'definitions' => BusinessModuleService::DEFINITIONS,
+                'modules' => $moduleService->effectiveFor($business),
+                'recommended' => $moduleService->recommendedFor($business),
+                'readiness' => $moduleService->readiness($business),
+            ]);
+        })->name('businesses.modules');
+
+        Route::put('/businesses/{id}/modules', function (Request $request, $id) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($id);
+            $validated = $request->validate([
+                'modules' => 'nullable|array',
+                'modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
+            ]);
+
+            app(BusinessModuleService::class)->update($business, $validated['modules'] ?? []);
+
+            return redirect()->route('vendor.businesses.modules', $business->id)
+                ->with('success', 'Business features updated. Required dependencies were enabled automatically.');
+        })->name('businesses.modules.update');
+
+        // Setup Wizard
+        Route::get('/businesses/{id}/setup', function ($id) {
+            $user = Auth::user();
+            $business = Business::where('created_by', $user->id)->findOrFail($id);
+            $moduleService = app(BusinessModuleService::class);
+            $modules = $moduleService->effectiveFor($business);
+
+            return view('vendor.businesses.setup', compact('business', 'modules'));
+        })->name('businesses.setup');
+
+        Route::post('/businesses/{id}/setup', function (Request $request, $id) {
+            $user = Auth::user();
+            $business = Business::where('created_by', $user->id)->findOrFail($id);
+            $validated = $request->validate([
+                'business_type' => 'required|in:restaurant,retail,salon,hotel,turf,taxi,event,other',
+            ]);
+
+            $moduleMap = [
+                'restaurant' => ['catalog', 'orders'],
+                'retail'     => ['catalog', 'orders', 'inventory'],
+                'salon'      => ['bookings'],
+                'hotel'      => ['bookings'],
+                'turf'       => ['bookings', 'turf'],
+                'taxi'       => ['transport'],
+                'event'      => ['bookings', 'turf'],
+                'other'      => ['catalog'],
+            ];
+
+            $modules = $moduleMap[$validated['business_type']] ?? ['catalog'];
+            $moduleService = app(BusinessModuleService::class);
+            $moduleService->update($business, $modules);
+
+            return redirect()->route('vendor.dashboard')
+                ->with('success', 'Your business is set up! You can customize features anytime in Business Features.');
+        })->name('businesses.setup.post');
+
+        // 9-Step Onboarding Wizard
+        Route::get('/onboarding/{id}/step/{step}', function ($id, $step) {
+            $user = Auth::user();
+            $business = Business::where('created_by', $user->id)->findOrFail($id);
+            $step = max(1, min(9, (int) $step));
+
+            $stepLabels = [
+                'Find Business', 'Business Type', 'Category', 'Customer Actions',
+                'Confirmation', 'Fulfilment', 'Business Info', 'Operating Hours', 'Review',
+            ];
+
+            $businessTypes = [
+                ['key' => 'shop', 'icon' => '🛒', 'label' => 'Shop / Retail', 'desc' => 'Products, grocery, clothing'],
+                ['key' => 'restaurant', 'icon' => '🍽️', 'label' => 'Restaurant / Food', 'desc' => 'Menu, orders, delivery'],
+                ['key' => 'pharmacy', 'icon' => '💊', 'label' => 'Pharmacy / Healthcare', 'desc' => 'Medicines, prescriptions'],
+                ['key' => 'hotel', 'icon' => '🏨', 'label' => 'Hotel / Stay', 'desc' => 'Rooms, reservations'],
+                ['key' => 'taxi', 'icon' => '🚕', 'label' => 'Taxi / Transport', 'desc' => 'Rides, delivery, rental'],
+                ['key' => 'salon', 'icon' => '💇', 'label' => 'Salon / Beauty', 'desc' => 'Appointments, services'],
+                ['key' => 'sports', 'icon' => '⚽', 'label' => 'Turf / Sports', 'desc' => 'Courts, slots, events'],
+                ['key' => 'other', 'icon' => '📋', 'label' => 'Other / General', 'desc' => 'Basic listing, contact'],
+            ];
+
+            $typeCategoryMap = [
+                'shop' => 'ordering',
+                'restaurant' => 'catalog',
+                'pharmacy' => 'catalog',
+                'hotel' => 'booking',
+                'taxi' => 'transport',
+                'salon' => 'booking',
+                'sports' => 'turf',
+                'other' => 'directory',
+            ];
+
+            $selectedType = old('business_type', session('onboarding_business_type', 'shop'));
+            $moduleType = $typeCategoryMap[$selectedType] ?? 'directory';
+            $categories = \App\Models\Category::where('module_type', $moduleType)
+                ->where('world_id', '!=', null)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            $capabilities = [
+                ['key' => 'view_info', 'icon' => '👁️', 'label' => 'View my information', 'desc' => 'Customers can see your profile', 'color' => 'blue'],
+                ['key' => 'call_whatsapp', 'icon' => '💬', 'label' => 'Call or WhatsApp me', 'desc' => 'Customers can contact you directly', 'color' => 'green'],
+                ['key' => 'browse_products', 'icon' => '🛍️', 'label' => 'Browse products', 'desc' => 'Customers can view your catalog', 'color' => 'purple'],
+                ['key' => 'place_orders', 'icon' => '📦', 'label' => 'Place orders', 'desc' => 'Customers can order for pickup/delivery', 'color' => 'amber'],
+                ['key' => 'book_appointments', 'icon' => '📅', 'label' => 'Book appointments', 'desc' => 'Customers can book time slots', 'color' => 'pink'],
+                ['key' => 'reserve_rooms', 'icon' => '🛏️', 'label' => 'Reserve rooms', 'desc' => 'Customers can book rooms', 'color' => 'teal'],
+                ['key' => 'book_slots', 'icon' => '⏱️', 'label' => 'Book time slots', 'desc' => 'Customers can book courts/venues', 'color' => 'cyan'],
+                ['key' => 'request_transport', 'icon' => '🚗', 'label' => 'Request transport', 'desc' => 'Customers can request rides', 'color' => 'yellow'],
+            ];
+
+            $confirmationOptions = [
+                ['key' => 'auto', 'icon' => '⚡', 'label' => 'Confirm automatically', 'desc' => 'Orders and bookings are confirmed instantly', 'color' => 'green'],
+                ['key' => 'manual', 'icon' => '✋', 'label' => 'I will confirm each request', 'desc' => 'You review and accept/decline each request', 'color' => 'amber'],
+                ['key' => 'contact', 'icon' => '📞', 'label' => 'Customers should contact me', 'desc' => 'No online confirmation, just call/WhatsApp', 'color' => 'blue'],
+            ];
+
+            $fulfilmentOptions = [
+                ['key' => 'pickup', 'icon' => '🏃', 'label' => 'Customer pickup', 'desc' => 'Customers collect from your location', 'color' => 'blue'],
+                ['key' => 'delivery', 'icon' => '🚚', 'label' => 'I deliver', 'desc' => 'You deliver to customers', 'color' => 'green'],
+                ['key' => 'visit', 'icon' => '🏪', 'label' => 'Customer visits venue', 'desc' => 'Customers come to you (hotel, salon, etc.)', 'color' => 'purple'],
+                ['key' => 'cod', 'icon' => '💵', 'label' => 'Cash on delivery', 'desc' => 'Customers pay when they receive', 'color' => 'amber'],
+            ];
+
+            $existingHours = $business->working_hours ?? [];
+            $selectedCategory = $step >= 3 ? \App\Models\Category::find(old('category_id')) : null;
+            $selectedCapabilities = old('capabilities', []);
+            $selectedConfirmation = old('confirmation_mode', 'manual');
+
+            $capDescriptions = [
+                'view_info' => 'See your profile and contact info',
+                'call_whatsapp' => 'Contact you directly',
+                'browse_products' => 'Browse your products or menu',
+                'place_orders' => 'Send pickup or delivery orders',
+                'book_appointments' => 'Book appointment slots',
+                'reserve_rooms' => 'Reserve rooms',
+                'book_slots' => 'Book time slots',
+                'request_transport' => 'Request rides',
+            ];
+
+            return view('vendor.onboarding.wizard', compact(
+                'business', 'currentStep', 'stepLabels', 'businessTypes',
+                'categories', 'capabilities', 'confirmationOptions',
+                'fulfilmentOptions', 'existingHours', 'selectedCategory',
+                'selectedCapabilities', 'selectedConfirmation', 'capDescriptions'
+            ));
+        })->name('onboarding.step');
+
+        Route::post('/onboarding/{id}/step/{step}', function (Request $request, $id, $step) {
+            $user = Auth::user();
+            $business = Business::where('created_by', $user->id)->findOrFail($id);
+            $step = max(1, min(9, (int) $step));
+
+            if ($step === 1) {
+                session(['onboarding_has_listing' => $request->has_listing]);
+            } elseif ($step === 2) {
+                $request->validate(['business_type' => 'required']);
+                session(['onboarding_business_type' => $request->business_type]);
+            } elseif ($step === 3) {
+                $request->validate(['category_id' => 'required|exists:categories,id']);
+                session(['onboarding_category_id' => $request->category_id]);
+            } elseif ($step === 4) {
+                session(['onboarding_capabilities' => $request->capabilities ?? []]);
+            } elseif ($step === 5) {
+                $request->validate(['confirmation_mode' => 'required']);
+                session(['onboarding_confirmation' => $request->confirmation_mode]);
+            } elseif ($step === 6) {
+                session(['onboarding_fulfilment' => $request->fulfilment ?? []]);
+            } elseif ($step === 7) {
+                $validated = $request->validate([
+                    'name' => 'required|string|max:255',
+                    'phone' => 'required|string|max:20',
+                    'whatsapp' => 'nullable|string|max:20',
+                    'address' => 'required|string',
+                    'description' => 'nullable|string',
+                ]);
+                $business->update($validated);
+            } elseif ($step === 8) {
+                $hours = $request->hours ?? [];
+                $workingHours = [];
+                foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $day) {
+                    if (isset($hours[$day]['open'])) {
+                        $workingHours[$day] = $hours[$day]['open_time'] . '-' . $hours[$day]['close_time'];
+                    }
+                }
+                $business->update(['working_hours' => $workingHours]);
+            } elseif ($step === 9) {
+                // Apply everything
+                $categoryId = session('onboarding_category_id');
+                $capabilities = session('onboarding_capabilities', []);
+                $confirmation = session('onboarding_confirmation', 'manual');
+
+                $business->update(['category_id' => $categoryId]);
+
+                $moduleMap = [
+                    'view_info' => [],
+                    'call_whatsapp' => [],
+                    'browse_products' => ['catalog'],
+                    'place_orders' => ['catalog', 'orders'],
+                    'book_appointments' => ['bookings'],
+                    'reserve_rooms' => ['bookings'],
+                    'book_slots' => ['bookings', 'turf'],
+                    'request_transport' => ['transport'],
+                ];
+
+                $modules = ['catalog' => false, 'orders' => false, 'bookings' => false, 'inventory' => false, 'transport' => false, 'turf' => false];
+                foreach ($capabilities as $cap) {
+                    foreach ($moduleMap[$cap] ?? [] as $mod) {
+                        $modules[$mod] = true;
+                    }
+                }
+
+                app(BusinessModuleService::class)->update($business, $modules);
+
+                $experienceMap = [
+                    'browse_products' => 'retail',
+                    'place_orders' => 'retail',
+                    'book_appointments' => 'appointment',
+                    'reserve_rooms' => 'stay',
+                    'book_slots' => 'turf',
+                    'request_transport' => 'taxi',
+                ];
+
+                $experiences = ['directory'];
+                foreach ($capabilities as $cap) {
+                    if (isset($experienceMap[$cap]) && !in_array($experienceMap[$cap], $experiences)) {
+                        $experiences[] = $experienceMap[$cap];
+                    }
+                }
+
+                $business->update([
+                    'enabled_experiences' => array_fill_keys($experiences, true),
+                    'primary_experience' => $experiences[0] ?? 'directory',
+                ]);
+
+                // Create classification
+                if ($categoryId && !$business->classifications()->where('category_id', $categoryId)->exists()) {
+                    $business->classifications()->create([
+                        'category_id' => $categoryId,
+                        'is_primary' => true,
+                        'source' => 'vendor_selected',
+                    ]);
+                }
+
+                session()->forget(['onboarding_has_listing', 'onboarding_business_type', 'onboarding_category_id', 'onboarding_capabilities', 'onboarding_confirmation', 'onboarding_fulfilment']);
+
+                return redirect()->route('vendor.dashboard')
+                    ->with('success', 'Your business is published! Customers can now find you on HOLA.');
+            }
+
+            return redirect()->route('vendor.onboarding.step', ['id' => $business->id, 'step' => $step + 1]);
+        })->name('onboarding.store');
+
         // Products
         Route::get('/businesses/{businessId}/products', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($business->hasModule('catalog'), 404);
             $products = Product::where('business_id', $business->id)->latest()->paginate(20);
 
             return view('vendor.products.index', compact('products', 'business'));
@@ -2488,7 +3067,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/products/create', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($business->hasModule('catalog'), 404);
 
             return view('vendor.products.form', compact('business'));
         })->name('products.create');
@@ -2496,12 +3075,19 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::post('/businesses/{businessId}/products', function (Request $request, $businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($business->hasModule('catalog'), 404);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'menu_section' => 'nullable|string|max:100',
+                'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
+                'preparation_minutes' => 'nullable|integer|min:1|max:1440',
+                'available_from' => 'nullable|required_with:available_until|date_format:H:i',
+                'available_until' => 'nullable|required_with:available_from|date_format:H:i',
+                'sold_out_until' => 'nullable|date|after:now',
                 'price' => 'nullable|numeric|min:0',
                 'stock' => 'nullable|integer|min:0',
+                'availability' => 'nullable|in:in_stock,out_of_stock,limited',
                 'is_active' => 'nullable|boolean',
             ]);
             $validated['business_id'] = $business->id;
@@ -2515,7 +3101,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/products/{id}/edit', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($business->hasModule('catalog'), 404);
             $product = Product::where('business_id', $business->id)->findOrFail($id);
 
             return view('vendor.products.form', compact('business', 'product'));
@@ -2524,13 +3110,20 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/businesses/{businessId}/products/{id}', function (Request $request, $businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($business->hasModule('catalog'), 404);
             $product = Product::where('business_id', $business->id)->findOrFail($id);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'menu_section' => 'nullable|string|max:100',
+                'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
+                'preparation_minutes' => 'nullable|integer|min:1|max:1440',
+                'available_from' => 'nullable|required_with:available_until|date_format:H:i',
+                'available_until' => 'nullable|required_with:available_from|date_format:H:i',
+                'sold_out_until' => 'nullable|date|after:now',
                 'price' => 'nullable|numeric|min:0',
                 'stock' => 'nullable|integer|min:0',
+                'availability' => 'nullable|in:in_stock,out_of_stock,limited',
                 'is_active' => 'nullable|boolean',
             ]);
             $validated['is_active'] = $request->has('is_active');
@@ -2542,7 +3135,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::delete('/businesses/{businessId}/products/{id}', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($business->hasModule('catalog'), 404);
             Product::where('business_id', $business->id)->findOrFail($id)->delete();
 
             return redirect()->route('vendor.products', $business->id)->with('success', 'Product deleted.');
@@ -2552,8 +3145,10 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/services', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
-            $services = Service::where('business_id', $business->id)->orderBy('sort_order')->paginate(20);
+            abort_unless($business->hasModule('bookings'), 404);
+            $services = Service::where('business_id', $business->id)
+                ->withCount(['bookings', 'timeSlots' => fn ($query) => $query->where('is_active', true)])
+                ->orderBy('sort_order')->paginate(20);
 
             return view('vendor.services.index', compact('services', 'business'));
         })->name('services');
@@ -2561,7 +3156,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/services/create', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
+            abort_unless($business->hasModule('bookings'), 404);
 
             return view('vendor.services.form', compact('business'));
         })->name('services.create');
@@ -2569,16 +3164,29 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::post('/businesses/{businessId}/services', function (Request $request, $businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
+            abort_unless($business->hasModule('bookings'), 404);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0',
-                'duration' => 'required|integer|min:15',
+                'booking_mode' => 'required|in:appointment,slot,stay,seat',
+                'price_unit' => 'required|in:booking,hour,night,person,seat',
+                'duration' => 'nullable|integer|min:15|max:1440',
                 'capacity' => 'nullable|integer|min:1',
+                'inventory_units' => 'nullable|integer|min:1|max:10000',
+                'unit_label' => 'nullable|string|max:40',
+                'check_in_time' => 'nullable|date_format:H:i',
+                'check_out_time' => 'nullable|date_format:H:i',
+                'min_stay_nights' => 'nullable|integer|min:1|max:365',
+                'max_stay_nights' => 'nullable|integer|min:1|max:365|gte:min_stay_nights',
+                'advance_booking_days' => 'nullable|integer|min:1|max:365',
+                'cancellation_hours' => 'nullable|integer|min:0|max:168',
                 'is_active' => 'nullable|boolean',
             ]);
             $validated['business_id'] = $business->id;
+            $validated['has_fixed_slots'] = in_array($validated['booking_mode'], ['slot', 'seat'], true);
+            $validated['duration'] = $validated['duration'] ?? 60;
+            $validated['inventory_units'] = $validated['inventory_units'] ?? 1;
             $validated['slug'] = Str::slug($validated['name']).'-'.Str::random(5);
             $validated['is_active'] = $request->has('is_active');
             Service::create($validated);
@@ -2589,7 +3197,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::get('/businesses/{businessId}/services/{id}/edit', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
+            abort_unless($business->hasModule('bookings'), 404);
             $service = Service::where('business_id', $business->id)->findOrFail($id);
 
             return view('vendor.services.form', compact('business', 'service'));
@@ -2598,17 +3206,30 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/businesses/{businessId}/services/{id}', function (Request $request, $businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
+            abort_unless($business->hasModule('bookings'), 404);
             $service = Service::where('business_id', $business->id)->findOrFail($id);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0',
-                'duration' => 'required|integer|min:15',
+                'booking_mode' => 'required|in:appointment,slot,stay,seat',
+                'price_unit' => 'required|in:booking,hour,night,person,seat',
+                'duration' => 'nullable|integer|min:15|max:1440',
                 'capacity' => 'nullable|integer|min:1',
+                'inventory_units' => 'nullable|integer|min:1|max:10000',
+                'unit_label' => 'nullable|string|max:40',
+                'check_in_time' => 'nullable|date_format:H:i',
+                'check_out_time' => 'nullable|date_format:H:i',
+                'min_stay_nights' => 'nullable|integer|min:1|max:365',
+                'max_stay_nights' => 'nullable|integer|min:1|max:365|gte:min_stay_nights',
+                'advance_booking_days' => 'nullable|integer|min:1|max:365',
+                'cancellation_hours' => 'nullable|integer|min:0|max:168',
                 'is_active' => 'nullable|boolean',
             ]);
             $validated['is_active'] = $request->has('is_active');
+            $validated['has_fixed_slots'] = in_array($validated['booking_mode'], ['slot', 'seat'], true);
+            $validated['duration'] = $validated['duration'] ?? 60;
+            $validated['inventory_units'] = $validated['inventory_units'] ?? 1;
             $service->update($validated);
 
             return redirect()->route('vendor.services', $business->id)->with('success', 'Service updated.');
@@ -2617,17 +3238,72 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::delete('/businesses/{businessId}/services/{id}', function ($businessId, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
+            abort_unless($business->hasModule('bookings'), 404);
             Service::where('business_id', $business->id)->findOrFail($id)->delete();
 
             return redirect()->route('vendor.services', $business->id)->with('success', 'Service deleted.');
         })->name('services.destroy');
 
+        Route::get('/businesses/{businessId}/services/{serviceId}/slots', function ($businessId, $serviceId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('bookings'), 404);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            abort_unless(in_array($service->booking_mode, ['slot', 'seat']), 404);
+            $slots = $service->timeSlots()->orderByRaw('day_of_week is null desc')->orderBy('day_of_week')->orderBy('start_time')->get();
+
+            return view('vendor.services.slots', compact('business', 'service', 'slots'));
+        })->name('services.slots');
+
+        Route::post('/businesses/{businessId}/services/{serviceId}/slots', function (Request $request, $businessId, $serviceId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $validated = $request->validate([
+                'day_of_week' => 'nullable|integer|between:0,6',
+                'start_time' => 'required|date_format:H:i',
+                'end_time' => 'required|date_format:H:i|after:start_time',
+                'capacity' => 'required|integer|min:1|max:10000',
+                'price_override' => 'nullable|numeric|min:0',
+            ]);
+            $validated['service_id'] = $service->id;
+            $validated['is_active'] = true;
+            TimeSlot::create($validated);
+
+            return back()->with('success', 'Time slot added.');
+        })->name('services.slots.store');
+
+        Route::put('/businesses/{businessId}/services/{serviceId}/slots/{slotId}', function (Request $request, $businessId, $serviceId, $slotId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $slot = TimeSlot::where('service_id', $service->id)->findOrFail($slotId);
+            $validated = $request->validate([
+                'day_of_week' => 'nullable|integer|between:0,6',
+                'start_time' => 'required|date_format:H:i',
+                'end_time' => 'required|date_format:H:i|after:start_time',
+                'capacity' => 'required|integer|min:1|max:10000',
+                'price_override' => 'nullable|numeric|min:0',
+                'is_active' => 'nullable|boolean',
+            ]);
+            $validated['is_active'] = $request->has('is_active');
+            $slot->update($validated);
+
+            return back()->with('success', 'Time slot updated.');
+        })->name('services.slots.update');
+
+        Route::delete('/businesses/{businessId}/services/{serviceId}/slots/{slotId}', function ($businessId, $serviceId, $slotId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $slot = TimeSlot::where('service_id', $service->id)->findOrFail($slotId);
+            abort_if($slot->bookings()->whereIn('status', ['pending', 'confirmed'])->exists(), 422, 'Cannot delete a slot with active bookings.');
+            $slot->delete();
+
+            return back()->with('success', 'Time slot deleted.');
+        })->name('services.slots.destroy');
+
         // Bookings
         Route::get('/businesses/{businessId}/bookings', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['bookings'] ?? false, 404);
+            abort_unless($business->hasModule('bookings'), 404);
             $query = Booking::where('business_id', $business->id)->with('service:id,name')->latest('booking_date');
 
             if ($status = request('status')) {
@@ -2635,6 +3311,13 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             }
             if ($date = request('date')) {
                 $query->whereDate('booking_date', $date);
+            }
+            if ($search = request('search')) {
+                $safe = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
+                $query->where(function ($searchQuery) use ($safe) {
+                    $searchQuery->where('customer_name', 'like', $safe)
+                        ->orWhere('customer_phone', 'like', $safe);
+                });
             }
 
             $bookings = $query->paginate(20)->withQueryString();
@@ -2645,35 +3328,143 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/bookings/{id}/status', function (Request $request, $id) {
             $booking = Booking::with('business')->findOrFail($id);
             $user = Auth::user();
-            abort_unless($booking->business->enabled_modules['bookings'] ?? false, 404);
+            abort_unless($booking->business->hasModule('bookings'), 404);
             if ($booking->business->created_by !== $user->id) {
                 abort(403);
             }
 
             $validated = $request->validate([
-                'status' => 'required|in:confirmed,cancelled,completed,no_show',
-                'cancellation_reason' => 'nullable|string',
+                'status' => 'required|in:confirmed,cancelled,completed,no_show,rejected,rescheduled',
+                'cancellation_reason' => 'nullable|string|max:500',
             ]);
-            $booking->update($validated);
-
-            $ts = match ($validated['status']) {
-                'confirmed' => 'confirmed_at',
-                'completed' => 'completed_at',
-                'cancelled' => 'cancelled_at',
-                default => null,
-            };
-            if ($ts) {
-                $booking->update([$ts => now()]);
-            }
+            app(BookingWorkflowService::class)->transition(
+                $booking,
+                $validated['status'],
+                $validated['cancellation_reason'] ?? null,
+            );
 
             return back()->with('success', 'Booking '.$validated['status'].'.');
         })->name('bookings.status');
+
+        Route::put('/bookings/{id}/payment-status', function (Request $request, $id) {
+            $booking = Booking::with('business')->findOrFail($id);
+            $user = Auth::user();
+            abort_unless($booking->business->hasModule('bookings'), 404);
+            abort_unless($booking->business->created_by === $user->id, 403);
+            $request->validate(['payment_status' => 'required|in:paid']);
+
+            app(BookingWorkflowService::class)->markCashCollected($booking);
+
+            return back()->with('success', 'Cash payment marked as collected.');
+        })->name('bookings.payment-status');
+
+        // Transport fleet and requests
+        Route::get('/businesses/{businessId}/vehicles', function ($businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('transport'), 404);
+            $vehicles = $business->vehicles()->withCount(['trips' => fn ($query) => $query->whereIn('status', ['pending', 'confirmed', 'started'])])->orderBy('sort_order')->get();
+
+            return view('vendor.transport.vehicles', compact('business', 'vehicles'));
+        })->name('vehicles');
+
+        Route::post('/businesses/{businessId}/vehicles', function (Request $request, $businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('transport'), 404);
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'type' => 'required|in:car,bolero,suv,van,auto,bike,bus,truck,pickup,tempo',
+                'service_mode' => 'required|in:taxi,shared,rental,goods',
+                'seats' => 'required|integer|min:1|max:100',
+                'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
+                'capacity_unit' => 'required|in:seats,kg,tons,vehicle',
+                'base_fare' => 'required|numeric|min:0',
+                'fare_per_km' => 'required|numeric|min:0',
+                'min_km' => 'nullable|integer|min:1',
+                'registration_number' => 'nullable|string|max:50',
+                'requires_quote' => 'nullable|boolean',
+            ]);
+            $validated['business_id'] = $business->id;
+            $validated['is_active'] = true;
+            $validated['availability_status'] = 'available';
+            $validated['requires_quote'] = $request->has('requires_quote');
+            Vehicle::create($validated);
+
+            return back()->with('success', 'Transport option added.');
+        })->name('vehicles.store');
+
+        Route::put('/businesses/{businessId}/vehicles/{vehicleId}', function (Request $request, $businessId, $vehicleId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
+            $validated = $request->validate([
+                'name' => 'required|string|max:255', 'service_mode' => 'required|in:taxi,shared,rental,goods',
+                'seats' => 'required|integer|min:1|max:100', 'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
+                'capacity_unit' => 'required|in:seats,kg,tons,vehicle', 'base_fare' => 'required|numeric|min:0',
+                'fare_per_km' => 'required|numeric|min:0', 'availability_status' => 'required|in:available,busy,offline',
+                'next_available_at' => 'nullable|date', 'requires_quote' => 'nullable|boolean', 'is_active' => 'nullable|boolean',
+            ]);
+            $validated['requires_quote'] = $request->has('requires_quote');
+            $validated['is_active'] = $request->has('is_active');
+            $vehicle->update($validated);
+
+            return back()->with('success', 'Transport option updated.');
+        })->name('vehicles.update');
+
+        Route::delete('/businesses/{businessId}/vehicles/{vehicleId}', function ($businessId, $vehicleId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
+            abort_if($vehicle->trips()->whereIn('status', ['pending', 'confirmed', 'started'])->exists(), 422, 'Cannot delete a vehicle with active requests.');
+            $vehicle->delete();
+
+            return back()->with('success', 'Transport option deleted.');
+        })->name('vehicles.destroy');
+
+        Route::get('/businesses/{businessId}/trips', function ($businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('transport'), 404);
+            $query = $business->trips()->with('vehicle')->latest();
+            if ($status = request('status')) {
+                $query->where('status', $status);
+            }
+            if ($search = request('search')) {
+                $safe = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
+                $query->where(fn ($q) => $q->where('customer_name', 'like', $safe)->orWhere('customer_phone', 'like', $safe)->orWhere('pickup_location', 'like', $safe));
+            }
+
+            return view('vendor.transport.trips', ['business' => $business, 'trips' => $query->paginate(20)->withQueryString()]);
+        })->name('trips');
+
+        Route::put('/trips/{tripId}/status', function (Request $request, $tripId) {
+            $trip = Trip::with('business')->findOrFail($tripId);
+            abort_unless($trip->business->created_by === Auth::id(), 403);
+            $validated = $request->validate(['status' => 'required|in:confirmed,started,completed,cancelled', 'cancellation_reason' => 'nullable|string|max:500', 'driver_name' => 'nullable|string|max:255', 'driver_phone' => 'nullable|string|max:20']);
+            app(TripWorkflowService::class)->transition($trip, $validated['status'], $validated['cancellation_reason'] ?? null, ['name' => $validated['driver_name'] ?? null, 'phone' => $validated['driver_phone'] ?? null]);
+
+            return back()->with('success', 'Transport request '.$validated['status'].'.');
+        })->name('trips.status');
+
+        Route::put('/trips/{tripId}/quote', function (Request $request, $tripId) {
+            $trip = Trip::with('business')->findOrFail($tripId);
+            abort_unless($trip->business->created_by === Auth::id(), 403);
+            $validated = $request->validate(['fare' => 'required|numeric|min:0|max:10000000', 'quote_notes' => 'nullable|string|max:1000']);
+            app(TripWorkflowService::class)->quote($trip, (float) $validated['fare'], $validated['quote_notes'] ?? null);
+
+            return back()->with('success', 'Fare quote saved. Contact the customer to confirm it.');
+        })->name('trips.quote');
+
+        Route::put('/trips/{tripId}/payment-status', function (Request $request, $tripId) {
+            $trip = Trip::with('business')->findOrFail($tripId);
+            abort_unless($trip->business->created_by === Auth::id(), 403);
+            $request->validate(['payment_status' => 'required|in:paid']);
+            app(TripWorkflowService::class)->markCashCollected($trip);
+
+            return back()->with('success', 'Cash payment marked as collected.');
+        })->name('trips.payment-status');
 
         // Orders
         Route::get('/businesses/{businessId}/orders', function ($businessId) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
-            abort_unless($business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($business->hasModule('orders'), 404);
             $query = Order::where('business_id', $business->id)->with('items')->latest();
 
             if ($status = request('status')) {
@@ -2681,6 +3472,14 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             }
             if ($paymentStatus = request('payment_status')) {
                 $query->where('payment_status', $paymentStatus);
+            }
+            if ($search = request('search')) {
+                $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+                $query->where(function ($searchQuery) use ($safe) {
+                    $searchQuery->where('order_number', 'like', $safe)
+                        ->orWhere('customer_name', 'like', $safe)
+                        ->orWhere('customer_phone', 'like', $safe);
+                });
             }
 
             $orders = $query->paginate(20)->withQueryString();
@@ -2691,34 +3490,209 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::put('/orders/{id}/status', function (Request $request, $id) {
             $order = Order::with('business')->findOrFail($id);
             $user = Auth::user();
-            abort_unless($order->business->enabled_modules['orders'] ?? false, 404);
+            abort_unless($order->business->hasModule('orders'), 404);
             if ($order->business->created_by !== $user->id) {
                 abort(403);
             }
 
             $validated = $request->validate([
-                'status' => 'required|in:confirmed,preparing,ready,out_for_delivery,delivered,cancelled',
+                'status' => 'required|in:confirmed,preparing,ready,out_for_delivery,delivered,cancelled,rejected',
                 'cancellation_reason' => 'nullable|string',
             ]);
-            $order->update($validated);
-
-            $ts = match ($validated['status']) {
-                'confirmed' => 'confirmed_at',
-                'ready' => 'ready_at',
-                'delivered' => 'delivered_at',
-                'cancelled' => 'cancelled_at',
-                default => null,
-            };
-            if ($ts) {
-                $order->update([$ts => now()]);
-            }
+            app(OrderWorkflowService::class)->transition(
+                $order,
+                $validated['status'],
+                $validated['cancellation_reason'] ?? null,
+            );
 
             return back()->with('success', 'Order '.$validated['status'].'.');
         })->name('orders.status');
 
+        Route::put('/orders/{id}/payment-status', function (Request $request, $id) {
+            $order = Order::with('business')->findOrFail($id);
+            abort_unless($order->business->created_by === Auth::id(), 403);
+            $request->validate(['payment_status' => 'required|in:paid']);
+
+            app(OrderWorkflowService::class)->markCashCollected($order);
+
+            return back()->with('success', 'Cash payment marked as collected.');
+        })->name('orders.payment-status');
+
+        // Experience management
+        Route::get('/businesses/{businessId}/experiences', function ($businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $experienceService = app(\App\Services\BusinessExperienceService::class);
+            $readiness = $experienceService->calculateExperienceReadiness($business);
+
+            return view('vendor.businesses.experiences', compact('business', 'readiness'));
+        })->name('businesses.experiences');
+
+        Route::put('/businesses/{businessId}/experiences', function (Request $request, $businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $validated = $request->validate([
+                'primary_experience' => 'nullable|string|in:directory,retail,restaurant,appointment,stay,turf,taxi,shared_transport,vehicle_rental,goods_transport,seat_event',
+                'enabled_experiences' => 'nullable|array',
+                'enabled_experiences.*' => 'string|in:directory,retail,restaurant,appointment,stay,turf,taxi,shared_transport,vehicle_rental,goods_transport,seat_event',
+            ]);
+
+            $business->update([
+                'primary_experience' => $validated['primary_experience'] ?? $business->primary_experience,
+                'enabled_experiences' => $validated['enabled_experiences'] ?? $business->enabled_experiences,
+            ]);
+
+            return back()->with('success', 'Experiences updated.');
+        })->name('businesses.experiences.update');
+
+        Route::put('/businesses/{businessId}/experiences/{experience}/availability', function (Request $request, $businessId, $experience) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $request->validate([
+                'availability_mode' => 'required|in:live,request,contact',
+            ]);
+
+            $config = $business->experience_config ?? [];
+            $config[$experience]['availability_mode'] = $request->availability_mode;
+            $business->update([
+                'experience_config' => $config,
+                'availability_updated_at' => now(),
+                'availability_is_stale' => false,
+            ]);
+
+            return back()->with('success', ucfirst(str_replace('_', ' ', $experience)).' availability set to '.ucfirst($request->availability_mode).'.');
+        })->name('businesses.experiences.availability');
+
+        // Turf inventory management
+        Route::get('/businesses/{businessId}/turf', function ($businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('turf') || $business->hasModule('bookings'), 404);
+            $services = $business->services()->where('booking_mode', 'slot')->with(['timeSlots' => function ($q) {
+                $q->orderBy('day_of_week')->orderBy('start_time');
+            }])->get();
+
+            return view('vendor.inventory.turf', compact('business', 'services'));
+        })->name('businesses.turf');
+
+        Route::put('/businesses/{businessId}/turf/services/{serviceId}/toggle', function (Request $request, $businessId, $serviceId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $service->update(['is_active' => $request->boolean('is_active')]);
+
+            return back()->with('success', 'Turf availability updated.');
+        })->name('businesses.turf.toggle');
+
+        // Room/stay inventory management
+        Route::get('/businesses/{businessId}/rooms', function ($businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('bookings'), 404);
+            $services = $business->services()->where('booking_mode', 'stay')->get();
+
+            return view('vendor.inventory.rooms', compact('business', 'services'));
+        })->name('businesses.rooms');
+
+        Route::put('/businesses/{businessId}/rooms/{serviceId}', function (Request $request, $businessId, $serviceId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $validated = $request->validate([
+                'inventory_units' => 'required|integer|min:0|max:10000',
+                'price' => 'required|numeric|min:0',
+                'is_active' => 'nullable|boolean',
+            ]);
+            $validated['is_active'] = $request->boolean('is_active');
+            $service->update($validated);
+
+            return back()->with('success', 'Room updated.');
+        })->name('businesses.rooms.update');
+
+        // Appointment calendar management
+        Route::get('/businesses/{businessId}/appointments', function ($businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('bookings'), 404);
+            $services = $business->services()->where('booking_mode', 'appointment')->with(['timeSlots' => function ($q) {
+                $q->orderBy('day_of_week')->orderBy('start_time');
+            }])->get();
+
+            return view('vendor.inventory.appointments', compact('business', 'services'));
+        })->name('businesses.appointments');
+
+        Route::put('/businesses/{businessId}/appointments/{serviceId}', function (Request $request, $businessId, $serviceId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $validated = $request->validate([
+                'is_active' => 'nullable|boolean',
+                'duration' => 'nullable|integer|min:15|max:1440',
+                'capacity' => 'nullable|integer|min:1',
+            ]);
+            $validated['is_active'] = $request->boolean('is_active');
+            $service->update($validated);
+
+            return back()->with('success', 'Appointment service updated.');
+        })->name('businesses.appointments.update');
+
+        Route::post('/businesses/{businessId}/appointments/{serviceId}/slots', function (Request $request, $businessId, $serviceId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $validated = $request->validate([
+                'day_of_week' => 'nullable|integer|between:0,6',
+                'start_time' => 'required|date_format:H:i',
+                'end_time' => 'required|date_format:H:i|after:start_time',
+                'capacity' => 'required|integer|min:1|max:10000',
+                'price_override' => 'nullable|numeric|min:0',
+            ]);
+            $validated['service_id'] = $service->id;
+            $validated['is_active'] = true;
+            TimeSlot::create($validated);
+
+            return back()->with('success', 'Time slot added.');
+        })->name('businesses.appointments.slots.store');
+
+        Route::delete('/businesses/{businessId}/appointments/{serviceId}/slots/{slotId}', function ($businessId, $serviceId, $slotId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $slot = TimeSlot::where('service_id', $service->id)->findOrFail($slotId);
+            abort_if($slot->bookings()->whereIn('status', ['pending', 'confirmed'])->exists(), 422, 'Cannot delete a slot with active bookings.');
+            $slot->delete();
+
+            return back()->with('success', 'Time slot deleted.');
+        })->name('businesses.appointments.slots.destroy');
+
+        // Seat event inventory
+        Route::get('/businesses/{businessId}/seats', function ($businessId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            abort_unless($business->hasModule('bookings'), 404);
+            $services = $business->services()->where('booking_mode', 'seat')->get();
+
+            return view('vendor.inventory.seats', compact('business', 'services'));
+        })->name('businesses.seats');
+
+        Route::put('/businesses/{businessId}/seats/{serviceId}', function (Request $request, $businessId, $serviceId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $service = Service::where('business_id', $business->id)->findOrFail($serviceId);
+            $validated = $request->validate([
+                'capacity' => 'required|integer|min:0',
+                'price' => 'required|numeric|min:0',
+                'is_active' => 'nullable|boolean',
+            ]);
+            $validated['is_active'] = $request->boolean('is_active');
+            $service->update($validated);
+
+            return back()->with('success', 'Seat event updated.');
+        })->name('businesses.seats.update');
+
+        // Vehicle availability toggle
+        Route::put('/businesses/{businessId}/vehicles/{vehicleId}/availability', function (Request $request, $businessId, $vehicleId) {
+            $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
+            $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
+            $validated = $request->validate([
+                'availability_status' => 'required|in:available,busy,offline',
+            ]);
+            $vehicle->update($validated);
+
+            return back()->with('success', 'Vehicle availability updated.');
+        })->name('businesses.vehicles.availability');
+
         // Settings
         Route::get('/settings', function () {
             $user = Auth::user();
+
             return view('vendor.settings.index', compact('user'));
         })->name('settings');
 
@@ -2729,6 +3703,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 'phone' => 'nullable|string|max:20',
             ]);
             $user->update($validated);
+
             return redirect()->route('vendor.settings')->with('success', 'Profile updated.');
         })->name('settings.update');
 
@@ -2738,7 +3713,28 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 'password' => 'required|string|min:6|confirmed',
             ]);
             Auth::user()->update(['password' => bcrypt($validated['password'])]);
+
             return redirect()->route('vendor.settings')->with('success', 'Password changed.');
         })->name('settings.password');
+
+        // Vendor Analytics
+        Route::get('/analytics', [\App\Http\Controllers\Vendor\AnalyticsController::class, 'overview'])->name('analytics');
+        Route::get('/analytics/popular-products', [\App\Http\Controllers\Vendor\AnalyticsController::class, 'popularProducts'])->name('analytics.popular-products');
+        Route::get('/analytics/revenue-chart', [\App\Http\Controllers\Vendor\AnalyticsController::class, 'revenueChart'])->name('analytics.revenue-chart');
+
+        // Vendor Media Library
+        Route::get('/media', [\App\Http\Controllers\Vendor\MediaController::class, 'index'])->name('media');
+        Route::post('/media/upload', [\App\Http\Controllers\Vendor\MediaController::class, 'upload'])->name('media.upload');
+        Route::delete('/media/{media}', [\App\Http\Controllers\Vendor\MediaController::class, 'destroy'])->name('media.destroy');
+
+        // Notifications
+        Route::get('/notifications', [\App\Http\Controllers\VendorNotificationController::class, 'index'])->name('notifications');
+        Route::get('/notifications/{notification}', [\App\Http\Controllers\VendorNotificationController::class, 'show'])->name('notifications.show');
+        Route::post('/notifications/{notification}/read', [\App\Http\Controllers\VendorNotificationController::class, 'markRead'])->name('notifications.read');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\VendorNotificationController::class, 'markAllRead'])->name('notifications.read-all');
+        Route::delete('/notifications/{notification}', [\App\Http\Controllers\VendorNotificationController::class, 'destroy'])->name('notifications.destroy');
     });
 });
+
+// ─── Health ───
+Route::get('/health/backups', [\App\Http\Controllers\HealthController::class, 'backupStatus'])->name('health.backups');

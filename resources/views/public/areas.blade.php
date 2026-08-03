@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Browse by Area | Hola - Churachandpur Directory')
+@section('title', 'Browse by Area | Eiho One - Churachandpur Directory')
 @section('description', 'Explore businesses by neighborhood in Churachandpur, Manipur')
 
 @section('content')

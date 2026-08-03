@@ -31,4 +31,14 @@ class ReportController extends Controller
             'message' => 'Report submitted successfully.',
         ]);
     }
+
+    public function myReports(Request $request)
+    {
+        $reports = Report::where('user_id', $request->user()->id)
+            ->with('business:id,name,slug,image')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json(['reports' => $reports]);
+    }
 }

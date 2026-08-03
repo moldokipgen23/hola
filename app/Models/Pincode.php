@@ -36,11 +36,11 @@ class Pincode extends Model
         $lat = (float) $latitude;
         $lng = (float) $longitude;
 
-        return self::selectRaw(
-            "*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance",
+        return self::whereNotNull('latitude')->whereNotNull('longitude')->selectRaw(
+            '*, (6371 * acos(LEAST(1, GREATEST(-1, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))))) AS distance',
             [$lat, $lng, $lat]
         )->having('distance', '<=', $radius)
-         ->orderBy('distance');
+            ->orderBy('distance');
     }
 
     public static function isServiceable(string $pincode): bool

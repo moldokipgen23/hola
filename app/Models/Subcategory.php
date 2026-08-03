@@ -15,10 +15,12 @@ class Subcategory extends Model
         'icon',
         'order',
         'is_active',
+        'recommended_modules',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'recommended_modules' => 'array',
     ];
 
     public function category(): BelongsTo

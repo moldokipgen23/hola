@@ -154,18 +154,6 @@ class AuthController extends Controller
         if (! $pincode) {
             return response()->json(['message' => 'Invalid pincode. Please enter a valid Indian pincode.'], 422);
         }
-        if (! $pincode->serviceable) {
-            return response()->json([
-                'message' => "We're not in {$pincode->district}, {$pincode->state} yet! Leave your email and we'll notify you when we launch there.",
-                'area' => [
-                    'pincode' => $pincode->pincode,
-                    'locality' => $pincode->locality,
-                    'district' => $pincode->district,
-                    'state' => $pincode->state,
-                ],
-            ], 422);
-        }
-
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
@@ -199,6 +187,7 @@ class AuthController extends Controller
             'token' => $user->createToken('hola')->plainTextToken,
             'user' => $user,
             'business' => $business,
+            'transaction_serviceable' => $pincode->serviceable,
             'message' => 'Owner account and business created successfully.',
         ]);
     }

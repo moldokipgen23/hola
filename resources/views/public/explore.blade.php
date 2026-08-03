@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Explore Businesses | Hola - Churachandpur')
+@section('title', 'Explore Businesses | Eiho One - Churachandpur')
 @section('description', 'Discover and explore local businesses in Lamka, Churachandpur. Shop, book services, or find what you need nearby.')
 
 @section('content')
@@ -17,21 +17,36 @@
         <a href="{{ route('explore') }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ !request('module') ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">
             All
         </a>
-        <a href="{{ route('explore', ['module' => 'ordering']) }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ request('module') === 'ordering' ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">
-            🛍️ Shopping
-        </a>
-        <a href="{{ route('explore', ['module' => 'booking']) }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ request('module') === 'booking' ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">
-            📅 Booking
-        </a>
-        <a href="{{ route('explore', ['module' => 'directory']) }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ request('module') === 'directory' ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">
-            📍 Directory
-        </a>
+        @if($launchControl->worldEnabled('shop') && $launchControl->moduleEnabled('catalog'))
+            <a href="{{ route('explore', ['module' => 'ordering']) }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ request('module') === 'ordering' ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">🛍️ Shopping</a>
+        @endif
+        @if($launchControl->worldEnabled('book') && $launchControl->moduleEnabled('bookings'))
+            <a href="{{ route('explore', ['module' => 'booking']) }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ request('module') === 'booking' ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">📅 Booking</a>
+        @endif
+        @if($launchControl->worldEnabled('ride') && $launchControl->moduleEnabled('transport'))
+            <a href="{{ route('explore', ['module' => 'transport']) }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ request('module') === 'transport' ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">🚗 Transport</a>
+        @endif
+        @if($launchControl->experienceEnabled('directory'))
+            <a href="{{ route('explore', ['module' => 'directory']) }}" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap {{ request('module') === 'directory' ? 'bg-primary-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300' }}">📍 Directory</a>
+        @endif
     </div>
 </div>
 
 {{-- Map --}}
 <div class="max-w-6xl mx-auto px-4 py-4">
-    <div id="map" class="rounded-xl overflow-hidden border border-slate-200" style="height: 400px;"></div>
+    <button type="button" id="toggleMap" class="md:hidden w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700">
+        Show map
+    </button>
+    <div id="mapPanel" class="hidden md:block">
+        <div class="flex items-center justify-between gap-3 mb-2">
+            <p class="text-sm text-slate-500"><span id="mapCount">{{ $mapBusinesses->count() }}</span> matching locations</p>
+            <button type="button" id="locateMe" class="px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:border-primary-300">
+                ◎ Use my location
+            </button>
+        </div>
+        <div id="map" class="rounded-xl overflow-hidden border border-slate-200" style="height: 320px;"></div>
+        <p id="locationStatus" class="mt-2 text-xs text-slate-500" aria-live="polite"></p>
+    </div>
 </div>
 
 {{-- Filters + Results --}}
@@ -51,7 +66,7 @@
             <div>
                 <select name="category" class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-300">
                     <option value="">All Categories</option>
-                    @foreach(\App\Models\Category::active()->orderBy('name')->get() as $cat)
+                    @foreach($categories as $cat)
                         <option value="{{ $cat->slug }}" {{ request('category') == $cat->slug ? 'selected' : '' }}>{{ $cat->name }}</option>
                     @endforeach
                 </select>
@@ -59,7 +74,7 @@
             <div>
                 <select name="area" class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-300">
                     <option value="">All Areas</option>
-                    @foreach(\App\Models\Area::active()->where('slug', '!=', 'other')->withCount('businesses')->orderBy('name')->get()->filter(fn($a) => $a->businesses_count > 0) as $area)
+                    @foreach($areas as $area)
                         <option value="{{ $area->slug }}" {{ request('area') == $area->slug ? 'selected' : '' }}>{{ $area->name }}</option>
                     @endforeach
                 </select>
@@ -100,9 +115,12 @@
 
 @section('scripts')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 @php
-    $mapData = $businesses->map(fn($b) => [
+    $mapData = $mapBusinesses->map(fn($b) => [
         'name' => $b->name,
         'slug' => $b->slug,
         'lat' => $b->latitude,
@@ -113,14 +131,32 @@
 @endphp
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const businesses = {!! json_encode($mapData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    const businesses = {{ Illuminate\Support\Js::from($mapData) }};
+    const mapPanel = document.getElementById('mapPanel');
+    const toggleMap = document.getElementById('toggleMap');
+    const locateButton = document.getElementById('locateMe');
+    const locationStatus = document.getElementById('locationStatus');
+    let map = null;
+
+    toggleMap.addEventListener('click', function () {
+        mapPanel.classList.toggle('hidden');
+        toggleMap.textContent = mapPanel.classList.contains('hidden') ? 'Show map' : 'Hide map';
+        window.setTimeout(() => map?.invalidateSize(), 50);
+    });
 
     if (businesses.length === 0) {
         document.getElementById('map').classList.add('hidden');
+        locateButton.classList.add('hidden');
+        locationStatus.textContent = 'No matching businesses have map coordinates yet.';
         return;
     }
 
-    const map = L.map('map').setView([24.33, 93.70], 13);
+    if (typeof L === 'undefined') {
+        locationStatus.textContent = 'The map could not load. Business results are still available below.';
+        return;
+    }
+
+    map = L.map('map').setView([24.33, 93.70], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
@@ -128,13 +164,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }).addTo(map);
 
     const markers = [];
+    const markerLayer = typeof L.markerClusterGroup === 'function'
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 })
+        : L.layerGroup();
+    markerLayer.addTo(map);
     businesses.forEach(function (b) {
-        const marker = L.marker([b.lat, b.lng]).addTo(map);
-        marker.bindPopup(
-            '<a href="/business/' + b.slug + '" style="color:#0d9488;font-weight:600;text-decoration:none;">' + b.name + '</a>' +
-            (b.category ? '<br><span style="font-size:12px;color:#94a3b8;">' + b.category + '</span>' : '') +
-            (b.address ? '<br><span style="font-size:12px;color:#64748b;">' + b.address + '</span>' : '')
-        );
+        const marker = L.marker([b.lat, b.lng]);
+        const popup = document.createElement('div');
+        const link = document.createElement('a');
+        link.href = '/business/' + encodeURIComponent(b.slug);
+        link.style.cssText = 'color:#2563eb;font-weight:600;text-decoration:none;';
+        link.textContent = b.name;
+        popup.appendChild(link);
+        [b.category, b.address].filter(Boolean).forEach(function (line, index) {
+            const detail = document.createElement('div');
+            detail.style.cssText = 'font-size:12px;color:' + (index === 0 ? '#94a3b8' : '#64748b') + ';';
+            detail.textContent = line;
+            popup.appendChild(detail);
+        });
+        marker.bindPopup(popup);
+        markerLayer.addLayer(marker);
         markers.push(marker);
     });
 
@@ -144,6 +193,32 @@ document.addEventListener('DOMContentLoaded', function () {
     } else if (markers.length === 1) {
         map.setView([markers[0].getLatLng().lat, markers[0].getLatLng().lng], 15);
     }
+
+    locateButton.addEventListener('click', function () {
+        if (!navigator.geolocation) {
+            locationStatus.textContent = 'Location is not supported by this browser.';
+            return;
+        }
+
+        locateButton.disabled = true;
+        locationStatus.textContent = 'Finding your location…';
+        navigator.geolocation.getCurrentPosition(function (position) {
+            const point = [position.coords.latitude, position.coords.longitude];
+            L.circleMarker(point, {
+                radius: 8,
+                color: '#ffffff',
+                weight: 3,
+                fillColor: '#2563eb',
+                fillOpacity: 1,
+            }).addTo(map).bindPopup('You are here').openPopup();
+            map.setView(point, 14);
+            locationStatus.textContent = 'Map centered on your current location.';
+            locateButton.disabled = false;
+        }, function () {
+            locationStatus.textContent = 'We could not access your location. Check browser permission and try again.';
+            locateButton.disabled = false;
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    });
 });
 </script>
 @endsection

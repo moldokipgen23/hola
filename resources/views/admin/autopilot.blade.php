@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Autopilot — Hola Admin')
+@section('title', 'Autopilot — Eiho One Admin')
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-8">
@@ -22,6 +22,53 @@
                     {{ ($agent->status ?? 'paused') === 'active' ? 'AUTOPILOT ON — Click to turn OFF' : 'AUTOPILOT OFF — Click to turn ON' }}
                 </button>
             </form>
+        </div>
+    </div>
+
+    {{-- Operational Health --}}
+    <div class="glass-card p-5 rounded-xl mb-6 border {{ $operations['status'] === 'ok' ? 'border-emerald-500/20' : 'border-red-500/30' }}">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div>
+                <h3 class="font-semibold text-white">System & Autopilot Health</h3>
+                <p class="text-slate-400 text-sm">Live scheduler, queue and task-processing status</p>
+            </div>
+            <span class="badge {{ $operations['status'] === 'ok' ? 'badge-green' : 'badge-red' }}">
+                {{ $operations['status'] === 'ok' ? 'Operational' : 'Needs attention' }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            @foreach(['application' => 'Application', 'database' => 'Database', 'storage' => 'Storage', 'scheduler' => 'Scheduler', 'queue' => 'Queue'] as $key => $label)
+                @php
+                    $check = $operations['checks'][$key] ?? false;
+                @endphp
+                <div class="rounded-lg bg-slate-900/40 p-3">
+                    <p class="text-xs text-slate-500">{{ $label }}</p>
+                    <p class="mt-1 text-sm font-semibold {{ $check === true || $check === 'not_required' ? 'text-emerald-400' : 'text-red-400' }}">
+                        {{ $check === 'not_required' ? 'Not required' : ($check ? 'Healthy' : 'Down') }}
+                    </p>
+                </div>
+            @endforeach
+            <div class="rounded-lg bg-slate-900/40 p-3">
+                <p class="text-xs text-slate-500">Queue backlog</p>
+                <p class="mt-1 text-sm font-semibold {{ ($operations['queue_backlog'] ?? 0) > 0 ? 'text-yellow-400' : 'text-emerald-400' }}">
+                    {{ $operations['queue_backlog'] ?? 0 }} jobs
+                </p>
+            </div>
+            <div class="rounded-lg bg-slate-900/40 p-3">
+                <p class="text-xs text-slate-500">Stale tasks</p>
+                <p class="mt-1 text-sm font-semibold {{ $operations['agent_tasks']['stale'] > 0 ? 'text-red-400' : 'text-emerald-400' }}">
+                    {{ $operations['agent_tasks']['stale'] }}
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+            <span>Pending tasks: {{ $operations['agent_tasks']['pending'] }}</span>
+            <span>Running tasks: {{ $operations['agent_tasks']['running'] }}</span>
+            <span>Failed in 24h: {{ $operations['agent_tasks']['failed_last_24_hours'] }}</span>
+            <span>Scheduler heartbeat: {{ $operations['heartbeats']['scheduler'] ? \Illuminate\Support\Carbon::parse($operations['heartbeats']['scheduler'])->diffForHumans() : 'never' }}</span>
+            <span>Queue heartbeat: {{ $operations['heartbeats']['queue'] ? \Illuminate\Support\Carbon::parse($operations['heartbeats']['queue'])->diffForHumans() : 'not available' }}</span>
         </div>
     </div>
 

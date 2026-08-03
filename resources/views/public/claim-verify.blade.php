@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Verify Claim | Hola')
+@section('title', 'Verify Claim | Eiho One')
 
 @section('content')
 <div class="bg-white border-b border-slate-100">

@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', isset($subcategory) ? 'Edit Subcategory' : 'Add Subcategory')
-@section('header', isset($subcategory) ? 'Edit Subcategory' : 'Add Subcategory')
+@section('title', isset($subcategory) ? 'Edit Business Type' : 'Add Business Type')
+@section('header', isset($subcategory) ? 'Edit Business Type' : 'Add Business Type')
 
 @section('content')
 <div class="max-w-2xl mx-auto">
@@ -25,7 +25,7 @@
                 <select name="category_id" required class="input-dark">
                     <option value="">Select...</option>
                     @foreach($categories ?? [] as $cat)
-                        <option value="{{ $cat->id }}" {{ old('category_id', $subcategory->category_id ?? '') == $cat->id ? 'selected' : '' }}>
+                        <option value="{{ $cat->id }}" {{ old('category_id', $subcategory->category_id ?? request('category_id', '')) == $cat->id ? 'selected' : '' }}>
                             {{ $cat->name }}
                         </option>
                     @endforeach
@@ -33,9 +33,9 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-400 mb-1">Name *</label>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Business type *</label>
                 <input type="text" name="name" value="{{ old('name', $subcategory->name ?? '') }}" required
-                    class="input-dark">
+                    class="input-dark" placeholder="Example: Taxi, Football Turf, Restaurant">
             </div>
 
             <div>
@@ -55,6 +55,27 @@
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', $subcategory->is_active ?? 1) ? 'checked' : '' }}>
                     <span class="text-sm text-slate-300">Active</span>
                 </label>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">What should this business be able to do?</label>
+                <p class="text-xs text-slate-500 mb-3">Choose only what applies. Every business already has a listing, map, call, and WhatsApp details.</p>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    @foreach([
+                        'catalog' => 'Show products or menu',
+                        'orders' => 'Accept COD orders',
+                        'bookings' => 'Accept booking requests',
+                        'inventory' => 'Track product availability',
+                        'transport' => 'Accept taxi / transport requests',
+                        'turf' => 'Manage turf time slots',
+                    ] as $module => $label)
+                        <label class="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2">
+                            <input type="checkbox" name="recommended_modules[]" value="{{ $module }}"
+                                {{ in_array($module, old('recommended_modules', $subcategory->recommended_modules ?? []), true) ? 'checked' : '' }}>
+                            <span class="text-sm text-slate-300">{{ $label }}</span>
+                        </label>
+                    @endforeach
+                </div>
             </div>
 
             <div>

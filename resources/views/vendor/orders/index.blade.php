@@ -26,7 +26,7 @@
         <div>
             <select name="payment_status" class="input-dark w-full">
                 <option value="">All Payment</option>
-                <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+                <option value="pending" {{ request('payment_status') == 'pending' ? 'selected' : '' }}>Awaiting Cash</option>
                 <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid</option>
                 <option value="refunded" {{ request('payment_status') == 'refunded' ? 'selected' : '' }}>Refunded</option>
             </select>
@@ -103,10 +103,10 @@
                 </td>
                 <td>
                     @php
-                        $paymentClasses = ['unpaid' => 'badge-red', 'paid' => 'badge-green', 'refunded' => 'bg-orange-500/20 text-orange-400'];
+                        $paymentClasses = ['pending' => 'badge-red', 'paid' => 'badge-green', 'refunded' => 'bg-orange-500/20 text-orange-400'];
                     @endphp
                     <span class="badge {{ $paymentClasses[$order->payment_status] ?? 'badge-yellow' }}">
-                        {{ ucfirst($order->payment_status) }}
+                        {{ $order->payment_status === 'pending' ? 'Awaiting Cash' : ucfirst($order->payment_status) }}
                     </span>
                 </td>
                 <td class="text-slate-400 text-xs">{{ $order->created_at->format('M d, Y') }}</td>
@@ -135,8 +135,10 @@
                         @if($order->status === 'ready')
                             <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
                                 @csrf @method('PUT')
-                                <input type="hidden" name="status" value="out_for_delivery">
-                                <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20">Deliver</button>
+                                <input type="hidden" name="status" value="{{ $order->delivery_method === 'pickup' ? 'delivered' : 'out_for_delivery' }}">
+                                <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20">
+                                    {{ $order->delivery_method === 'pickup' ? 'Picked Up' : 'Deliver' }}
+                                </button>
                             </form>
                         @endif
                         @if($order->status === 'out_for_delivery')
@@ -146,11 +148,18 @@
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20">Delivered</button>
                             </form>
                         @endif
-                        @if(!in_array($order->status, ['delivered', 'cancelled']))
+                        @if(in_array($order->status, ['pending', 'confirmed', 'preparing', 'ready']))
                             <form method="POST" action="{{ route('vendor.orders.status', $order->id) }}" class="inline">
                                 @csrf @method('PUT')
                                 <input type="hidden" name="status" value="cancelled">
                                 <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20">Cancel</button>
+                            </form>
+                        @endif
+                        @if($order->payment_status !== 'paid' && !in_array($order->status, ['cancelled', 'refunded']))
+                            <form method="POST" action="{{ route('vendor.orders.payment-status', $order->id) }}" class="inline">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="payment_status" value="paid">
+                                <button type="submit" class="px-2 py-1 text-xs rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">Cash Collected</button>
                             </form>
                         @endif
                     </div>

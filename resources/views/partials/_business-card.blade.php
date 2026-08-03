@@ -11,12 +11,25 @@
     $priceLabels = [1 => '₹', 2 => '₹₹', 3 => '₹₹₹'];
 
     $isOpen = null;
+    $formattedCloseTime = null;
     if ($business->working_hours && is_array($business->working_hours)) {
         $dayOfWeek = strtolower(now()->format('l'));
         $todayHours = $business->working_hours[$dayOfWeek] ?? null;
         if ($todayHours && !empty($todayHours['open']) && !empty($todayHours['close'])) {
-            $now = now()->format('H:i');
-            $isOpen = $now >= $todayHours['open'] && $now <= $todayHours['close'];
+            try {
+                $now = now();
+                $opensAt = \Carbon\Carbon::parse($todayHours['open']);
+                $closesAt = \Carbon\Carbon::parse($todayHours['close']);
+
+                if ($closesAt->lessThanOrEqualTo($opensAt)) {
+                    $now->lessThan($opensAt) ? $opensAt->subDay() : $closesAt->addDay();
+                }
+
+                $isOpen = $now->betweenIncluded($opensAt, $closesAt);
+                $formattedCloseTime = $closesAt->format('g:i A');
+            } catch (\Throwable) {
+                $isOpen = null;
+            }
         }
     }
 @endphp
@@ -66,14 +79,17 @@
                         {{ $business->category->name }}
                     </span>
                 @endif
-                @if($business->module_type)
-                    @php
-                        $moduleLabels = ['ordering' => '🛍️', 'booking' => '📅', 'transport' => '🚗', 'turf' => '⚽', 'directory' => '📍', 'both' => '🔄'];
-                        $moduleLabel = $moduleLabels[$business->module_type] ?? '';
-                    @endphp
-                    @if($moduleLabel)
-                        <span class="text-xs">{{ $moduleLabel }}</span>
-                    @endif
+                @php
+                    $capabilities = $business->effectiveModules();
+                @endphp
+                @if($capabilities['orders'] ?? false)
+                    <span class="text-xs" title="Shopping">🛍️</span>
+                @endif
+                @if($capabilities['bookings'] ?? false)
+                    <span class="text-xs" title="Booking">📅</span>
+                @endif
+                @if($capabilities['transport'] ?? false)
+                    <span class="text-xs" title="Transport">🚗</span>
                 @endif
             </div>
             <div class="flex items-center gap-1 text-xs text-slate-400">
@@ -84,14 +100,8 @@
                 <div class="mt-2.5 flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full {{ $isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-400' }}"></span>
                     <span class="text-xs font-semibold {{ $isOpen ? 'text-emerald-600' : 'text-red-500' }}">{{ $isOpen ? 'Open Now' : 'Closed' }}</span>
-                    @if($isOpen && $business->working_hours)
-                        @php
-                            $dayOfWeek = strtolower(now()->format('l'));
-                            $closeTime = $business->working_hours[$dayOfWeek]['close'] ?? '';
-                        @endphp
-                        @if($closeTime)
-                            <span class="text-xs text-slate-400">· Closes {{ \Carbon\Carbon::createFromFormat("H:i", substr($closeTime, 0, 5))->format('g:i A') }}</span>
-                        @endif
+                    @if($isOpen && $formattedCloseTime)
+                        <span class="text-xs text-slate-400">· Closes {{ $formattedCloseTime }}</span>
                     @endif
                 </div>
             @endif

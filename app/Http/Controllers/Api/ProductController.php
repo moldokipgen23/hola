@@ -10,13 +10,15 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
         $products = Product::active()
-            ->with('business')
+            ->whereHas('business', fn ($query) => $query->active()->ofModule('catalog'))
+            ->with('business:id,name,slug,is_active,enabled_modules')
             ->when($request->business_id, function ($query, $businessId) {
                 $query->where('business_id', $businessId);
             })
             ->orderBy('order')
-            ->paginate($request->per_page ?? 20);
+            ->paginate($perPage);
 
         return response()->json([
             'products' => $products,
@@ -25,8 +27,10 @@ class ProductController extends Controller
 
     public function show($slug)
     {
-        $product = Product::where('slug', $slug)
-            ->with('business')
+        $product = Product::active()
+            ->where('slug', $slug)
+            ->whereHas('business', fn ($query) => $query->active()->ofModule('catalog'))
+            ->with('business:id,name,slug,is_active,enabled_modules')
             ->firstOrFail();
 
         return response()->json([
@@ -38,6 +42,7 @@ class ProductController extends Controller
     {
         $products = Product::active()
             ->where('business_id', $businessId)
+            ->whereHas('business', fn ($query) => $query->active()->ofModule('catalog'))
             ->orderBy('order')
             ->get();
 
@@ -49,7 +54,8 @@ class ProductController extends Controller
     public function popular()
     {
         $products = Product::active()
-            ->with('business')
+            ->whereHas('business', fn ($query) => $query->active()->ofModule('catalog'))
+            ->with('business:id,name,slug,is_active,enabled_modules')
             ->inRandomOrder()
             ->limit(10)
             ->get();

@@ -7,19 +7,34 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ClaimController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DeliveryConfigController;
 use App\Http\Controllers\Api\DeliveryZoneController;
+use App\Http\Controllers\Api\FilterController;
+use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OwnerDashboardController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PlatformFeatureController;
+use App\Http\Controllers\Api\PincodeController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PublicBookingController;
+use App\Http\Controllers\Api\PushTokenController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SavedListingController;
+use App\Http\Controllers\Api\SearchAnalyticsController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\TimeSlotController;
 use App\Http\Controllers\Api\TransportController;
+use App\Http\Controllers\Api\VendorSetupController;
+use App\Models\AreaInterest;
 use App\Models\Business;
+use App\Models\Category;
+use App\Models\Pincode;
+use App\Models\World;
+use App\Models\WorldHomepageContent;
+use App\Services\LaunchControlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,17 +45,80 @@ Route::middleware('throttle:10,1')->group(function () {
     Route::post('/auth/otp/verify', [AuthController::class, 'verifyOtp']);
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/register-owner', [AuthController::class, 'registerOwner']);
-    Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/auth/login', [AuthController::class, 'login'])->name('api.login');
     Route::post('/auth/admin/login', [AuthController::class, 'adminLogin']);
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 });
 
 // ─── Public Data ───
+Route::get('/platform/features', PlatformFeatureController::class);
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/featured', [CategoryController::class, 'featured']);
+Route::get('/categories/tree', function () {
+    $categories = Category::active()
+        ->root()
+        ->ordered()
+        ->with(['children' => function ($q) {
+            $q->active()->ordered()->with(['children' => function ($q2) {
+                $q2->active()->ordered();
+            }])->withCount('businesses');
+        }])
+        ->withCount('businesses')
+        ->get();
+
+    return response()->json(['data' => $categories]);
+});
 Route::get('/categories/{slug}', [CategoryController::class, 'show']);
 Route::get('/categories/{slug}/businesses', [CategoryController::class, 'showWithBusinesses']);
+
+// Worlds API
+Route::get('/worlds', function (LaunchControlService $launchControl) {
+    $worlds = World::active()->ordered()->get()
+        ->filter(fn (World $world) => $launchControl->worldAvailable($world->slug))
+        ->values();
+
+    return response()->json(['data' => $worlds]);
+});
+
+Route::get('/worlds/{slug}', function ($slug, LaunchControlService $launchControl) {
+    abort_unless($launchControl->worldAvailable($slug), 404);
+    $world = World::where('slug', $slug)->firstOrFail();
+    $categories = $world->categories()
+        ->active()
+        ->ordered()
+        ->withCount('businesses')
+        ->get();
+
+    return response()->json([
+        'data' => $world,
+        'categories' => $categories,
+    ]);
+});
+
+Route::get('/worlds/{slug}/categories', function ($slug, LaunchControlService $launchControl) {
+    abort_unless($launchControl->worldAvailable($slug), 404);
+    $world = World::where('slug', $slug)->firstOrFail();
+    $categories = $world->categories()
+        ->active()
+        ->root()
+        ->ordered()
+        ->with(['children' => function ($q) {
+            $q->active()->ordered()->withCount('businesses');
+        }])
+        ->withCount('businesses')
+        ->get();
+
+    return response()->json(['data' => $categories]);
+});
+
+// Category filters API
+Route::get('/categories/{id}/filters', function ($id) {
+    $category = Category::findOrFail($id);
+    $filters = $category->filters()->active()->filterable()->ordered()->get();
+
+    return response()->json(['data' => $filters]);
+});
 
 Route::get('/businesses', [BusinessController::class, 'index']);
 Route::get('/businesses/featured', [BusinessController::class, 'featured']);
@@ -53,17 +131,17 @@ Route::get('/businesses/{slug}', [BusinessController::class, 'show']);
 Route::post('/businesses/{slug}/track', [BusinessController::class, 'trackAction'])
     ->middleware('throttle:30,1');
 Route::get('/businesses/{slug}/related', [BusinessController::class, 'related']);
-Route::get('/businesses/{slug}/services', [BusinessController::class, 'services']);
-Route::get('/businesses/by-id/{id}/services', [BusinessController::class, 'publicServices']);
+Route::get('/businesses/{slug}/services', [BusinessController::class, 'services'])->middleware('launch:world.book,module.bookings');
+Route::get('/businesses/by-id/{id}/services', [BusinessController::class, 'publicServices'])->middleware('launch:world.book,module.bookings');
 
 // Public booking & order
-Route::post('/businesses/{slug}/bookings', [PublicBookingController::class, 'storeBooking']);
-Route::post('/businesses/{slug}/orders', [PublicBookingController::class, 'storeOrder']);
+Route::post('/businesses/{slug}/bookings', [PublicBookingController::class, 'storeBooking'])->middleware(['launch:world.book,module.bookings', 'auth.optional']);
+Route::post('/businesses/{slug}/orders', [PublicBookingController::class, 'storeOrder'])->middleware(['launch:world.shop,module.orders', 'auth.optional']);
 
 // Transport (taxi/vehicle booking)
-Route::get('/businesses/{slug}/vehicles', [TransportController::class, 'vehicles']);
-Route::post('/businesses/{slug}/trips/estimate', [TransportController::class, 'estimateFare']);
-Route::post('/businesses/{slug}/trips', [TransportController::class, 'bookTrip']);
+Route::get('/businesses/{slug}/vehicles', [TransportController::class, 'vehicles'])->middleware('launch:world.ride,module.transport');
+Route::post('/businesses/{slug}/trips/estimate', [TransportController::class, 'estimateFare'])->middleware('launch:world.ride,module.transport');
+Route::post('/businesses/{slug}/trips', [TransportController::class, 'bookTrip'])->middleware(['launch:world.ride,module.transport', 'auth.optional']);
 
 // Delivery Zones
 Route::get('/businesses/{slug}/delivery-zones', [DeliveryZoneController::class, 'index']);
@@ -71,7 +149,7 @@ Route::post('/businesses/{slug}/delivery-check', [DeliveryZoneController::class,
 Route::get('/delivery-zones/check-eligibility', [DeliveryZoneController::class, 'checkEligibility']);
 
 // Time Slots (turf/slot booking)
-Route::get('/services/{serviceId}/slots', [TimeSlotController::class, 'slotsByService']);
+Route::get('/services/{serviceId}/slots', [TimeSlotController::class, 'slotsByService'])->middleware('launch:world.book,module.bookings,module.turf');
 
 Route::middleware('auth:sanctum')->group(function () {
     // My Bookings & Orders (customer view)
@@ -88,13 +166,40 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::get('/businesses/{business}/reviews', [ReviewController::class, 'index']);
 
+// Homepage content (public)
+Route::get('/homepage/{world}', function ($world) {
+    $worldModel = World::where('slug', $world)->orWhere('id', $world)->firstOrFail();
+    $content = WorldHomepageContent::where('world_id', $worldModel->id)
+        ->active()
+        ->orderBy('sort_order')
+        ->get();
+
+    return response()->json(['data' => $content]);
+});
+
+// Delivery config
+Route::get('/businesses/{business}/delivery-config', [DeliveryConfigController::class, 'show']);
+Route::put('/businesses/{business}/delivery-config', [DeliveryConfigController::class, 'update'])
+    ->middleware('auth:sanctum');
+
+// Filters
+Route::get('/categories/{category}/filters', [FilterController::class, 'index']);
+Route::post('/businesses/filter', [FilterController::class, 'apply']);
+
+// Media
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/media', [MediaController::class, 'index']);
+    Route::post('/media/upload', [MediaController::class, 'upload']);
+    Route::delete('/media/{media}', [MediaController::class, 'destroy']);
+});
+
 // Public Settings & SEO
 Route::get('/settings', [SettingController::class, 'publicSettings']);
 Route::get('/sitemap', [SettingController::class, 'sitemap']);
 
-Route::get('/products', [ProductController::class, 'index']);
-Route::get('/products/popular', [ProductController::class, 'popular']);
-Route::get('/products/{slug}', [ProductController::class, 'show']);
+Route::get('/products', [ProductController::class, 'index'])->middleware('launch:world.shop,module.catalog');
+Route::get('/products/popular', [ProductController::class, 'popular'])->middleware('launch:world.shop,module.catalog');
+Route::get('/products/{slug}', [ProductController::class, 'show'])->middleware('launch:world.shop,module.catalog');
 
 // Public instant search (quick results for search dropdown)
 Route::get('/instant-search', function (Request $request) {
@@ -108,7 +213,6 @@ Route::get('/instant-search', function (Request $request) {
     $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $q).'%';
 
     $businesses = Business::active()
-        ->inServiceableArea()
         ->with('category:id,name,slug', 'area:id,name,slug')
         ->where(function ($query) use ($safe) {
             $query->where('name', 'like', $safe)
@@ -142,6 +246,7 @@ Route::get('/instant-search', function (Request $request) {
 
 Route::get('/search', [SearchController::class, 'search']);
 Route::get('/search/suggestions', [SearchController::class, 'suggestions']);
+Route::get('/search/universal', [SearchController::class, 'universal']);
 
 // ─── Authenticated User ───
 Route::middleware('auth:sanctum')->group(function () {
@@ -160,6 +265,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Reports
     Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/reports/mine', [ReportController::class, 'myReports']);
 
     // Reviews
     Route::post('/businesses/{business}/reviews', [ReviewController::class, 'store']);
@@ -178,6 +284,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+
+    // Push Tokens
+    Route::post('/push-tokens/register', [PushTokenController::class, 'register']);
+    Route::post('/push-tokens/unregister', [PushTokenController::class, 'unregister']);
+    Route::post('/push-tokens/test', [PushTokenController::class, 'test']);
 
     // Chat
     Route::get('/chat/conversations', [ChatController::class, 'conversations']);
@@ -220,6 +331,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/owner/businesses/{businessId}/bookings/{bookingId}', [OwnerDashboardController::class, 'showBooking']);
     Route::put('/owner/businesses/{businessId}/bookings/{bookingId}', [OwnerDashboardController::class, 'updateBooking']);
     Route::put('/owner/businesses/{businessId}/bookings/{bookingId}/status', [OwnerDashboardController::class, 'updateBookingStatus']);
+    Route::put('/owner/businesses/{businessId}/bookings/{bookingId}/payment-status', [OwnerDashboardController::class, 'updateBookingPaymentStatus']);
     Route::delete('/owner/businesses/{businessId}/bookings/{bookingId}', [OwnerDashboardController::class, 'destroyBooking']);
 
     // Owner Orders
@@ -227,6 +339,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/owner/businesses/{businessId}/orders', [OwnerDashboardController::class, 'storeOrder']);
     Route::get('/owner/businesses/{businessId}/orders/{orderId}', [OwnerDashboardController::class, 'showOrder']);
     Route::put('/owner/businesses/{businessId}/orders/{orderId}/status', [OwnerDashboardController::class, 'updateOrderStatus']);
+    Route::put('/owner/businesses/{businessId}/orders/{orderId}/payment-status', [OwnerDashboardController::class, 'updateOrderPaymentStatus']);
     Route::delete('/owner/businesses/{businessId}/orders/{orderId}', [OwnerDashboardController::class, 'destroyOrder']);
 
     // Owner Vehicles
@@ -239,6 +352,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/owner/businesses/{businessId}/trips', [OwnerDashboardController::class, 'trips']);
     Route::get('/owner/businesses/{businessId}/trips/{tripId}', [OwnerDashboardController::class, 'showTrip']);
     Route::put('/owner/businesses/{businessId}/trips/{tripId}/status', [OwnerDashboardController::class, 'updateTripStatus']);
+    Route::put('/owner/businesses/{businessId}/trips/{tripId}/quote', [OwnerDashboardController::class, 'updateTripQuote']);
+    Route::put('/owner/businesses/{businessId}/trips/{tripId}/payment-status', [OwnerDashboardController::class, 'updateTripPaymentStatus']);
 
     // Owner Time Slots
     Route::get('/owner/businesses/{businessId}/services/{serviceId}/slots', [OwnerDashboardController::class, 'timeSlots']);
@@ -254,6 +369,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Owner Reviews
     Route::post('/owner/reviews/{reviewId}/respond', [OwnerDashboardController::class, 'respondToReview']);
+
+    // Search Analytics
+    Route::post('/search/track', [SearchAnalyticsController::class, 'track']);
+    Route::post('/search/click', [SearchAnalyticsController::class, 'click']);
+
+    // Vendor Setup
+    Route::get('/vendor/setup', [VendorSetupController::class, 'show']);
+    Route::put('/vendor/setup', [VendorSetupController::class, 'update']);
+    Route::get('/vendor/setup/progress', [VendorSetupController::class, 'progress']);
 });
 
 // ─── Admin Routes ───
@@ -276,37 +400,32 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/products/{id}', [AdminController::class, 'updateProduct']);
     Route::delete('/products/{id}', [AdminController::class, 'destroyProduct']);
 
-    Route::get('/reports', [AdminController::class, 'indexReports']);
     Route::put('/reports/{id}', [AdminController::class, 'updateReport']);
 
-    Route::get('/claims', [ClaimController::class, 'index']);
     Route::put('/claims/{id}', [ClaimController::class, 'update']);
 
-    Route::get('/settings', [SettingController::class, 'index']);
     Route::put('/settings', [SettingController::class, 'update']);
-
-    Route::get('/analytics', [AdminController::class, 'analytics']);
 
     // Admin reviews management
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 });
 
 // ─── Pincode Master Data ───
-Route::get('/pincodes/lookup', [\App\Http\Controllers\Api\PincodeController::class, 'lookup']);
-Route::get('/pincodes/search', [\App\Http\Controllers\Api\PincodeController::class, 'search']);
-Route::get('/pincodes/nearby', [\App\Http\Controllers\Api\PincodeController::class, 'nearby']);
+Route::get('/pincodes/lookup', [PincodeController::class, 'lookup']);
+Route::get('/pincodes/search', [PincodeController::class, 'search']);
+Route::get('/pincodes/nearby', [PincodeController::class, 'nearby']);
 
 // ─── Area Interest / Coming Soon ───
-Route::post('/area-interest', function (\Illuminate\Http\Request $request) {
+Route::post('/area-interest', function (Request $request) {
     $request->validate([
         'pincode' => 'required|string|size:6',
         'phone' => 'nullable|string|max:20',
         'email' => 'nullable|email|max:255',
     ]);
 
-    $pincode = \App\Models\Pincode::lookup($request->pincode);
+    $pincode = Pincode::lookup($request->pincode);
 
-    \App\Models\AreaInterest::create([
+    AreaInterest::create([
         'pincode' => $request->pincode,
         'locality' => $pincode?->locality,
         'district' => $pincode?->district,
@@ -323,6 +442,6 @@ Route::post('/area-interest', function (\Illuminate\Http\Request $request) {
 });
 
 // ─── Payments (public — uses JWT) ───
-Route::get('/payments/config', [\App\Http\Controllers\Api\PaymentController::class, 'config']);
-Route::post('/payments/create-order', [\App\Http\Controllers\Api\PaymentController::class, 'createOrder']);
-Route::post('/payments/verify', [\App\Http\Controllers\Api\PaymentController::class, 'verifyPayment']);
+Route::get('/payments/config', [PaymentController::class, 'config']);
+Route::post('/payments/create-order', [PaymentController::class, 'createOrder']);
+Route::post('/payments/verify', [PaymentController::class, 'verifyPayment']);
