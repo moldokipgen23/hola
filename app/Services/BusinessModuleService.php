@@ -80,10 +80,14 @@ class BusinessModuleService
             return array_keys(array_filter($this->normalize($subcategory->recommended_modules)));
         }
 
+        // Transitional MODULE default for businesses that have not configured
+        // enabled_modules yet (the ~500 AI imports). This is not a world/count
+        // source of truth (world = categories.world_id, counts = classifications) —
+        // it only seeds sensible module suggestions until the vendor opts in.
+        // The legacy 'both' bucket is gone (finalize_category_taxonomy migrates it to 'ordering').
         $recommended = match ($business->category?->module_type) {
             'ordering' => ['catalog', 'orders', 'inventory'],
             'booking' => ['bookings'],
-            'both' => ['catalog', 'orders', 'inventory', 'bookings'],
             'transport' => ['transport'],
             'turf' => ['bookings', 'turf'],
             default => [],
