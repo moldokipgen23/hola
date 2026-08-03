@@ -287,7 +287,7 @@ Route::post('/claim/{id}/send-otp', function ($id) {
     }
 
     return back()->with('error', 'Failed to send verification code. Please try again.');
-})->name('public.claim.send-otp');
+})->middleware('throttle:5,1')->name('public.claim.send-otp');
 
 Route::get('/claim/{id}/verify', function ($id) {
     $business = Business::withoutTrashed()->findOrFail($id);
@@ -358,7 +358,7 @@ Route::post('/claim/{id}/verify', function ($id) {
 
     return redirect()->route('public.business', $business->slug)
         ->with('success', 'Identity verified! Claim submitted. We will review it within 24 hours.');
-})->name('public.claim.verify.submit');
+})->middleware('throttle:5,1')->name('public.claim.verify.submit');
 
 Route::post('/claim/{id}/resend-otp', function ($id) {
     $verification = ClaimVerification::where('business_id', $id)
@@ -414,7 +414,7 @@ Route::post('/claim/{id}/resend-otp', function ($id) {
     }
 
     return back()->with('error', 'Failed to resend code.');
-})->name('public.claim.resend-otp');
+})->middleware('throttle:5,1')->name('public.claim.resend-otp');
 
 // Login redirect (for auth middleware)
 Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
@@ -2702,7 +2702,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         }
 
         return back()->withErrors(['email' => 'Invalid credentials.'])->withInput();
-    })->name('login.post');
+    })->middleware('throttle:5,1')->name('login.post');
 
     Route::post('/logout', function () {
         Auth::logout();

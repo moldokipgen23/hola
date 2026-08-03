@@ -135,13 +135,13 @@ Route::get('/businesses/{slug}/services', [BusinessController::class, 'services'
 Route::get('/businesses/by-id/{id}/services', [BusinessController::class, 'publicServices'])->middleware('launch:world.book,module.bookings');
 
 // Public booking & order
-Route::post('/businesses/{slug}/bookings', [PublicBookingController::class, 'storeBooking'])->middleware(['launch:world.book,module.bookings', 'auth.optional']);
-Route::post('/businesses/{slug}/orders', [PublicBookingController::class, 'storeOrder'])->middleware(['launch:world.shop,module.orders', 'auth.optional']);
+Route::post('/businesses/{slug}/bookings', [PublicBookingController::class, 'storeBooking'])->middleware(['launch:world.book,module.bookings', 'auth.optional', 'throttle:20,1']);
+Route::post('/businesses/{slug}/orders', [PublicBookingController::class, 'storeOrder'])->middleware(['launch:world.shop,module.orders', 'auth.optional', 'throttle:20,1']);
 
 // Transport (taxi/vehicle booking)
 Route::get('/businesses/{slug}/vehicles', [TransportController::class, 'vehicles'])->middleware('launch:world.ride,module.transport');
 Route::post('/businesses/{slug}/trips/estimate', [TransportController::class, 'estimateFare'])->middleware('launch:world.ride,module.transport');
-Route::post('/businesses/{slug}/trips', [TransportController::class, 'bookTrip'])->middleware(['launch:world.ride,module.transport', 'auth.optional']);
+Route::post('/businesses/{slug}/trips', [TransportController::class, 'bookTrip'])->middleware(['launch:world.ride,module.transport', 'auth.optional', 'throttle:20,1']);
 
 // Delivery Zones
 Route::get('/businesses/{slug}/delivery-zones', [DeliveryZoneController::class, 'index']);
