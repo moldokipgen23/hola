@@ -17,6 +17,13 @@ class PaymentController extends Controller
 {
     private function onlinePaymentsEnabled(): bool
     {
+        // Single source of truth: LaunchControlService `payments.online` is the master
+        // kill-switch (defaults OFF). The legacy Setting can only narrow this — it can
+        // never turn online payments on while the platform flag is off.
+        if (! app(\App\Services\LaunchControlService::class)->enabled('payments.online')) {
+            return false;
+        }
+
         return filter_var(Setting::get('payment_online_enabled', false), FILTER_VALIDATE_BOOL);
     }
 
