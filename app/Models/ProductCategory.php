@@ -10,6 +10,7 @@ class ProductCategory extends Model
 {
     protected $fillable = [
         'business_id',
+        'business_type_id',
         'shop_section_id',
         'parent_id',
         'name',
@@ -28,6 +29,11 @@ class ProductCategory extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function businessType(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'business_type_id');
     }
 
     public function section(): BelongsTo
@@ -58,6 +64,11 @@ class ProductCategory extends Model
     public function scopeForBusiness($query, int $businessId)
     {
         return $query->where('business_id', $businessId);
+    }
+
+    public function scopeForBusinessType($query, int $businessTypeId)
+    {
+        return $query->where('business_type_id', $businessTypeId);
     }
 
     public function scopeRoot($query)

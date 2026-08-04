@@ -5,7 +5,7 @@
 
 @section('content')
 @php
-    $filterQuery = request()->except(['category_id', 'page']);
+    $filterQuery = request()->except(['business_type_id', 'page']);
 @endphp
 
 <div class="flex justify-between items-center mb-4">
@@ -16,28 +16,28 @@
     <a href="{{ route('admin.products.create') }}" class="btn-primary">+ Add Product</a>
 </div>
 
-<!-- Category tabs -->
+<!-- Shopping business type tabs -->
 <div class="flex gap-1 mb-4 border-b border-white/10 overflow-x-auto">
     <a href="{{ route('admin.products', $filterQuery) }}"
-        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ ! request('category_id') ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ ! request('business_type_id') ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
         All ({{ $totalProducts }})
     </a>
-    @foreach($categories as $cat)
-        <a href="{{ route('admin.products', array_merge($filterQuery, ['category_id' => $cat->id])) }}"
-            class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ request('category_id') == $cat->id ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
-            {{ $cat->name }} ({{ $cat->products_count }})
+    @foreach($businessTypes as $type)
+        <a href="{{ route('admin.products', array_merge($filterQuery, ['business_type_id' => $type->id])) }}"
+            class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ request('business_type_id') == $type->id ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+            {{ $type->name }} ({{ $typeCounts[$type->id] ?? 0 }})
         </a>
     @endforeach
 </div>
 
 <!-- Search -->
 <form method="GET" class="mb-4">
-    <input type="hidden" name="category_id" value="{{ request('category_id') }}">
+    <input type="hidden" name="business_type_id" value="{{ request('business_type_id') }}">
     <div class="flex gap-2">
         <input type="text" name="search" value="{{ request('search') }}" placeholder="Search products..."
             class="input-dark w-full md:max-w-xs">
         <button type="submit" class="btn-primary">Search</button>
-        @if(request('search') || request('category_id'))
+        @if(request('search') || request('business_type_id'))
             <a href="{{ route('admin.products') }}" class="btn-ghost">Clear</a>
         @endif
     </div>

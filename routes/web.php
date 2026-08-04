@@ -1073,16 +1073,46 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin', 'admin.dept
 
     // Products
     Route::get('/products', function () {
-        $categories = \App\Models\ProductCategory::select('id', 'name')
-            ->withCount('products')
-            ->orderBy('name')
-            ->get();
+        $shopWorld = \App\Models\World::where('slug', 'shop')->first();
+        $businessTypes = $shopWorld
+            ? \App\Models\Category::where('world_id', $shopWorld->id)
+                ->whereNull('parent_id')
+                ->orderBy('order')->orderBy('name')
+                ->get()
+            : collect();
         $totalProducts = \App\Models\Product::count();
+
+        $typeCounts = [];
+        $typeCategoryIds = [];
+        $allShopCategories = $shopWorld
+            ? \App\Models\Category::where('world_id', $shopWorld->id)->get()->keyBy('id')
+            : collect();
+
+        $collectTypeIds = function (int $typeId, array &$ids) use (&$collectTypeIds, $allShopCategories): void {
+            $ids[] = $typeId;
+            foreach ($allShopCategories->where('parent_id', $typeId) as $child) {
+                $collectTypeIds($child->id, $ids);
+            }
+        };
+
+        foreach ($businessTypes as $type) {
+            $ids = [];
+            $collectTypeIds($type->id, $ids);
+            $typeCategoryIds[$type->id] = $ids;
+            $typeCounts[$type->id] = \App\Models\Product::whereHas('business', function ($q) use ($ids) {
+                $q->where(fn ($b) => $b->whereIn('category_id', $ids)
+                    ->orWhereHas('classifications', fn ($c) => $c->whereIn('category_id', $ids)->where('is_active', true)));
+            })->count();
+        }
 
         $query = \App\Models\Product::with(['business', 'category'])->orderBy('name');
 
-        if ($categoryId = request('category_id')) {
-            $query->where('product_category_id', $categoryId);
+        if ($typeId = request('business_type_id')) {
+            $ids = $typeCategoryIds[(int) $typeId] ?? [$typeId];
+            $query->whereHas('business', function ($q) use ($ids) {
+                $q->where(fn ($b) => $b->whereIn('category_id', $ids)
+                    ->orWhereHas('classifications', fn ($c) => $c->whereIn('category_id', $ids)->where('is_active', true)));
+            });
         }
         if ($search = request('search')) {
             $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
@@ -1091,7 +1121,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin', 'admin.dept
 
         $products = $query->paginate(20)->withQueryString();
 
-        return view('admin.products.index', compact('products', 'categories', 'totalProducts'));
+        return view('admin.products.index', compact('products', 'businessTypes', 'typeCounts', 'totalProducts'));
     })->name('products')->middleware('launch:world.shop');
 
     Route::get('/products/create', function () {
@@ -2909,41 +2939,51 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin', 'admin.dept
         return redirect()->route('admin.shop-sections')->with('success', 'Shop section deleted.');
     })->name('shop-sections.destroy')->middleware('launch:world.shop');
 
-    // Product Categories — per-business storefront categories under a Shop section.
+    // Product Categories — admin taxonomy grouped per shopping business type,
+    // with optional sub-categories (parent_id). No per-business coupling.
     Route::get('/product-categories', function (\Illuminate\Http\Request $request) {
-        $businesses = \App\Models\Business::where(function ($q) {
-                $q->where('enabled_modules->catalog', true)->orWhere('enabled_modules->orders', true);
-            })
-            ->with('primaryClassification')->orderBy('name')->get();
-        $business = $businesses->firstWhere('id', $request->query('business_id'))
-            ?? $businesses->first();
+        $shopWorld = \App\Models\World::where('slug', 'shop')->first();
+        $businessTypes = $shopWorld
+            ? \App\Models\Category::where('world_id', $shopWorld->id)
+                ->whereNull('parent_id')
+                ->orderBy('order')->orderBy('name')
+                ->get()
+            : collect();
+        $type = $businessTypes->firstWhere('id', $request->query('business_type_id'))
+            ?? $businessTypes->first();
 
-        $categories = $business
-            ? \App\Models\ProductCategory::where('business_id', $business->id)
+        $categories = $type
+            ? \App\Models\ProductCategory::where('business_type_id', $type->id)
                 ->with('section')
                 ->withCount('products')
-                ->orderBy('sort_order')->orderBy('name')->get()
+                ->orderBy('sort_order')->orderBy('name')
+                ->get()
             : collect();
 
         $sections = \App\Models\ShopSection::active()->ordered()->get();
 
-        return view('admin.product-categories.index', compact('businesses', 'business', 'categories', 'sections'));
+        return view('admin.product-categories.index', compact('businessTypes', 'type', 'categories', 'sections'));
     })->name('product-categories')->middleware('launch:world.shop');
 
     Route::post('/product-categories', function (\Illuminate\Http\Request $request) {
         $validated = $request->validate([
-            'business_id' => 'required|exists:businesses,id',
+            'business_type_id' => 'required|exists:categories,id',
             'shop_section_id' => 'nullable|exists:shop_sections,id',
             'parent_id' => 'nullable|exists:product_categories,id',
             'name' => 'required|string|max:255',
         ]);
+
+        if (! empty($validated['parent_id'])) {
+            $parent = \App\Models\ProductCategory::find($validated['parent_id']);
+            abort_unless($parent && $parent->business_type_id === (int) $validated['business_type_id'], 422);
+        }
 
         $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']) . '-' . \Illuminate\Support\Str::random(4);
         $validated['is_active'] = true;
 
         \App\Models\ProductCategory::create($validated);
 
-        return redirect()->route('admin.product-categories', ['business_id' => $validated['business_id']])
+        return redirect()->route('admin.product-categories', ['business_type_id' => $validated['business_type_id']])
             ->with('success', 'Product category created.');
     })->name('product-categories.store')->middleware('launch:world.shop');
 
@@ -2952,22 +2992,28 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin', 'admin.dept
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'shop_section_id' => 'nullable|exists:shop_sections,id',
+            'parent_id' => 'nullable|exists:product_categories,id',
             'is_active' => 'boolean',
         ]);
+
+        if (! empty($validated['parent_id'])) {
+            $parent = \App\Models\ProductCategory::find($validated['parent_id']);
+            abort_unless($parent && $parent->business_type_id === $category->business_type_id, 422);
+        }
 
         $validated['is_active'] = $request->boolean('is_active');
         $category->update($validated);
 
-        return redirect()->route('admin.product-categories', ['business_id' => $category->business_id])
+        return redirect()->route('admin.product-categories', ['business_type_id' => $category->business_type_id])
             ->with('success', 'Product category updated.');
     })->name('product-categories.update')->middleware('launch:world.shop');
 
     Route::delete('/product-categories/{id}', function ($id) {
         $category = \App\Models\ProductCategory::findOrFail($id);
-        $businessId = $category->business_id;
+        $businessTypeId = $category->business_type_id;
         $category->delete();
 
-        return redirect()->route('admin.product-categories', ['business_id' => $businessId])
+        return redirect()->route('admin.product-categories', ['business_type_id' => $businessTypeId])
             ->with('success', 'Product category deleted.');
     })->name('product-categories.destroy')->middleware('launch:world.shop');
 

@@ -66,42 +66,57 @@ class TaxonomySeparationTest extends TestCase
         $this->assertDatabaseMissing('shop_sections', ['id' => $section->id]);
     }
 
-    public function test_product_categories_are_managed_per_business_under_a_shop_section(): void
+    public function test_product_categories_are_managed_per_business_type_with_subcategories(): void
     {
         $this->seed(LaunchPhase1Seeder::class);
+        $this->seed(WorldSeeder::class);
         FeatureFlag::where('key', 'world.shop')->firstOrFail()->update(['is_enabled' => true]);
         LaunchControlService::clearCache();
 
-        $category = Category::where('slug', 'food-restaurants')->firstOrFail();
-        $business = Business::create([
-            'name' => 'Test Cafe',
-            'slug' => 'test-cafe',
-            'category_id' => $category->id,
-            'address' => 'Test street',
-        ]);
+        $groceryType = Category::where('slug', 'grocery')->firstOrFail();
         $section = ShopSection::where('slug', 'grocery')->firstOrFail();
 
         $admin = User::factory()->create(['role' => 'super_admin']);
 
         $this->actingAs($admin)
             ->post(route('admin.product-categories.store'), [
-                'business_id' => $business->id,
+                'business_type_id' => $groceryType->id,
                 'shop_section_id' => $section->id,
                 'name' => 'Fruits',
             ])
-            ->assertRedirect(route('admin.product-categories', ['business_id' => $business->id]));
+            ->assertRedirect(route('admin.product-categories', ['business_type_id' => $groceryType->id]));
 
         $this->assertDatabaseHas('product_categories', [
-            'business_id' => $business->id,
+            'business_type_id' => $groceryType->id,
             'shop_section_id' => $section->id,
             'name' => 'Fruits',
+            'parent_id' => null,
+        ]);
+
+        $fruits = \App\Models\ProductCategory::where('business_type_id', $groceryType->id)
+            ->where('name', 'Fruits')
+            ->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post(route('admin.product-categories.store'), [
+                'business_type_id' => $groceryType->id,
+                'parent_id' => $fruits->id,
+                'name' => 'Apples',
+            ])
+            ->assertRedirect(route('admin.product-categories', ['business_type_id' => $groceryType->id]));
+
+        $this->assertDatabaseHas('product_categories', [
+            'business_type_id' => $groceryType->id,
+            'parent_id' => $fruits->id,
+            'name' => 'Apples',
         ]);
 
         $this->actingAs($admin)
-            ->get(route('admin.product-categories', ['business_id' => $business->id]))
+            ->get(route('admin.product-categories', ['business_type_id' => $groceryType->id]))
             ->assertOk()
             ->assertSee('Fruits')
-            ->assertSee('Grocery');
+            ->assertSee('Apples')
+            ->assertDontSee('business_id');
     }
 
     public function test_vehicle_types_are_globally_managed_and_seeded_with_defaults(): void
