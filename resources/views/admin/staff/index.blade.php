@@ -15,6 +15,7 @@
             <tr>
                 <th>Staff</th>
                 <th>Role</th>
+                <th>Department</th>
                 <th>Status</th>
                 <th>Last Login</th>
                 <th>Joined</th>
@@ -45,6 +46,21 @@
                     @endif
                 </td>
                 <td>
+                    @if($member->department === 'directory')
+                        <span class="badge badge-blue">Directory</span>
+                    @elseif($member->department === 'shopping')
+                        <span class="badge badge-yellow">Shopping</span>
+                    @elseif($member->department === 'booking')
+                        <span class="badge badge-green">Booking</span>
+                    @elseif($member->department === 'taxi')
+                        <span class="badge badge-red">Taxi</span>
+                    @elseif($member->department === 'support')
+                        <span class="badge badge-green">Support</span>
+                    @else
+                        <span class="text-slate-500 text-xs">Full Access</span>
+                    @endif
+                </td>
+                <td>
                     @if($member->is_active)
                         <span class="badge badge-green">Active</span>
                     @else
@@ -62,7 +78,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="6" class="text-center text-slate-500 py-12">No staff members found.</td>
+                <td colspan="7" class="text-center text-slate-500 py-12">No staff members found.</td>
             </tr>
             @endforelse
         </tbody>

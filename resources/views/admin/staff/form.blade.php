@@ -41,6 +41,19 @@
             </select>
         </div>
 
+        <div>
+            <label class="block text-slate-400 text-sm mb-1">Department (access scope)</label>
+            <select name="department" class="input-dark" id="department-select">
+                <option value="">Full Access (all departments)</option>
+                <option value="directory" {{ (old('department', $isEdit ? $staff->department : '') == 'directory') ? 'selected' : '' }}>Directory Department</option>
+                <option value="shopping" {{ (old('department', $isEdit ? $staff->department : '') == 'shopping') ? 'selected' : '' }}>Shopping Department</option>
+                <option value="booking" {{ (old('department', $isEdit ? $staff->department : '') == 'booking') ? 'selected' : '' }}>Booking Department</option>
+                <option value="taxi" {{ (old('department', $isEdit ? $staff->department : '') == 'taxi') ? 'selected' : '' }}>Taxi / Transport Department</option>
+                <option value="support" {{ (old('department', $isEdit ? $staff->department : '') == 'support') ? 'selected' : '' }}>Support (customers + reviews only)</option>
+            </select>
+            <p class="text-xs text-slate-500 mt-1">Scope this staff member to one department. They will only see and access that department's menu. Super Admin always has full access.</p>
+        </div>
+
         <div class="flex items-center gap-2">
             <input type="checkbox" name="is_active" value="1" id="is_active" class="rounded" {{ old('is_active', $isEdit ? $staff->is_active : true) ? 'checked' : '' }}>
             <label for="is_active" class="text-slate-400 text-sm">Active</label>
@@ -62,3 +75,18 @@
     @endif
 </div>
 @endsection
+
+@push('scripts')
+<script>
+const roleSelect = document.querySelector('select[name="role"]');
+const deptSelect = document.getElementById('department-select');
+function syncDepartmentLock() {
+    const isSuper = roleSelect.value === 'super_admin';
+    deptSelect.value = isSuper ? '' : deptSelect.value;
+    deptSelect.disabled = isSuper;
+    deptSelect.classList.toggle('opacity-50', isSuper);
+}
+roleSelect.addEventListener('change', syncDepartmentLock);
+syncDepartmentLock();
+</script>
+@endpush

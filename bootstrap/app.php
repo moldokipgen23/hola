@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\HealthController;
+use App\Http\Middleware\AdminDepartmentScope;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\AuthenticateIntegrationRequest;
 use App\Http\Middleware\EnsureVendorOwnership;
@@ -10,6 +11,7 @@ use App\Http\Middleware\OptionalSanctumAuthentication;
 use App\Http\Middleware\RateLimitApi;
 use App\Http\Middleware\RequireLaunchFeature;
 use App\Http\Middleware\SetSessionCookieByGuard;
+use App\Http\Middleware\VendorWorldScope;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -37,6 +39,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToGroup('web', SetSessionCookieByGuard::class);
         $middleware->alias([
             'admin' => AdminMiddleware::class,
+            'admin.dept' => AdminDepartmentScope::class,
+            'vendor.world' => VendorWorldScope::class,
             'auth.integration' => AuthenticateIntegrationRequest::class,
             'integration.scope' => IntegrationScope::class,
             'integration.tenant' => IntegrationTenant::class,

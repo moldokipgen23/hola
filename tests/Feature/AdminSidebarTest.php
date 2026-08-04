@@ -16,7 +16,7 @@ class AdminSidebarTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_sidebar_shows_grouped_department_nav(): void
+    public function test_admin_sidebar_shows_department_nav_in_order(): void
     {
         $this->seed(LaunchPhase1Seeder::class);
 
@@ -32,8 +32,8 @@ class AdminSidebarTest extends TestCase
             ->assertSee('href="' . route('admin.vendors') . '"', false)
             ->assertSee('>Overview</p>', false)
             ->assertSee('>Directory</p>', false)
+            ->assertSee('>Booking</p>', false)
             ->assertSee('>Users</p>', false)
-            ->assertSee('>Fulfillment</p>', false)
             ->assertSee('>Analytics</p>', false)
             ->assertSee('>Settings</p>', false)
             ->assertSee('>System</p>', false)
@@ -41,8 +41,8 @@ class AdminSidebarTest extends TestCase
             ->assertSeeInOrder([
                 '>Overview</p>',
                 '>Directory</p>',
+                '>Booking</p>',
                 '>Users</p>',
-                '>Fulfillment</p>',
                 '>Analytics</p>',
                 '>Settings</p>',
                 '>System</p>',
@@ -50,7 +50,7 @@ class AdminSidebarTest extends TestCase
             ]);
     }
 
-    public function test_admin_sidebar_hides_shop_department_in_phase_one_launch(): void
+    public function test_admin_sidebar_hides_shop_and_taxi_departments_in_phase_one_launch(): void
     {
         $this->seed(LaunchPhase1Seeder::class);
 
@@ -59,20 +59,21 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('>Catalog</p>', false)
-            ->assertDontSee('>Orders</p>', false)
+            ->assertDontSee('>Shopping</p>', false)
+            ->assertDontSee('>Taxi / Transport</p>', false)
             ->assertDontSee('href="' . route('admin.products') . '"', false)
             ->assertDontSee('href="' . route('admin.orders') . '"', false)
-            ->assertDontSee('>Shopping</span>', false)
-            ->assertDontSee('>Taxi / Transport</span>', false);
+            ->assertDontSee('href="' . route('admin.vehicle-types') . '"', false)
+            ->assertSee('href="' . route('admin.businesses') . '"', false);
     }
 
-    public function test_admin_sidebar_shows_shop_and_book_departments_when_worlds_enabled(): void
+    public function test_admin_sidebar_shows_all_departments_when_worlds_enabled(): void
     {
         $this->seed(LaunchPhase1Seeder::class);
 
-        FeatureFlag::where('key', 'world.shop')->firstOrFail()->update(['is_enabled' => true]);
-        FeatureFlag::where('key', 'world.book')->firstOrFail()->update(['is_enabled' => true]);
+        foreach (FeatureFlag::where('key', 'like', 'world.%')->get() as $flag) {
+            $flag->update(['is_enabled' => true]);
+        }
         LaunchControlService::clearCache();
 
         $admin = User::factory()->create(['role' => 'super_admin']);
@@ -80,15 +81,19 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Catalog</p>', false)
-            ->assertSee('>Orders</p>', false)
+            ->assertSee('>Shopping</p>', false)
+            ->assertSee('>Booking</p>', false)
+            ->assertSee('>Taxi / Transport</p>', false)
             ->assertSee('href="' . route('admin.products') . '"', false)
             ->assertSee('href="' . route('admin.orders') . '"', false)
             ->assertSee('href="' . route('admin.services') . '"', false)
+            ->assertSee('href="' . route('admin.bookings') . '"', false)
+            ->assertSee('href="' . route('admin.vehicle-types') . '"', false)
+            ->assertSee('href="' . route('admin.pincodes') . '"', false)
             ->assertSee('href="' . route('admin.businesses') . '"', false);
     }
 
-    public function test_admin_sidebar_hides_book_department_when_book_world_disabled(): void
+    public function test_admin_sidebar_hides_booking_department_when_book_world_disabled(): void
     {
         $this->seed(LaunchPhase1Seeder::class);
 
@@ -100,7 +105,7 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('>Catalog</p>', false)
+            ->assertDontSee('>Booking</p>', false)
             ->assertDontSee('href="' . route('admin.bookings') . '"', false)
             ->assertDontSee('href="' . route('admin.services') . '"', false)
             ->assertSee('href="' . route('admin.businesses') . '"', false);

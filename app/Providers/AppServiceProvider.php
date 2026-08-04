@@ -33,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
             $view->with('launchControl', app(LaunchControlService::class));
         });
 
+        View::composer('vendor.layouts.dashboard', function ($view) {
+            $view->with('launchControl', app(LaunchControlService::class));
+        });
+
         View::composer('layouts.admin', function ($view) {
             $nav = app(AdminNavService::class);
             $view->with('adminBadges', $nav->badges());

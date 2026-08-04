@@ -208,6 +208,17 @@
                     $currentBizId = $currentBiz->id;
                 }
                 $mods = $currentBiz ? $currentBiz->effectiveModules() : [];
+                if (! $launchControl->worldEnabled('shop')) {
+                    $mods['catalog'] = false;
+                    $mods['orders'] = false;
+                }
+                if (! $launchControl->worldEnabled('book')) {
+                    $mods['bookings'] = false;
+                    $mods['turf'] = false;
+                }
+                if (! $launchControl->worldEnabled('ride')) {
+                    $mods['transport'] = false;
+                }
             @endphp
 
             <!-- Nav -->

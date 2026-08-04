@@ -474,7 +474,7 @@ Route::post('/admin/logout', function () {
 })->middleware('auth')->name('admin.logout');
 
 // Admin Routes (protected)
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin', 'admin.dept'])->group(function () {
     // One simple home for the business taxonomy. Categories are grouped by the
     // customer journey they create, while subcategories describe the business type.
     Route::get('/business-types', function () {
@@ -2281,6 +2281,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'role' => 'required|in:moderator,admin,super_admin',
+            'department' => 'nullable|in:directory,shopping,booking,taxi,support',
             'is_active' => 'boolean',
         ]);
 
@@ -2289,11 +2290,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'email' => $request->email,
             'password' => $request->password,
             'role' => $request->role,
+            'department' => $request->role === 'super_admin' ? null : $request->input('department'),
             'is_active' => $request->boolean('is_active', true),
             'created_by_admin' => Auth::id(),
         ]);
 
-        ActivityLogService::log('staff_created', $staff, ['role' => $staff->role]);
+        ActivityLogService::log('staff_created', $staff, ['role' => $staff->role, 'department' => $staff->department]);
 
         return redirect()->route('admin.staff')->with('success', 'Staff member created.');
     })->name('staff.store');
@@ -2317,6 +2319,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,'.$staff->id,
             'role' => 'required|in:moderator,admin,super_admin',
+            'department' => 'nullable|in:directory,shopping,booking,taxi,support',
             'is_active' => 'boolean',
         ]);
 
@@ -2324,6 +2327,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             'name' => $request->name,
             'email' => $request->email,
             'role' => $request->role,
+            'department' => $request->role === 'super_admin' ? null : $request->input('department'),
             'is_active' => $request->boolean('is_active', true),
         ];
 
@@ -3068,7 +3072,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
     })->name('logout');
 
     // Protected vendor routes
-    Route::middleware('auth')->group(function () {
+    Route::middleware(['auth', 'vendor.world'])->group(function () {
         Route::get('/dashboard', function () {
             $user = Auth::user();
             $businesses = Business::where('created_by', $user->id)

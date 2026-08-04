@@ -35,6 +35,19 @@
                 @else
                     <span class="badge badge-green">Moderator</span>
                 @endif
+                @if($staff->department === 'directory')
+                    <span class="badge badge-blue">Directory</span>
+                @elseif($staff->department === 'shopping')
+                    <span class="badge badge-yellow">Shopping</span>
+                @elseif($staff->department === 'booking')
+                    <span class="badge badge-green">Booking</span>
+                @elseif($staff->department === 'taxi')
+                    <span class="badge badge-red">Taxi</span>
+                @elseif($staff->department === 'support')
+                    <span class="badge badge-green">Support</span>
+                @else
+                    <span class="badge badge-blue">Full Access</span>
+                @endif
                 @if($staff->is_active)
                     <span class="badge badge-green">Active</span>
                 @else

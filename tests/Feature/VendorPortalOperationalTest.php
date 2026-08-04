@@ -113,6 +113,23 @@ class VendorPortalOperationalTest extends TestCase
         ]);
     }
 
+    public function test_vendor_shopping_tools_hidden_when_shop_world_disabled(): void
+    {
+        $this->seed(\Database\Seeders\LaunchPhase1Seeder::class);
+        \App\Services\LaunchControlService::clearCache();
+
+        [$owner, $business] = $this->business('restaurants', ['catalog' => true, 'orders' => true]);
+
+        // world.shop is OFF in phase one -> vendor catalog tools redirect to the dashboard
+        $this->actingAs($owner)->get(route('vendor.products', $business->id))
+            ->assertRedirect(route('vendor.dashboard'));
+
+        \App\Models\FeatureFlag::where('key', 'world.shop')->firstOrFail()->update(['is_enabled' => true]);
+        \App\Services\LaunchControlService::clearCache();
+
+        $this->actingAs($owner)->get(route('vendor.products', $business->id))->assertOk();
+    }
+
     private function business(string $categorySlug, array $modules): array
     {
         Pincode::updateOrCreate(['pincode' => '795128'], [

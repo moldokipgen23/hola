@@ -13,6 +13,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+    /** Department scoping for admin staff. Null = full access across all departments. */
+    public const ADMIN_DEPARTMENTS = ['directory', 'shopping', 'booking', 'taxi', 'support'];
+
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, \Illuminate\Auth\MustVerifyEmail, Notifiable, SoftDeletes;
 
@@ -24,6 +27,7 @@ class User extends Authenticatable
         'google_id',
         'avatar',
         'role',
+        'department',
         'is_active',
         'banned_at',
         'ban_reason',
@@ -123,6 +127,22 @@ class User extends Authenticatable
     public function isOwner(): bool
     {
         return $this->role === 'owner';
+    }
+
+    /**
+     * The admin department this staff member is scoped to, or null for full access.
+     */
+    public function adminDepartment(): ?string
+    {
+        if (! in_array($this->role, ['super_admin', 'admin', 'moderator'], true)) {
+            return null;
+        }
+
+        if ($this->role === 'super_admin') {
+            return null;
+        }
+
+        return in_array($this->department, self::ADMIN_DEPARTMENTS, true) ? $this->department : null;
     }
 
     public function isBanned(): bool

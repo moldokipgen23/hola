@@ -8,9 +8,13 @@ use App\Models\FeatureFlag;
 use App\Models\ImportItem;
 use App\Models\Order;
 use App\Models\Report;
+use App\Models\User;
 
 class AdminNavService
 {
+    public const DEPARTMENTS = ['directory', 'shopping', 'booking', 'taxi'];
+    public const SUPPORT_DEPARTMENT = 'support';
+
     public function badges(): array
     {
         return [
@@ -28,65 +32,131 @@ class AdminNavService
         return in_array(auth()->user()?->role, ['super_admin', 'admin'], true);
     }
 
+    /**
+     * The department the signed-in staff member is scoped to, or null for full access.
+     */
+    public function userDepartment(): ?string
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user->adminDepartment() : null;
+    }
+
+    public function departmentLabel(?string $department): string
+    {
+        return match ($department) {
+            'directory' => 'Directory',
+            'shopping' => 'Shopping',
+            'booking' => 'Booking',
+            'taxi' => 'Taxi / Transport',
+            self::SUPPORT_DEPARTMENT => 'Support',
+            default => 'Full Access',
+        };
+    }
+
+    public function departmentOptions(): array
+    {
+        return [
+            null => 'Full Access (all departments)',
+            'directory' => 'Directory Department',
+            'shopping' => 'Shopping Department',
+            'booking' => 'Booking Department',
+            'taxi' => 'Taxi / Transport Department',
+            self::SUPPORT_DEPARTMENT => 'Support (customers + reviews only)',
+        ];
+    }
+
+    /**
+     * A menu group/item is visible when:
+     *  - 'shared'  => every admin sees it
+     *  - array     => full-access staff (null department) or a matching department sees it
+     *  - null/absent => full-access staff only
+     */
+    private function visibleTo(array|string|null $tag, ?string $department): bool
+    {
+        if ($tag === 'shared') {
+            return true;
+        }
+
+        if ($department === null) {
+            return true;
+        }
+
+        if (is_array($tag)) {
+            return in_array($department, $tag, true);
+        }
+
+        return false;
+    }
+
     public function menuItems(): array
     {
         $badges = $this->badges();
         $isPower = $this->isPowerUser();
+        $department = $this->userDepartment();
 
         $usersItems = [
             ['label' => 'Customers', 'route' => 'admin.users*', 'icon' => 'users'],
             ['label' => 'Business Owners', 'route' => 'admin.vendors*', 'icon' => 'sellers'],
         ];
 
-        if ($isPower) {
+        if ($isPower && $department === null) {
             $usersItems[] = ['label' => 'Staff', 'route' => 'admin.staff*', 'icon' => 'staff'];
         }
 
         $menu = [
             [
                 'title' => 'Overview',
+                'departments' => 'shared',
                 'items' => [
                     ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'dashboard'],
                 ],
             ],
             [
                 'title' => 'Directory',
+                'departments' => ['directory', self::SUPPORT_DEPARTMENT],
                 'items' => [
-                    ['label' => 'All Businesses', 'route' => 'admin.businesses', 'icon' => 'businesses'],
-                    ['label' => 'Pending Claims', 'route' => 'admin.claims*', 'icon' => 'shield', 'badge' => $badges['pending_claims'] ?? 0],
-                    ['label' => 'AI Import Queue', 'route' => 'admin.import*', 'icon' => 'import', 'badge' => $badges['pending_imports'] ?? 0],
-                    ['label' => 'Categories', 'route' => 'admin.category-tree*', 'icon' => 'categories'],
-                    ['label' => 'Reviews', 'route' => 'admin.reviews*', 'icon' => 'star'],
+                    ['label' => 'All Businesses', 'route' => 'admin.businesses', 'icon' => 'businesses', 'departments' => ['directory']],
+                    ['label' => 'Pending Claims', 'route' => 'admin.claims*', 'icon' => 'shield', 'badge' => $badges['pending_claims'] ?? 0, 'departments' => ['directory']],
+                    ['label' => 'AI Import Queue', 'route' => 'admin.import*', 'icon' => 'import', 'badge' => $badges['pending_imports'] ?? 0, 'departments' => ['directory']],
+                    ['label' => 'Categories', 'route' => 'admin.category-tree*', 'icon' => 'categories', 'departments' => ['directory']],
+                    ['label' => 'Reviews', 'route' => 'admin.reviews*', 'icon' => 'star', 'departments' => ['directory', self::SUPPORT_DEPARTMENT]],
                 ],
             ],
             [
-                'title' => 'Orders',
+                'title' => 'Shopping',
                 'feature' => 'world.shop',
-                'items' => [
-                    ['label' => 'All Orders', 'route' => 'admin.orders*', 'icon' => 'orders', 'badge' => $badges['pending_orders'] ?? 0],
-                ],
-            ],
-            [
-                'title' => 'Catalog',
-                'feature' => 'world.shop',
+                'departments' => ['shopping'],
                 'items' => [
                     ['label' => 'Products', 'route' => 'admin.products*', 'icon' => 'products'],
+                    ['label' => 'Orders', 'route' => 'admin.orders*', 'icon' => 'orders', 'badge' => $badges['pending_orders'] ?? 0],
                     ['label' => 'Product Categories', 'route' => 'admin.product-categories*', 'icon' => 'categories'],
                     ['label' => 'Shop Sections', 'route' => 'admin.shop-sections*', 'icon' => 'sections'],
-                    ['label' => 'Services', 'route' => 'admin.services*', 'icon' => 'services', 'feature' => 'world.book'],
+                    ['label' => 'Delivery Zones', 'route' => 'admin.areas*', 'icon' => 'areas'],
                 ],
             ],
-            ['title' => 'Users', 'items' => $usersItems],
             [
-                'title' => 'Fulfillment',
+                'title' => 'Booking',
+                'feature' => 'world.book',
+                'departments' => ['booking'],
                 'items' => [
-                    ['label' => 'Delivery Areas', 'route' => 'admin.areas*', 'icon' => 'areas'],
-                    ['label' => 'Pincodes', 'route' => 'admin.pincodes*', 'icon' => 'pincodes'],
-                    ['label' => 'Vehicle Types', 'route' => 'admin.vehicle-types*', 'icon' => 'truck', 'feature' => 'world.ride'],
+                    ['label' => 'Services', 'route' => 'admin.services*', 'icon' => 'services'],
+                    ['label' => 'Bookings', 'route' => 'admin.bookings*', 'icon' => 'calendar', 'badge' => $badges['pending_bookings'] ?? 0],
                 ],
             ],
+            [
+                'title' => 'Taxi / Transport',
+                'feature' => 'world.ride',
+                'departments' => ['taxi'],
+                'items' => [
+                    ['label' => 'Vehicle Types', 'route' => 'admin.vehicle-types*', 'icon' => 'truck'],
+                    ['label' => 'Serviceable Areas', 'route' => 'admin.pincodes*', 'icon' => 'pincodes'],
+                ],
+            ],
+            ['title' => 'Users', 'departments' => 'shared', 'items' => $usersItems],
             [
                 'title' => 'Analytics',
+                'departments' => self::DEPARTMENTS,
                 'items' => [
                     ['label' => 'Overview', 'route' => 'admin.analytics*', 'icon' => 'analytics'],
                     ['label' => 'Search Insights', 'route' => 'admin.search-history*', 'icon' => 'search'],
@@ -107,14 +177,14 @@ class AdminNavService
             ['label' => 'Transactions', 'route' => 'admin.transactions*', 'icon' => 'transactions'],
         ];
 
-        if ($isPower) {
+        if ($isPower && $department === null) {
             $systemItems[] = ['label' => 'Activity Logs', 'route' => 'admin.activity-logs*', 'icon' => 'logs'];
             $systemItems[] = ['label' => 'API Keys', 'route' => 'admin.integration-keys*', 'icon' => 'keys'];
         }
 
         $menu[] = ['title' => 'System', 'items' => $systemItems];
 
-        if ($isPower) {
+        if ($isPower && $department === null) {
             $menu[] = [
                 'title' => 'AI Agents',
                 'items' => [
@@ -124,6 +194,30 @@ class AdminNavService
             ];
         }
 
-        return $menu;
+        $launchControl = app(LaunchControlService::class);
+
+        return collect($menu)
+            ->filter(function (array $group) use ($department, $launchControl) {
+                if (isset($group['feature'])) {
+                    $slug = str_replace('world.', '', (string) $group['feature']);
+
+                    if (! $launchControl->worldEnabled($slug)) {
+                        return false;
+                    }
+                }
+
+                return $this->visibleTo($group['departments'] ?? null, $department);
+            })
+            ->map(function (array $group) use ($department) {
+                $group['items'] = collect($group['items'])
+                    ->filter(fn (array $item) => $this->visibleTo($item['departments'] ?? $group['departments'] ?? null, $department))
+                    ->values()
+                    ->all();
+
+                return $group;
+            })
+            ->filter(fn (array $group) => count($group['items']) > 0)
+            ->values()
+            ->all();
     }
 }
