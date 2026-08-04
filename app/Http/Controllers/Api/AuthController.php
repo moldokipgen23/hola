@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\Pincode;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use App\Services\SmsService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -79,8 +80,11 @@ class AuthController extends Controller
 
         $user->update(['otp' => $otp, 'otp_expires_at' => now()->addMinutes(10)]);
 
-        // TODO: Integrate actual SMS provider. Do not log the OTP in plaintext.
-        \Log::info("OTP requested for {$request->phone}");
+        $sent = SmsService::sendOtp($request->phone, $otp);
+
+        if (! $sent) {
+            return response()->json(['message' => 'Failed to send OTP. Please try again.'], 500);
+        }
 
         return response()->json(['message' => 'OTP sent successfully.']);
     }
@@ -94,7 +98,7 @@ class AuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
-        if (! $user || $user->otp !== $request->otp || now()->greaterThan($user->otp_expires_at)) {
+        if (! $user || ! hash_equals((string) $user->otp, (string) $request->otp) || now()->greaterThan($user->otp_expires_at)) {
             return response()->json(['message' => 'Invalid or expired OTP'], 401);
         }
 

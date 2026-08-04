@@ -77,4 +77,14 @@ return [
         'service_account_path' => env('FIREBASE_SERVICE_ACCOUNT_PATH', storage_path('app/firebase-service-account.json')),
     ],
 
+    'msg91' => [
+        'auth_key' => env('MSG91_AUTH_KEY'),
+        'template_id' => env('MSG91_TEMPLATE_ID'),
+        'sender_id' => env('MSG91_SENDER_ID', 'EIHONE'),
+    ],
+
+    'callmebot' => [
+        'api_key' => env('CALLMEBOT_API_KEY'),
+    ],
+
 ];
