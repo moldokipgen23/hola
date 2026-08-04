@@ -2601,21 +2601,28 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return redirect()->route('admin.feature-flags')->with('success', 'Feature flag deleted.');
     })->name('feature-flags.destroy');
 
-    // Category Tree Manager
+    // Directory Category Manager
+    // Shows ONLY the AI/imported business classifications (is_canonical=true).
+    // Shop product categories live in their own taxonomy (shop_sections +
+    // product_categories) and are managed under the Shop department.
     Route::get('/category-tree', function () {
-        $worlds = \App\Models\World::active()->ordered()->with(['categories' => function ($q) {
-            $q->whereNull('parent_id')->with('children');
-        }])->get();
+        $categories = \App\Models\Category::with(['children' => function ($q) {
+            $q->active()->ordered()->with('children');
+        }])
+            ->where('is_canonical', true)
+            ->root()
+            ->active()
+            ->ordered()
+            ->get();
 
-        return view('admin.categories.tree', compact('worlds'));
+        return view('admin.categories.tree', compact('categories'));
     })->name('category-tree');
 
     Route::post('/category-tree', function (\Illuminate\Http\Request $request) {
         $validated = $request->validate([
-            'world_id' => 'required|exists:worlds,id',
             'parent_id' => 'nullable|exists:categories,id',
             'name' => 'required|string|max:255',
-            'module_type' => 'required|string',
+            'module_type' => 'required|in:directory,ordering,booking',
             'launch_phase' => 'required|string',
             'is_active' => 'boolean',
             'show_on_home' => 'boolean',
@@ -2626,14 +2633,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $validated['is_active'] = $request->boolean('is_active');
         $validated['show_on_home'] = $request->boolean('show_on_home');
         $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['is_canonical'] = true;
 
-        // Shared write-path: consistent world/parent/level with the standard form.
-        // Root keeps the admin's explicit world choice; a child inherits its parent's world.
-        \App\Models\Category::applyTaxonomy($validated, $validated['parent_id'] ?? null, $validated['world_id']);
+        // Shared write-path: the world is derived from the classification bucket,
+        // not chosen by hand. A child inherits its parent's world.
+        \App\Models\Category::applyTaxonomy($validated, $validated['parent_id'] ?? null);
 
         \App\Models\Category::create($validated);
 
-        return redirect()->route('admin.category-tree')->with('success', 'Category created.');
+        return redirect()->route('admin.category-tree')->with('success', 'Directory category created.');
     })->name('category-tree.store');
 
     Route::patch('/category-tree/{id}/toggle', function ($id) {
@@ -2643,6 +2651,103 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return redirect()->route('admin.category-tree')
             ->with('success', $cat->name . ' ' . ($cat->is_active ? 'activated' : 'deactivated') . '.');
     })->name('category-tree.toggle');
+
+    // Shop Sections — global storefront sections, independent from Directory taxonomy.
+    Route::get('/shop-sections', function () {
+        $sections = \App\Models\ShopSection::withCount('productCategories')->ordered()->get();
+
+        return view('admin.shop-sections.index', compact('sections'));
+    })->name('shop-sections')->middleware('launch:world.shop');
+
+    Route::post('/shop-sections', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
+        $validated['sort_order'] = (int) ($validated['sort_order'] ?? 0);
+        $validated['is_active'] = true;
+
+        \App\Models\ShopSection::create($validated);
+
+        return redirect()->route('admin.shop-sections')->with('success', 'Shop section created.');
+    })->name('shop-sections.store')->middleware('launch:world.shop');
+
+    Route::patch('/shop-sections/{id}/toggle', function ($id) {
+        $section = \App\Models\ShopSection::findOrFail($id);
+        $section->update(['is_active' => !$section->is_active]);
+
+        return redirect()->route('admin.shop-sections')
+            ->with('success', $section->name . ' ' . ($section->is_active ? 'activated' : 'deactivated') . '.');
+    })->name('shop-sections.toggle')->middleware('launch:world.shop');
+
+    Route::delete('/shop-sections/{id}', function ($id) {
+        $section = \App\Models\ShopSection::findOrFail($id);
+        $section->delete();
+
+        return redirect()->route('admin.shop-sections')->with('success', 'Shop section deleted.');
+    })->name('shop-sections.destroy')->middleware('launch:world.shop');
+
+    // Product Categories — per-business storefront categories under a Shop section.
+    Route::get('/product-categories', function (\Illuminate\Http\Request $request) {
+        $businesses = \App\Models\Business::with('primaryClassification')->orderBy('name')->get();
+        $business = $businesses->firstWhere('id', $request->query('business_id'))
+            ?? $businesses->first();
+
+        $categories = $business
+            ? \App\Models\ProductCategory::where('business_id', $business->id)
+                ->with('section')
+                ->withCount('products')
+                ->orderBy('sort_order')->orderBy('name')->get()
+            : collect();
+
+        $sections = \App\Models\ShopSection::active()->ordered()->get();
+
+        return view('admin.product-categories.index', compact('businesses', 'business', 'categories', 'sections'));
+    })->name('product-categories')->middleware('launch:world.shop');
+
+    Route::post('/product-categories', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'business_id' => 'required|exists:businesses,id',
+            'shop_section_id' => 'nullable|exists:shop_sections,id',
+            'parent_id' => 'nullable|exists:product_categories,id',
+            'name' => 'required|string|max:255',
+        ]);
+
+        $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']) . '-' . \Illuminate\Support\Str::random(4);
+        $validated['is_active'] = true;
+
+        \App\Models\ProductCategory::create($validated);
+
+        return redirect()->route('admin.product-categories', ['business_id' => $validated['business_id']])
+            ->with('success', 'Product category created.');
+    })->name('product-categories.store')->middleware('launch:world.shop');
+
+    Route::patch('/product-categories/{id}', function (\Illuminate\Http\Request $request, $id) {
+        $category = \App\Models\ProductCategory::findOrFail($id);
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'shop_section_id' => 'nullable|exists:shop_sections,id',
+            'is_active' => 'boolean',
+        ]);
+
+        $validated['is_active'] = $request->boolean('is_active');
+        $category->update($validated);
+
+        return redirect()->route('admin.product-categories', ['business_id' => $category->business_id])
+            ->with('success', 'Product category updated.');
+    })->name('product-categories.update')->middleware('launch:world.shop');
+
+    Route::delete('/product-categories/{id}', function ($id) {
+        $category = \App\Models\ProductCategory::findOrFail($id);
+        $businessId = $category->business_id;
+        $category->delete();
+
+        return redirect()->route('admin.product-categories', ['business_id' => $businessId])
+            ->with('success', 'Product category deleted.');
+    })->name('product-categories.destroy')->middleware('launch:world.shop');
 
     // Homepage CMS
     Route::get('/homepage', [\App\Http\Controllers\Admin\HomepageContentController::class, 'index'])->name('homepage');

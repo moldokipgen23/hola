@@ -10,6 +10,7 @@ class ProductCategory extends Model
 {
     protected $fillable = [
         'business_id',
+        'shop_section_id',
         'parent_id',
         'name',
         'slug',
@@ -27,6 +28,11 @@ class ProductCategory extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(ShopSection::class, 'shop_section_id');
     }
 
     public function parent(): BelongsTo

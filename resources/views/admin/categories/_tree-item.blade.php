@@ -27,7 +27,8 @@
                 <span class="badge badge-green text-xs">{{ $category->launch_phase }}</span>
             </div>
             <div class="flex items-center gap-3 mt-1">
-                <span class="text-slate-500 text-xs">{{ $category->module_type }}</span>
+                @php $bucketLabels = ['directory' => 'Directory', 'ordering' => 'Shop', 'booking' => 'Book']; @endphp
+                <span class="text-slate-500 text-xs">Bucket: {{ $bucketLabels[$category->module_type] ?? $category->module_type }}</span>
                 <span class="text-slate-500 text-xs">{{ $businessCount }} businesses</span>
                 @if($hasChildren)
                     <span class="text-slate-500 text-xs">{{ $children->count() }} children</span>

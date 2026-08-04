@@ -47,7 +47,7 @@ class AdminNavService
                     ['label' => 'Featured', 'route' => 'admin.featured*', 'icon' => 'star'],
                     ['label' => 'Claims', 'route' => 'admin.claims*', 'icon' => 'shield', 'badge' => $badges['pending_claims'] ?? 0],
                     ['label' => 'AI Imports', 'route' => 'admin.import*', 'icon' => 'import', 'badge' => $badges['pending_imports'] ?? 0],
-                    ['label' => 'Categories', 'route' => 'admin.category-tree*', 'icon' => 'categories'],
+                    ['label' => 'Directory Categories', 'route' => 'admin.category-tree*', 'icon' => 'categories'],
                     ['label' => 'Classification Audit', 'route' => 'admin.classification-audit*', 'icon' => 'audit'],
                 ],
             ],
@@ -71,6 +71,8 @@ class AdminNavService
                 'items' => [
                     ['label' => 'Products', 'route' => 'admin.products*', 'icon' => 'products'],
                     ['label' => 'Orders', 'route' => 'admin.orders*', 'icon' => 'orders', 'badge' => $badges['pending_orders'] ?? 0],
+                    ['label' => 'Shop Sections', 'route' => 'admin.shop-sections*', 'icon' => 'sections'],
+                    ['label' => 'Product Categories', 'route' => 'admin.product-categories*', 'icon' => 'categories'],
                 ],
             ],
             [
