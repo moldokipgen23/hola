@@ -4,9 +4,28 @@
 @section('header', 'All Orders')
 
 @section('content')
-<div class="flex justify-between items-center mb-6">
+@php
+    $typeTabs = ['shopping' => 'Shopping', 'booking' => 'Booking', 'taxi' => 'Taxi'];
+    $filterQuery = request()->except(['type', 'page']);
+@endphp
+
+<div class="flex justify-between items-center mb-4">
     <h3 class="text-white font-semibold text-lg">All Orders</h3>
     <span class="text-slate-500 text-sm">{{ $orders->total() }} orders</span>
+</div>
+
+<!-- Business type tabs -->
+<div class="flex gap-1 mb-4 border-b border-white/10 overflow-x-auto">
+    <a href="{{ route('admin.orders', $filterQuery) }}"
+        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ ! request('type') ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+        All
+    </a>
+    @foreach($typeTabs as $key => $label)
+        <a href="{{ route('admin.orders', array_merge($filterQuery, ['type' => $key])) }}"
+            class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ request('type') == $key ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+            {{ $label }}
+        </a>
+    @endforeach
 </div>
 
 <form method="GET" class="glass-card p-4 rounded-xl mb-4">

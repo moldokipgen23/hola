@@ -4,12 +4,31 @@
 @section('header', 'Business Owners')
 
 @section('content')
-<div class="flex justify-between items-center mb-6">
+@php
+    $typeTabs = ['shopping' => 'Shopping', 'booking' => 'Booking', 'taxi' => 'Taxi'];
+    $filterQuery = request()->except(['type', 'page']);
+@endphp
+
+<div class="flex justify-between items-center mb-4">
     <div>
         <h3 class="text-white font-semibold text-lg">All Business Owners</h3>
         <p class="text-slate-500 text-sm mt-1">{{ $vendors->total() }} owned businesses</p>
     </div>
     <a href="{{ route('admin.businesses.create') }}" class="btn-primary">Add Business</a>
+</div>
+
+<!-- Business type tabs -->
+<div class="flex gap-1 mb-4 border-b border-white/10 overflow-x-auto">
+    <a href="{{ route('admin.vendors', $filterQuery) }}"
+        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ ! request('type') ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+        All
+    </a>
+    @foreach($typeTabs as $key => $label)
+        <a href="{{ route('admin.vendors', array_merge($filterQuery, ['type' => $key])) }}"
+            class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ request('type') == $key ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+            {{ $label }}
+        </a>
+    @endforeach
 </div>
 
 <!-- Filters -->
@@ -18,15 +37,6 @@
         <div class="md:col-span-2">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Search owner or business..."
                 class="input-dark w-full">
-        </div>
-        <div>
-            <select name="type" class="input-dark w-full">
-                <option value="">All Types</option>
-                <option value="shopping" {{ request('type') == 'shopping' ? 'selected' : '' }}>Shopping</option>
-                <option value="booking" {{ request('type') == 'booking' ? 'selected' : '' }}>Booking</option>
-                <option value="taxi" {{ request('type') == 'taxi' ? 'selected' : '' }}>Taxi / Transport</option>
-                <option value="directory" {{ request('type') == 'directory' ? 'selected' : '' }}>Directory Only</option>
-            </select>
         </div>
         <div>
             <select name="category_id" class="input-dark w-full">

@@ -2445,6 +2445,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             $query->where('payment_status', $paymentStatus);
         }
 
+        // Business type filter — mirrors the Business Types browse routes.
+        if ($type = request('type')) {
+            $query->whereHas('business', function ($q) use ($type) {
+                if ($type === 'shopping') {
+                    $q->where('enabled_modules->catalog', true)->orWhere('enabled_modules->orders', true);
+                } elseif ($type === 'booking') {
+                    $q->where('enabled_modules->bookings', true);
+                } elseif ($type === 'taxi') {
+                    $q->where('enabled_modules->transport', true);
+                }
+            });
+        }
+
         $orders = $query->paginate(20)->withQueryString();
 
         return view('admin.orders.index', compact('orders'));
