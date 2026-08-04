@@ -24,8 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
         using: function () {
             Route::middleware('web')->group(base_path('routes/web.php'));
             Route::middleware('api')->prefix('api')->group(base_path('routes/api.php'));
-            Route::middleware('api')->prefix('api/v1')
-                ->group(base_path('routes/integration.php'));
+            // Integration API disabled — not needed for Phase 1, security risk
+            // Route::middleware('api')->prefix('api/v1')
+            //     ->group(base_path('routes/integration.php'));
             Route::get('/up', function () {
                 return response()->json(['status' => 'ok']);
             });

@@ -441,7 +441,9 @@ Route::post('/area-interest', function (Request $request) {
     ]);
 });
 
-// ─── Payments (public — uses JWT) ───
-Route::get('/payments/config', [PaymentController::class, 'config']);
-Route::post('/payments/create-order', [PaymentController::class, 'createOrder']);
-Route::post('/payments/verify', [PaymentController::class, 'verifyPayment']);
+// ─── Payments (auth required) ───
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/payments/config', [PaymentController::class, 'config']);
+    Route::post('/payments/create-order', [PaymentController::class, 'createOrder']);
+    Route::post('/payments/verify', [PaymentController::class, 'verifyPayment']);
+});
