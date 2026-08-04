@@ -55,6 +55,33 @@
 
         .sidebar-link svg { width: 20px; height: 20px; flex-shrink: 0; }
 
+        /* ─── Accordion Sidebar ─── */
+        .sidebar-group-toggle {
+            display: flex; align-items: center; justify-content: space-between;
+            width: 100%; padding: 8px 12px; border-radius: 10px;
+            color: #64748b; cursor: pointer;
+            font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+            transition: background 0.2s ease, color 0.2s ease;
+            margin-top: 18px;
+        }
+
+        .sidebar-group-toggle:hover { background: rgba(255,255,255,0.04); color: #94a3b8; }
+
+        .sidebar-group-toggle .chevron { width: 14px; height: 14px; transition: transform 0.25s ease; }
+
+        .sidebar-group-toggle.collapsed .chevron { transform: rotate(-90deg); }
+
+        .accordion-body {
+            display: grid; grid-template-rows: 1fr;
+            transition: grid-template-rows 0.25s ease;
+        }
+
+        .accordion-body.collapsed { grid-template-rows: 0fr; }
+
+        .accordion-body > div { overflow: hidden; min-height: 0; }
+
+        .accordion-inner { padding-top: 4px; }
+
         /* ─── Main ─── */
         .main-bg {
             background: radial-gradient(ellipse at 20% 0%, rgba(59,130,246,0.08) 0%, transparent 50%),
@@ -223,28 +250,43 @@
             </div>
 
             <!-- Nav -->
-            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <nav class="flex-1 p-4 overflow-y-auto">
                 <div>
                     @foreach ($menuGroups as $group)
                         @if (isset($group['feature']) && ! $launchControl->enabled($group['feature']))
                             @continue
                         @endif
 
-                        <p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-4 mb-2 {{ $loop->first ? 'mt-2' : 'mt-6' }}">{{ $group['title'] }}</p>
+                        @php
+                            $groupHasActive = collect($group['items'])
+                                ->contains(fn ($item) => request()->routeIs($item['route']));
+                        @endphp
 
-                        @foreach ($group['items'] as $item)
-                            @if (isset($item['feature']) && ! $launchControl->enabled($item['feature']))
-                                @continue
-                            @endif
+                        <div class="sidebar-group" data-group="{{ $group['title'] }}">
+                            <button type="button" class="sidebar-group-toggle {{ $groupHasActive ? '' : 'collapsed' }}" onclick="toggleSidebarGroup(this)">
+                                <span>{{ $group['title'] }}</span>
+                                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="accordion-body {{ $groupHasActive ? '' : 'collapsed' }}">
+                                <div>
+                                    <div class="accordion-inner space-y-1">
+                                        @foreach ($group['items'] as $item)
+                                            @if (isset($item['feature']) && ! $launchControl->enabled($item['feature']))
+                                                @continue
+                                            @endif
 
-                            <a href="{{ route(str_replace('*', '', $item['route'])) }}" class="sidebar-link {{ request()->routeIs($item['route']) ? 'active' : '' }}">
-                                <x-admin.icon :name="$item['icon']" class="w-5 h-5" />
-                                <span>{{ $item['label'] }}</span>
-                                @if (($item['badge'] ?? 0) > 0)
-                                    <span class="sidebar-badge">{{ $item['badge'] }}{{ $item['badge_suffix'] ?? '' }}</span>
-                                @endif
-                            </a>
-                        @endforeach
+                                            <a href="{{ route(str_replace('*', '', $item['route'])) }}" class="sidebar-link {{ request()->routeIs($item['route']) ? 'active' : '' }}">
+                                                <x-admin.icon :name="$item['icon']" class="w-5 h-5" />
+                                                <span>{{ $item['label'] }}</span>
+                                                @if (($item['badge'] ?? 0) > 0)
+                                                    <span class="sidebar-badge">{{ $item['badge'] }}{{ $item['badge_suffix'] ?? '' }}</span>
+                                                @endif
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     @endforeach
                 </div>
             </nav>
@@ -308,6 +350,31 @@
             document.getElementById('sidebar').classList.toggle('open');
             document.getElementById('overlay').classList.toggle('hidden');
         }
+
+        function setSidebarGroup(group, open) {
+            const body = group.querySelector('.accordion-body');
+            const toggle = group.querySelector('.sidebar-group-toggle');
+            body.classList.toggle('collapsed', !open);
+            toggle.classList.toggle('collapsed', !open);
+        }
+
+        function initSidebarAccordion() {
+            document.querySelectorAll('.sidebar-group').forEach(group => {
+                const hasActive = !!group.querySelector('.sidebar-link.active');
+                if (hasActive) { setSidebarGroup(group, true); return; }
+                const stored = localStorage.getItem('admin-sidebar:' + group.dataset.group);
+                setSidebarGroup(group, stored !== '0');
+            });
+        }
+
+        function toggleSidebarGroup(toggle) {
+            const group = toggle.closest('.sidebar-group');
+            const isCollapsed = group.querySelector('.accordion-body').classList.contains('collapsed');
+            setSidebarGroup(group, isCollapsed);
+            localStorage.setItem('admin-sidebar:' + group.dataset.group, isCollapsed ? '1' : '0');
+        }
+
+        initSidebarAccordion();
 
         document.querySelectorAll('form[data-confirm]').forEach(form => {
             form.addEventListener('submit', e => {

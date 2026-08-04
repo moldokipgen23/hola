@@ -30,23 +30,23 @@ class AdminSidebarTest extends TestCase
             ->assertSee('href="' . route('admin.claims') . '"', false)
             ->assertSee('href="' . route('admin.reviews') . '"', false)
             ->assertSee('href="' . route('admin.vendors') . '"', false)
-            ->assertSee('>Overview</p>', false)
-            ->assertSee('>Directory</p>', false)
-            ->assertSee('>Booking</p>', false)
-            ->assertSee('>Users</p>', false)
-            ->assertSee('>Analytics</p>', false)
-            ->assertSee('>Settings</p>', false)
-            ->assertSee('>System</p>', false)
-            ->assertSee('>AI Agents</p>', false)
+            ->assertSee('>Overview</span>', false)
+            ->assertSee('>Directory</span>', false)
+            ->assertSee('>Booking</span>', false)
+            ->assertSee('>Users</span>', false)
+            ->assertSee('>Analytics</span>', false)
+            ->assertSee('>Settings</span>', false)
+            ->assertSee('>System</span>', false)
+            ->assertSee('>AI Agents</span>', false)
             ->assertSeeInOrder([
-                '>Overview</p>',
-                '>Directory</p>',
-                '>Booking</p>',
-                '>Users</p>',
-                '>Analytics</p>',
-                '>Settings</p>',
-                '>System</p>',
-                '>AI Agents</p>',
+                '>Overview</span>',
+                '>Directory</span>',
+                '>Booking</span>',
+                '>Users</span>',
+                '>Analytics</span>',
+                '>Settings</span>',
+                '>System</span>',
+                '>AI Agents</span>',
             ]);
     }
 
@@ -59,8 +59,8 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('>Shopping</p>', false)
-            ->assertDontSee('>Taxi / Transport</p>', false)
+            ->assertDontSee('>Shopping</span>', false)
+            ->assertDontSee('>Taxi / Transport</span>', false)
             ->assertDontSee('href="' . route('admin.products') . '"', false)
             ->assertDontSee('href="' . route('admin.orders') . '"', false)
             ->assertDontSee('href="' . route('admin.vehicle-types') . '"', false)
@@ -81,9 +81,9 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Shopping</p>', false)
-            ->assertSee('>Booking</p>', false)
-            ->assertSee('>Taxi / Transport</p>', false)
+            ->assertSee('>Shopping</span>', false)
+            ->assertSee('>Booking</span>', false)
+            ->assertSee('>Taxi / Transport</span>', false)
             ->assertSee('href="' . route('admin.products') . '"', false)
             ->assertSee('href="' . route('admin.orders') . '"', false)
             ->assertSee('href="' . route('admin.services') . '"', false)
@@ -105,7 +105,7 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('>Booking</p>', false)
+            ->assertDontSee('>Booking</span>', false)
             ->assertDontSee('href="' . route('admin.bookings') . '"', false)
             ->assertDontSee('href="' . route('admin.services') . '"', false)
             ->assertSee('href="' . route('admin.businesses') . '"', false);
@@ -144,7 +144,7 @@ class AdminSidebarTest extends TestCase
             ->assertDontSee('href="' . route('admin.integration-keys') . '"', false)
             ->assertDontSee('href="' . route('admin.activity-logs') . '"', false)
             ->assertDontSee('href="' . route('admin.agents') . '"', false)
-            ->assertDontSee('>AI Agents</p>', false);
+            ->assertDontSee('>AI Agents</span>', false);
 
         $admin = User::factory()->create(['role' => 'super_admin']);
         $this->actingAs($admin)
@@ -155,7 +155,7 @@ class AdminSidebarTest extends TestCase
             ->assertSee('href="' . route('admin.activity-logs') . '"', false)
             ->assertSee('href="' . route('admin.autopilot') . '"', false)
             ->assertSee('href="' . route('admin.agents') . '"', false)
-            ->assertSee('>Users</p>', false)
-            ->assertSee('>AI Agents</p>', false);
+            ->assertSee('>Users</span>', false)
+            ->assertSee('>AI Agents</span>', false);
     }
 }
