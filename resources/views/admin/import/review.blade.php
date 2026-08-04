@@ -8,6 +8,8 @@
     $qualAgents = \App\Models\AiAgent::whereJsonContains('skills', 'quality_checker')->get();
     $descAgents = \App\Models\AiAgent::whereJsonContains('skills', 'description_writer')->get();
     $allBatches = \App\Models\ImportBatch::where('pending', '>', 0)->orderByDesc('created_at')->get();
+    $pendingCount = \App\Models\ImportItem::where('status', 'pending')->count();
+    $dupCount = \App\Models\ImportItem::where('status', 'duplicate')->count();
 @endphp
 
 @section('content')
@@ -17,13 +19,11 @@
         <a href="{{ route('admin.import.review', ['status' => 'pending']) }}"
             class="px-4 py-2 text-sm font-medium border-b-2 transition {{ $status === 'pending' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-white' }}">
             Pending
-            @php $pendingCount = \App\Models\ImportItem::where('status', 'pending')->count(); @endphp
             @if($pendingCount > 0)<span class="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-xs">{{ $pendingCount }}</span>@endif
         </a>
         <a href="{{ route('admin.import.review', ['status' => 'duplicates']) }}"
             class="px-4 py-2 text-sm font-medium border-b-2 transition {{ $status === 'duplicates' ? 'border-red-500 text-red-400' : 'border-transparent text-slate-400 hover:text-white' }}">
             Duplicates
-            @php $dupCount = \App\Models\ImportItem::where('status', 'duplicate')->count(); @endphp
             @if($dupCount > 0)<span class="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-xs">{{ $dupCount }}</span>@endif
         </a>
     </div>

@@ -16,6 +16,13 @@ class CapabilityTemplateController extends Controller
         return view('admin.capability-templates.index', compact('templates'));
     }
 
+    public function show(CapabilityTemplate $template)
+    {
+        $businesses = Business::active()->orderBy('name')->get();
+
+        return view('admin.capability-templates.show', compact('template', 'businesses'));
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

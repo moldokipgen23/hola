@@ -471,7 +471,7 @@ Route::post('/admin/logout', function () {
     Auth::logout();
 
     return redirect()->route('admin.login');
-})->name('admin.logout');
+})->middleware('auth')->name('admin.logout');
 
 // Admin Routes (protected)
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(function () {
@@ -2057,8 +2057,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Vendors (Owner Management) ─── admin + super_admin only
     Route::get('/vendors', function () {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $query = User::where('role', 'owner')->withCount('ownedBusinesses');
@@ -2086,8 +2084,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('vendors');
 
     Route::get('/vendors/{id}', function ($id) {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $vendor = User::where('role', 'owner')->findOrFail($id);
@@ -2099,8 +2095,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Staff Management ─── super_admin only
     Route::get('/staff', function () {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->latest()->paginate(20)->withQueryString();
@@ -2109,16 +2103,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff');
 
     Route::get('/staff/create', function () {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         return view('admin.staff.form', ['staff' => null]);
     })->name('staff.create');
 
     Route::post('/staff', function (Request $request) {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $request->validate([
@@ -2144,8 +2134,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.store');
 
     Route::get('/staff/{id}', function ($id) {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
@@ -2154,8 +2142,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.show');
 
     Route::get('/staff/{id}/edit', function ($id) {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
@@ -2164,8 +2150,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.edit');
 
     Route::put('/staff/{id}', function (Request $request, $id) {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
@@ -2195,8 +2179,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.update');
 
     Route::delete('/staff/{id}', function ($id) {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
@@ -2213,8 +2195,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Activity Logs ─── admin + super_admin
     Route::get('/activity-logs', function () {
-        if (! in_array(Auth::user()->role, ['super_admin', 'admin'])) {
-            abort(403);
         }
 
         $query = ActivityLog::with('user')->latest();
@@ -3694,4 +3674,4 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
 });
 
 // ─── Health ───
-Route::get('/health/backups', [\App\Http\Controllers\HealthController::class, 'backupStatus'])->name('health.backups');
+Route::get('/health/backups', [\App\Http\Controllers\HealthController::class, 'backupStatus'])->middleware(['auth', 'admin'])->name('health.backups');

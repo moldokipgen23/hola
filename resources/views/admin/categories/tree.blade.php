@@ -1,4 +1,4 @@
-@extends('admin.layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'Category Tree')
 @section('header', 'Category Tree Manager')

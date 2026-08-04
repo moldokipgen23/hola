@@ -26,14 +26,14 @@
     </div>
 
     {{-- Operational Health --}}
-    <div class="glass-card p-5 rounded-xl mb-6 border {{ $operations['status'] === 'ok' ? 'border-emerald-500/20' : 'border-red-500/30' }}">
+    <div class="glass-card p-5 rounded-xl mb-6 border {{ ($operations['status'] ?? 'error') === 'ok' ? 'border-emerald-500/20' : 'border-red-500/30' }}">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div>
                 <h3 class="font-semibold text-white">System & Autopilot Health</h3>
                 <p class="text-slate-400 text-sm">Live scheduler, queue and task-processing status</p>
             </div>
-            <span class="badge {{ $operations['status'] === 'ok' ? 'badge-green' : 'badge-red' }}">
-                {{ $operations['status'] === 'ok' ? 'Operational' : 'Needs attention' }}
+            <span class="badge {{ ($operations['status'] ?? 'error') === 'ok' ? 'badge-green' : 'badge-red' }}">
+                {{ ($operations['status'] ?? 'error') === 'ok' ? 'Operational' : 'Needs attention' }}
             </span>
         </div>
 
@@ -57,18 +57,18 @@
             </div>
             <div class="rounded-lg bg-slate-900/40 p-3">
                 <p class="text-xs text-slate-500">Stale tasks</p>
-                <p class="mt-1 text-sm font-semibold {{ $operations['agent_tasks']['stale'] > 0 ? 'text-red-400' : 'text-emerald-400' }}">
-                    {{ $operations['agent_tasks']['stale'] }}
+                <p class="mt-1 text-sm font-semibold {{ ($operations['agent_tasks']['stale'] ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400' }}">
+                    {{ $operations['agent_tasks']['stale'] ?? 0 }}
                 </p>
             </div>
         </div>
 
         <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
-            <span>Pending tasks: {{ $operations['agent_tasks']['pending'] }}</span>
-            <span>Running tasks: {{ $operations['agent_tasks']['running'] }}</span>
-            <span>Failed in 24h: {{ $operations['agent_tasks']['failed_last_24_hours'] }}</span>
-            <span>Scheduler heartbeat: {{ $operations['heartbeats']['scheduler'] ? \Illuminate\Support\Carbon::parse($operations['heartbeats']['scheduler'])->diffForHumans() : 'never' }}</span>
-            <span>Queue heartbeat: {{ $operations['heartbeats']['queue'] ? \Illuminate\Support\Carbon::parse($operations['heartbeats']['queue'])->diffForHumans() : 'not available' }}</span>
+            <span>Pending tasks: {{ $operations['agent_tasks']['pending'] ?? 0 }}</span>
+            <span>Running tasks: {{ $operations['agent_tasks']['running'] ?? 0 }}</span>
+            <span>Failed in 24h: {{ $operations['agent_tasks']['failed_last_24_hours'] ?? 0 }}</span>
+            <span>Scheduler heartbeat: {{ ($operations['heartbeats']['scheduler'] ?? null) ? \Illuminate\Support\Carbon::parse($operations['heartbeats']['scheduler'])->diffForHumans() : 'never' }}</span>
+            <span>Queue heartbeat: {{ ($operations['heartbeats']['queue'] ?? null) ? \Illuminate\Support\Carbon::parse($operations['heartbeats']['queue'])->diffForHumans() : 'not available' }}</span>
         </div>
     </div>
 

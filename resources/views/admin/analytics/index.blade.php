@@ -31,27 +31,27 @@
 <!-- Platform Stats -->
 <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
     <div class="glass-card p-4 rounded-xl text-center">
-        <p class="text-2xl font-bold text-white">{{ $analytics['total_businesses'] }}</p>
+        <p class="text-2xl font-bold text-white">{{ $analytics['total_businesses'] ?? 0 }}</p>
         <p class="text-xs text-slate-500 mt-1">Businesses</p>
     </div>
     <div class="glass-card p-4 rounded-xl text-center">
-        <p class="text-2xl font-bold text-blue-400">{{ $analytics['total_users'] }}</p>
+        <p class="text-2xl font-bold text-blue-400">{{ $analytics['total_users'] ?? 0 }}</p>
         <p class="text-xs text-slate-500 mt-1">Users</p>
     </div>
     <div class="glass-card p-4 rounded-xl text-center">
-        <p class="text-2xl font-bold text-yellow-400">{{ $analytics['total_reviews'] }}</p>
+        <p class="text-2xl font-bold text-yellow-400">{{ $analytics['total_reviews'] ?? 0 }}</p>
         <p class="text-xs text-slate-500 mt-1">Reviews</p>
     </div>
     <div class="glass-card p-4 rounded-xl text-center">
-        <p class="text-2xl font-bold text-green-400">{{ $analytics['active_businesses'] }}</p>
+        <p class="text-2xl font-bold text-green-400">{{ $analytics['active_businesses'] ?? 0 }}</p>
         <p class="text-xs text-slate-500 mt-1">Active</p>
     </div>
     <div class="glass-card p-4 rounded-xl text-center">
-        <p class="text-2xl font-bold text-purple-400">{{ $analytics['featured_businesses'] }}</p>
+        <p class="text-2xl font-bold text-purple-400">{{ $analytics['featured_businesses'] ?? 0 }}</p>
         <p class="text-xs text-slate-500 mt-1">Featured</p>
     </div>
     <div class="glass-card p-4 rounded-xl text-center">
-        <p class="text-2xl font-bold text-red-400">{{ $analytics['pending_claims'] }}</p>
+        <p class="text-2xl font-bold text-red-400">{{ $analytics['pending_claims'] ?? 0 }}</p>
         <p class="text-xs text-slate-500 mt-1">Pending Claims</p>
     </div>
 </div>
@@ -89,7 +89,7 @@
                     <div class="flex items-center gap-3">
                         <div class="w-24 h-1.5 rounded-full bg-slate-700 overflow-hidden">
                             <div class="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-600"
-                                style="width: {{ $businessesMaxViews > 0 ? ($business->views_count / $businessesMaxViews) * 100 : 0 }}%">
+                                style="width: {{ ($businessesMaxViews ?? 0) > 0 ? ($business->views_count / $businessesMaxViews) * 100 : 0 }}%">
                             </div>
                         </div>
                         <span class="text-slate-400 text-xs w-16 text-right">{{ number_format($business->views_count) }}</span>
@@ -157,10 +157,10 @@ const userCtx = document.getElementById('userGrowthChart').getContext('2d');
 new Chart(userCtx, {
     type: 'line',
     data: {
-        labels: {!! json_encode(array_keys($analytics['user_growth']->toArray() ?? [])) !!},
+        labels: {!! json_encode(array_keys(($analytics['user_growth'] ?? collect())->toArray())) !!},
         datasets: [{
             label: 'New Users',
-            data: {!! json_encode(array_values($analytics['user_growth']->toArray() ?? [])) !!},
+            data: {!! json_encode(array_values(($analytics['user_growth'] ?? collect())->toArray())) !!},
             borderColor: '#3b82f6',
             backgroundColor: 'rgba(59, 130, 246, 0.1)',
             fill: true,
@@ -182,10 +182,10 @@ const bizCtx = document.getElementById('businessGrowthChart').getContext('2d');
 new Chart(bizCtx, {
     type: 'line',
     data: {
-        labels: {!! json_encode(array_keys($analytics['business_growth']->toArray() ?? [])) !!},
+        labels: {!! json_encode(array_keys(($analytics['business_growth'] ?? collect())->toArray())) !!},
         datasets: [{
             label: 'New Businesses',
-            data: {!! json_encode(array_values($analytics['business_growth']->toArray() ?? [])) !!},
+            data: {!! json_encode(array_values(($analytics['business_growth'] ?? collect())->toArray())) !!},
             borderColor: '#8b5cf6',
             backgroundColor: 'rgba(139, 92, 246, 0.1)',
             fill: true,
@@ -207,9 +207,9 @@ const catCtx = document.getElementById('categoryChart').getContext('2d');
 new Chart(catCtx, {
     type: 'doughnut',
     data: {
-        labels: {!! json_encode($analytics['category_distribution']->pluck('name')->toArray() ?? []) !!},
+        labels: {!! json_encode(($analytics['category_distribution'] ?? collect())->pluck('name')->toArray()) !!},
         datasets: [{
-            data: {!! json_encode($analytics['category_distribution']->pluck('businesses_count')->toArray() ?? []) !!},
+            data: {!! json_encode(($analytics['category_distribution'] ?? collect())->pluck('businesses_count')->toArray()) !!},
             backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316'],
         }]
     },

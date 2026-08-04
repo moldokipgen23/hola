@@ -18,7 +18,7 @@
     <div class="space-y-4">
         @foreach($flags as $flag)
             @php
-                $feature = $masterFeatures[$flag->key];
+                $feature = $masterFeatures[$flag->key] ?? ['name' => $flag->key, 'description' => ''];
             @endphp
             <div class="glass-card p-5 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
