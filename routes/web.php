@@ -2057,8 +2057,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Vendors (Owner Management) ─── admin + super_admin only
     Route::get('/vendors', function () {
-        }
-
         $query = User::where('role', 'owner')->withCount('ownedBusinesses');
 
         if ($search = request('search')) {
@@ -2084,8 +2082,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('vendors');
 
     Route::get('/vendors/{id}', function ($id) {
-        }
-
         $vendor = User::where('role', 'owner')->findOrFail($id);
         $businesses = Business::where('created_by', $vendor->id)->with('category')->get();
         $recentActivity = ActivityLog::where('user_id', $vendor->id)->latest()->take(10)->get();
@@ -2095,22 +2091,16 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Staff Management ─── super_admin only
     Route::get('/staff', function () {
-        }
-
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->latest()->paginate(20)->withQueryString();
 
         return view('admin.staff.index', compact('staff'));
     })->name('staff');
 
     Route::get('/staff/create', function () {
-        }
-
         return view('admin.staff.form', ['staff' => null]);
     })->name('staff.create');
 
     Route::post('/staff', function (Request $request) {
-        }
-
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
@@ -2134,24 +2124,18 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.store');
 
     Route::get('/staff/{id}', function ($id) {
-        }
-
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
 
         return view('admin.staff.show', compact('staff'));
     })->name('staff.show');
 
     Route::get('/staff/{id}/edit', function ($id) {
-        }
-
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
 
         return view('admin.staff.form', compact('staff'));
     })->name('staff.edit');
 
     Route::put('/staff/{id}', function (Request $request, $id) {
-        }
-
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
 
         $request->validate([
@@ -2179,8 +2163,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('staff.update');
 
     Route::delete('/staff/{id}', function ($id) {
-        }
-
         $staff = User::whereIn('role', ['super_admin', 'admin', 'moderator'])->findOrFail($id);
 
         if ($staff->id === Auth::id()) {
@@ -2195,8 +2177,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // ─── Activity Logs ─── admin + super_admin
     Route::get('/activity-logs', function () {
-        }
-
         $query = ActivityLog::with('user')->latest();
 
         if ($action = request('action')) {
