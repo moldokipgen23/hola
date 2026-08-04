@@ -1073,9 +1073,25 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Products
     Route::get('/products', function () {
-        $products = Product::with('business')->orderBy('name')->paginate(20);
+        $categories = \App\Models\ProductCategory::select('id', 'name')
+            ->withCount('products')
+            ->orderBy('name')
+            ->get();
+        $totalProducts = \App\Models\Product::count();
 
-        return view('admin.products.index', compact('products'));
+        $query = \App\Models\Product::with(['business', 'category'])->orderBy('name');
+
+        if ($categoryId = request('category_id')) {
+            $query->where('product_category_id', $categoryId);
+        }
+        if ($search = request('search')) {
+            $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+            $query->where('name', 'like', $safe);
+        }
+
+        $products = $query->paginate(20)->withQueryString();
+
+        return view('admin.products.index', compact('products', 'categories', 'totalProducts'));
     })->name('products')->middleware('launch:world.shop');
 
     Route::get('/products/create', function () {
