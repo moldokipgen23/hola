@@ -60,9 +60,9 @@ class AdminNavService
                 ],
             ],
             [
-                'title' => 'Sellers',
+                'title' => 'Business Owners',
                 'items' => [
-                    ['label' => 'All Sellers', 'route' => 'admin.vendors*', 'icon' => 'sellers'],
+                    ['label' => 'All Owners', 'route' => 'admin.vendors*', 'icon' => 'sellers'],
                 ],
             ],
             [

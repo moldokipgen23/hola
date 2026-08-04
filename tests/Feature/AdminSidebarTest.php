@@ -31,7 +31,7 @@ class AdminSidebarTest extends TestCase
             ->assertSee('href="' . route('admin.reviews') . '"', false)
             ->assertSee('>Overview</p>', false)
             ->assertSee('>Directory + AI Scout</p>', false)
-            ->assertSee('>Sellers</p>', false)
+            ->assertSee('>Business Owners</p>', false)
             ->assertSee('>Fulfillment</p>', false)
             ->assertSee('>Customers</p>', false)
             ->assertSee('>Content</p>', false)

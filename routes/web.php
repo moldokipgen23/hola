@@ -2028,29 +2028,77 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     })->name('import.csv');
 
     // ─── Vendors (Owner Management) ─── admin + super_admin only
+    // Business Owners: joint view of each owned business + its owner,
+    // with business type (Shopping/Booking/Taxi), sub-type (Directory category),
+    // verification status, and owner suspend. One row per owned business.
     Route::get('/vendors', function () {
-        $query = User::where('role', 'owner')->withCount('ownedBusinesses');
+        $query = Business::query()
+            ->with(['createdBy', 'category'])
+            ->whereNotNull('created_by');
 
         if ($search = request('search')) {
             $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
             $query->where(function ($q) use ($safe) {
                 $q->where('name', 'like', $safe)
-                    ->orWhere('email', 'like', $safe)
-                    ->orWhere('phone', 'like', $safe);
+                    ->orWhereHas('createdBy', function ($oq) use ($safe) {
+                        $oq->where('name', 'like', $safe)
+                            ->orWhere('email', 'like', $safe);
+                    });
             });
         }
 
-        if ($status = request('status')) {
-            if ($status === 'banned') {
-                $query->whereNotNull('banned_at');
-            } elseif ($status === 'active') {
-                $query->where('is_active', true)->whereNull('banned_at');
-            }
+        // Business type filter — mirrors the Business Types browse routes.
+        if ($type = request('type')) {
+            $query->where(function ($q) use ($type) {
+                if ($type === 'shopping') {
+                    $q->where('enabled_modules->catalog', true)->orWhere('enabled_modules->orders', true);
+                } elseif ($type === 'booking') {
+                    $q->where('enabled_modules->bookings', true);
+                } elseif ($type === 'taxi') {
+                    $q->where('enabled_modules->transport', true);
+                } elseif ($type === 'directory') {
+                    // Directory-only listings have no transactional modules enabled.
+                    $q->where(function ($sub) {
+                        $sub->whereNull('enabled_modules')
+                            ->orWhere('enabled_modules', '[]')
+                            ->orWhere('enabled_modules', '{}')
+                            ->orWhereNot(function ($modules) {
+                                $modules->where('enabled_modules->catalog', true)
+                                    ->orWhere('enabled_modules->orders', true)
+                                    ->orWhere('enabled_modules->bookings', true)
+                                    ->orWhere('enabled_modules->transport', true);
+                            });
+                    });
+                }
+            });
         }
 
-        $vendors = $query->latest()->paginate(20)->withQueryString();
+        // Sub-type = Directory category
+        if ($categoryId = request('category_id')) {
+            $query->where('category_id', $categoryId);
+        }
 
-        return view('admin.vendors.index', compact('vendors'));
+        // Verification status (pending/verified/rejected)
+        if ($status = request('verification_status')) {
+            $query->where('verification_status', $status);
+        }
+
+        // Owner account status
+        if (request('owner_status') === 'banned') {
+            $query->whereHas('createdBy', fn ($q) => $q->whereNotNull('banned_at'));
+        } elseif (request('owner_status') === 'active') {
+            $query->whereHas('createdBy', fn ($q) => $q->whereNull('banned_at'));
+        }
+
+        $vendors = $query
+            ->withCount(['products', 'services', 'bookings', 'orders', 'vehicles'])
+            ->latest()
+            ->paginate(25)
+            ->withQueryString();
+
+        $categories = Category::where('is_canonical', true)->orderBy('name')->get(['id', 'name']);
+
+        return view('admin.vendors.index', compact('vendors', 'categories'));
     })->name('vendors');
 
     Route::get('/vendors/{id}', function ($id) {
