@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\LaunchControlService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class PaymentKillSwitchTest extends TestCase
@@ -18,6 +20,8 @@ class PaymentKillSwitchTest extends TestCase
         Setting::set('payment_online_enabled', true);
         Setting::set('payment_razorpay_enabled', true);
         LaunchControlService::clearCache();
+
+        Sanctum::actingAs(User::factory()->create());
 
         $this->getJson('/api/payments/config')
             ->assertOk()

@@ -1076,13 +1076,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $products = Product::with('business')->orderBy('name')->paginate(20);
 
         return view('admin.products.index', compact('products'));
-    })->name('products');
+    })->name('products')->middleware('launch:world.shop');
 
     Route::get('/products/create', function () {
         $businesses = Business::orderBy('name')->get();
 
         return view('admin.products.form', compact('businesses'));
-    })->name('products.create');
+    })->name('products.create')->middleware('launch:world.shop');
 
     Route::post('/products', function (Request $request) {
         $validated = $request->validate([
@@ -1105,14 +1105,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         Product::create($validated);
 
         return redirect()->route('admin.products')->with('success', 'Product created.');
-    })->name('products.store');
+    })->name('products.store')->middleware('launch:world.shop');
 
     Route::get('/products/{id}/edit', function ($id) {
         $product = Product::findOrFail($id);
         $businesses = Business::orderBy('name')->get();
 
         return view('admin.products.form', compact('product', 'businesses'));
-    })->name('products.edit');
+    })->name('products.edit')->middleware('launch:world.shop');
 
     Route::put('/products/{id}', function (Request $request, $id) {
         $product = Product::findOrFail($id);
@@ -1136,13 +1136,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $product->update($validated);
 
         return redirect()->route('admin.products')->with('success', 'Product updated.');
-    })->name('products.update');
+    })->name('products.update')->middleware('launch:world.shop');
 
     Route::delete('/products/{id}', function ($id) {
         Product::findOrFail($id)->delete();
 
         return redirect()->route('admin.products')->with('success', 'Product deleted.');
-    })->name('products.destroy');
+    })->name('products.destroy')->middleware('launch:world.shop');
 
     // Claims
     Route::get('/claims', function () {
@@ -2372,13 +2372,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $bookings = $query->paginate(20)->withQueryString();
 
         return view('admin.bookings.index', compact('bookings'));
-    })->name('bookings');
+    })->name('bookings')->middleware('launch:world.book');
 
     Route::delete('/bookings/{id}', function ($id) {
         Booking::findOrFail($id)->delete();
 
         return redirect()->route('admin.bookings')->with('success', 'Booking deleted.');
-    })->name('bookings.destroy');
+    })->name('bookings.destroy')->middleware('launch:world.book');
 
     // ─── Orders Management ───
     Route::get('/orders', function () {
@@ -2401,7 +2401,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $orders = $query->paginate(20)->withQueryString();
 
         return view('admin.orders.index', compact('orders'));
-    })->name('orders');
+    })->name('orders')->middleware('launch:world.shop');
 
     Route::delete('/orders/{id}', function ($id) {
         $order = Order::findOrFail($id);
@@ -2409,7 +2409,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $order->delete();
 
         return redirect()->route('admin.orders')->with('success', 'Order deleted.');
-    })->name('orders.destroy');
+    })->name('orders.destroy')->middleware('launch:world.shop');
 
     // ─── Reviews Moderation ───
     Route::get('/reviews', function () {
@@ -2458,13 +2458,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $services = $query->paginate(20)->withQueryString();
 
         return view('admin.services.index', compact('services'));
-    })->name('services');
+    })->name('services')->middleware('launch:world.book');
 
     Route::get('/services/{id}/edit', function ($id) {
         $service = Service::with('business')->findOrFail($id);
 
         return view('admin.services.form', compact('service'));
-    })->name('services.edit');
+    })->name('services.edit')->middleware('launch:world.book');
 
     Route::put('/services/{id}', function (Request $request, $id) {
         $service = Service::findOrFail($id);
@@ -2480,13 +2480,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         $service->update($validated);
 
         return redirect()->route('admin.services')->with('success', 'Service updated.');
-    })->name('services.update');
+    })->name('services.update')->middleware('launch:world.book');
 
     Route::delete('/services/{id}', function ($id) {
         Service::findOrFail($id)->delete();
 
         return redirect()->route('admin.services')->with('success', 'Service deleted.');
-    })->name('services.destroy');
+    })->name('services.destroy')->middleware('launch:world.book');
 
     // ─── Transactions ───
     Route::get('/transactions', function () {

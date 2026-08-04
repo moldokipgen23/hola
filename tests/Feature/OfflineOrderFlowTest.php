@@ -9,9 +9,11 @@ use App\Models\DeliveryZone;
 use App\Models\Order;
 use App\Models\Pincode;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\OrderWorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class OfflineOrderFlowTest extends TestCase
@@ -180,6 +182,8 @@ class OfflineOrderFlowTest extends TestCase
 
     public function test_online_payment_endpoints_are_dormant_but_cod_config_is_public(): void
     {
+        Sanctum::actingAs(User::factory()->create());
+
         $this->getJson('/api/payments/config')
             ->assertOk()
             ->assertJsonPath('payment_mode', 'offline')

@@ -37,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
             $nav = app(AdminNavService::class);
             $view->with('adminBadges', $nav->badges());
             $view->with('isPowerUser', $nav->isPowerUser());
+            $view->with('menuGroups', $nav->menuItems());
+            $view->with('launchControl', app(LaunchControlService::class));
         });
     }
 }

@@ -15,11 +15,16 @@ class RequireLaunchFeature
     {
         foreach ($features as $feature) {
             if (! $this->launchControl->enabled($feature)) {
-                return response()->json([
-                    'message' => 'This feature is not currently available.',
-                    'code' => 'feature_unavailable',
-                    'feature' => $feature,
-                ], 404);
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'This feature is not currently available.',
+                        'code' => 'feature_unavailable',
+                        'feature' => $feature,
+                    ], 404);
+                }
+
+                return redirect()->back()
+                    ->with('error', 'This feature is not currently available.');
             }
         }
 
