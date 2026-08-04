@@ -84,6 +84,13 @@ class AdminNavService
                 ],
             ],
             [
+                'title' => 'Ride',
+                'feature' => 'world.ride',
+                'items' => [
+                    ['label' => 'Vehicle Types', 'route' => 'admin.vehicle-types*', 'icon' => 'truck'],
+                ],
+            ],
+            [
                 'title' => 'Fulfillment',
                 'items' => [
                     ['label' => 'Areas', 'route' => 'admin.areas*', 'icon' => 'areas'],

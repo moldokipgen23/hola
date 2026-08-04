@@ -56,9 +56,29 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Menu section</label>
-                    <input type="text" name="menu_section" value="{{ old('menu_section', $product->menu_section ?? '') }}" class="input-dark" placeholder="Breakfast, Main Course…">
+                <div class="md:col-span-3">
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Category *</label>
+                    @if(($categories ?? collect())->isEmpty())
+                        <p class="text-xs text-amber-400/90 mb-2">No categories yet for this business. Ask the admin to add Product Categories, or contact support.</p>
+                        <input type="text" name="menu_section" value="{{ old('menu_section', $product->menu_section ?? '') }}" class="input-dark" placeholder="Free-text section (e.g. Breakfast, Main Course)">
+                    @else
+                        <select name="product_category_id" class="input-dark">
+                            <option value="">Select a category…</option>
+                            @php
+                                $grouped = ($categories ?? collect())->groupBy(fn ($c) => $c->section?->name ?? 'Uncategorized');
+                            @endphp
+                            @foreach($grouped as $sectionName => $sectionCategories)
+                                <optgroup label="{{ $sectionName }}">
+                                    @foreach($sectionCategories as $category)
+                                        <option value="{{ $category->id }}" {{ (string) old('product_category_id', $product->product_category_id ?? '') === (string) $category->id ? 'selected' : '' }}>
+                                            {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-slate-500 mt-1">Categories are set by the platform admin per business.</p>
+                    @endif
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Food type</label>

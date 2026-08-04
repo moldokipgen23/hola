@@ -6,6 +6,8 @@ use App\Models\Business;
 use App\Models\Category;
 use App\Models\FeatureFlag;
 use App\Models\ShopSection;
+use App\Models\Vehicle;
+use App\Models\VehicleType;
 use App\Models\User;
 use App\Services\LaunchControlService;
 use Database\Seeders\LaunchPhase1Seeder;
@@ -100,5 +102,82 @@ class TaxonomySeparationTest extends TestCase
             ->assertOk()
             ->assertSee('Fruits')
             ->assertSee('Grocery');
+    }
+
+    public function test_vehicle_types_are_globally_managed_and_seeded_with_defaults(): void
+    {
+        $this->seed(LaunchPhase1Seeder::class);
+        FeatureFlag::where('key', 'world.ride')->firstOrFail()->update(['is_enabled' => true]);
+        LaunchControlService::clearCache();
+
+        $admin = User::factory()->create(['role' => 'super_admin']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.vehicle-types'))
+            ->assertOk()
+            ->assertSee('Car')
+            ->assertSee('Truck')
+            ->assertSee('Bus');
+
+        $this->actingAs($admin)
+            ->post(route('admin.vehicle-types.store'), [
+                'name' => 'Tempo Traveller',
+                'slug' => 'tempo-traveller',
+                'description' => '12-18 seater van',
+            ])
+            ->assertRedirect(route('admin.vehicle-types'));
+
+        $this->assertDatabaseHas('vehicle_types', ['name' => 'Tempo Traveller']);
+
+        $type = VehicleType::where('slug', 'tempo-traveller')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.vehicle-types.toggle', $type->id))
+            ->assertRedirect();
+        $this->assertFalse($type->fresh()->is_active);
+    }
+
+    public function test_vehicle_type_used_by_vehicles_cannot_be_deleted(): void
+    {
+        $this->seed(LaunchPhase1Seeder::class);
+        FeatureFlag::where('key', 'world.ride')->firstOrFail()->update(['is_enabled' => true]);
+        LaunchControlService::clearCache();
+
+        $category = Category::where('slug', 'transport')->firstOrFail();
+        $business = Business::create([
+            'name' => 'Test Transport',
+            'slug' => 'test-transport',
+            'category_id' => $category->id,
+            'address' => 'Test street',
+        ]);
+
+        $truck = VehicleType::where('slug', 'truck')->firstOrFail();
+        Vehicle::create([
+            'business_id' => $business->id,
+            'name' => 'Heavy Truck',
+            'type' => 'truck',
+            'service_mode' => 'goods',
+            'seats' => 2,
+            'capacity_unit' => 'tons',
+            'base_fare' => 500,
+            'fare_per_km' => 25,
+        ]);
+
+        $admin = User::factory()->create(['role' => 'super_admin']);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.vehicle-types.destroy', $truck->id))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('vehicle_types', ['id' => $truck->id]);
+
+        $freeType = VehicleType::where('slug', 'car')->firstOrFail();
+        $this->actingAs($admin)
+            ->delete(route('admin.vehicle-types.destroy', $freeType->id))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('vehicle_types', ['id' => $freeType->id]);
     }
 }

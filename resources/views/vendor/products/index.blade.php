@@ -48,7 +48,7 @@
                     <td class="font-medium">{{ $product->name }}</td>
                     <td class="text-sm">{{ $product->business->name ?? '-' }}</td>
                     <td class="text-sm">₹{{ number_format($product->price, 2) }}</td>
-                    <td class="text-sm">{{ $product->menu_section ?: '-' }}</td>
+                    <td class="text-sm">{{ $product->category->name ?? ($product->menu_section ?: '-') }}</td>
                     <td class="text-sm">{{ $product->stock ?? '-' }}</td>
                     <td>
                         @if($product->is_orderable)

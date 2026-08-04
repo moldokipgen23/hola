@@ -10,6 +10,7 @@ class Product extends Model
 {
     protected $fillable = [
         'business_id',
+        'product_category_id',
         'name',
         'slug',
         'description',
@@ -40,6 +41,11 @@ class Product extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'product_category_id');
     }
 
     public function scopeActive($query)

@@ -287,6 +287,7 @@ class OwnerDashboardController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'product_category_id' => 'nullable|exists:product_categories,id',
             'menu_section' => 'nullable|string|max:100',
             'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
             'preparation_minutes' => 'nullable|integer|min:1|max:1440',
@@ -298,6 +299,12 @@ class OwnerDashboardController extends Controller
             'stock' => 'nullable|integer|min:0',
             'is_active' => 'sometimes|boolean',
         ]);
+
+        if (! empty($validated['product_category_id'])
+            && ! \App\Models\ProductCategory::where('id', $validated['product_category_id'])
+                ->where('business_id', $business->id)->exists()) {
+            return response()->json(['message' => 'Category does not belong to this business.'], 422);
+        }
 
         $validated['business_id'] = $business->id;
         $validated['slug'] = Str::slug($validated['name']).'-'.Str::random(5);
@@ -325,6 +332,7 @@ class OwnerDashboardController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
+            'product_category_id' => 'nullable|exists:product_categories,id',
             'menu_section' => 'nullable|string|max:100',
             'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
             'preparation_minutes' => 'nullable|integer|min:1|max:1440',
@@ -336,6 +344,12 @@ class OwnerDashboardController extends Controller
             'stock' => 'nullable|integer|min:0',
             'is_active' => 'sometimes|boolean',
         ]);
+
+        if ($request->filled('product_category_id')
+            && ! \App\Models\ProductCategory::where('id', $request->product_category_id)
+                ->where('business_id', $business->id)->exists()) {
+            return response()->json(['message' => 'Category does not belong to this business.'], 422);
+        }
 
         if ($request->hasFile('image')) {
             $filename = 'products/'.$product->slug.'.'.$request->file('image')->getClientOriginalExtension();
@@ -834,7 +848,7 @@ class OwnerDashboardController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:car,bolero,suv,van,auto,bike,bus,truck,pickup,tempo',
+            'type' => 'required|exists:vehicle_types,slug',
             'service_mode' => 'sometimes|in:taxi,shared,rental,goods',
             'seats' => 'required|integer|min:1|max:50',
             'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
@@ -880,7 +894,7 @@ class OwnerDashboardController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'type' => 'sometimes|in:car,bolero,suv,van,auto,bike,bus,truck,pickup,tempo',
+            'type' => 'sometimes|exists:vehicle_types,slug',
             'service_mode' => 'sometimes|in:taxi,shared,rental,goods',
             'seats' => 'sometimes|integer|min:1|max:50',
             'capacity_value' => 'nullable|numeric|min:0.01|max:100000',

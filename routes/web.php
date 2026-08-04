@@ -2749,6 +2749,49 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
             ->with('success', 'Product category deleted.');
     })->name('product-categories.destroy')->middleware('launch:world.shop');
 
+    // Vehicle Types — global transport types (car, truck, bus…). Vendors pick from these.
+    Route::get('/vehicle-types', function () {
+        $types = \App\Models\VehicleType::withCount('vehicles')->ordered()->get();
+
+        return view('admin.vehicle-types.index', compact('types'));
+    })->name('vehicle-types')->middleware('launch:world.ride');
+
+    Route::post('/vehicle-types', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:60|regex:/^[a-z0-9\-]+$/|unique:vehicle_types,slug',
+            'description' => 'nullable|string|max:500',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $validated['slug'] = $validated['slug'] ?? \Illuminate\Support\Str::slug($validated['name']);
+        $validated['sort_order'] = (int) ($validated['sort_order'] ?? 0);
+        $validated['is_active'] = true;
+
+        \App\Models\VehicleType::create($validated);
+
+        return redirect()->route('admin.vehicle-types')->with('success', 'Vehicle type created.');
+    })->name('vehicle-types.store')->middleware('launch:world.ride');
+
+    Route::patch('/vehicle-types/{id}/toggle', function ($id) {
+        $type = \App\Models\VehicleType::findOrFail($id);
+        $type->update(['is_active' => !$type->is_active]);
+
+        return redirect()->route('admin.vehicle-types')
+            ->with('success', $type->name . ' ' . ($type->is_active ? 'activated' : 'deactivated') . '.');
+    })->name('vehicle-types.toggle')->middleware('launch:world.ride');
+
+    Route::delete('/vehicle-types/{id}', function ($id) {
+        $type = \App\Models\VehicleType::findOrFail($id);
+        if ($type->vehicles()->exists()) {
+            return redirect()->route('admin.vehicle-types')
+                ->with('error', 'Cannot delete "' . $type->name . '" — it is used by ' . $type->vehicles()->count() . ' vehicle(s). Deactivate it instead.');
+        }
+        $type->delete();
+
+        return redirect()->route('admin.vehicle-types')->with('success', 'Vehicle type deleted.');
+    })->name('vehicle-types.destroy')->middleware('launch:world.ride');
+
     // Homepage CMS
     Route::get('/homepage', [\App\Http\Controllers\Admin\HomepageContentController::class, 'index'])->name('homepage');
     Route::get('/homepage/create', [\App\Http\Controllers\Admin\HomepageContentController::class, 'create'])->name('homepage.create');
@@ -3060,7 +3103,13 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $business = Business::where('created_by', $user->id)->findOrFail($businessId);
             abort_unless($business->hasModule('catalog'), 404);
 
-            return view('vendor.products.form', compact('business'));
+            $categories = \App\Models\ProductCategory::where('business_id', $business->id)
+                ->with('section')
+                ->active()
+                ->orderBy('sort_order')->orderBy('name')
+                ->get();
+
+            return view('vendor.products.form', compact('business', 'categories'));
         })->name('products.create');
 
         Route::post('/businesses/{businessId}/products', function (Request $request, $businessId) {
@@ -3070,6 +3119,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'product_category_id' => 'nullable|exists:product_categories,id',
                 'menu_section' => 'nullable|string|max:100',
                 'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
                 'preparation_minutes' => 'nullable|integer|min:1|max:1440',
@@ -3081,6 +3131,11 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 'availability' => 'nullable|in:in_stock,out_of_stock,limited',
                 'is_active' => 'nullable|boolean',
             ]);
+            if (! empty($validated['product_category_id'])
+                && ! \App\Models\ProductCategory::where('id', $validated['product_category_id'])
+                    ->where('business_id', $business->id)->exists()) {
+                return back()->withErrors(['product_category_id' => 'Selected category does not belong to this business.']);
+            }
             $validated['business_id'] = $business->id;
             $validated['slug'] = Str::slug($validated['name']).'-'.Str::random(5);
             $validated['is_active'] = $request->has('is_active');
@@ -3095,7 +3150,13 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             abort_unless($business->hasModule('catalog'), 404);
             $product = Product::where('business_id', $business->id)->findOrFail($id);
 
-            return view('vendor.products.form', compact('business', 'product'));
+            $categories = \App\Models\ProductCategory::where('business_id', $business->id)
+                ->with('section')
+                ->active()
+                ->orderBy('sort_order')->orderBy('name')
+                ->get();
+
+            return view('vendor.products.form', compact('business', 'product', 'categories'));
         })->name('products.edit');
 
         Route::put('/businesses/{businessId}/products/{id}', function (Request $request, $businessId, $id) {
@@ -3106,6 +3167,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'product_category_id' => 'nullable|exists:product_categories,id',
                 'menu_section' => 'nullable|string|max:100',
                 'food_type' => 'nullable|in:veg,non_veg,egg,vegan,other',
                 'preparation_minutes' => 'nullable|integer|min:1|max:1440',
@@ -3117,6 +3179,11 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
                 'availability' => 'nullable|in:in_stock,out_of_stock,limited',
                 'is_active' => 'nullable|boolean',
             ]);
+            if (! empty($validated['product_category_id'])
+                && ! \App\Models\ProductCategory::where('id', $validated['product_category_id'])
+                    ->where('business_id', $business->id)->exists()) {
+                return back()->withErrors(['product_category_id' => 'Selected category does not belong to this business.']);
+            }
             $validated['is_active'] = $request->has('is_active');
             $product->update($validated);
 
@@ -3354,8 +3421,9 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
             abort_unless($business->hasModule('transport'), 404);
             $vehicles = $business->vehicles()->withCount(['trips' => fn ($query) => $query->whereIn('status', ['pending', 'confirmed', 'started'])])->orderBy('sort_order')->get();
+            $vehicleTypes = \App\Models\VehicleType::active()->ordered()->get();
 
-            return view('vendor.transport.vehicles', compact('business', 'vehicles'));
+            return view('vendor.transport.vehicles', compact('business', 'vehicles', 'vehicleTypes'));
         })->name('vehicles');
 
         Route::post('/businesses/{businessId}/vehicles', function (Request $request, $businessId) {
@@ -3363,7 +3431,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             abort_unless($business->hasModule('transport'), 404);
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'type' => 'required|in:car,bolero,suv,van,auto,bike,bus,truck,pickup,tempo',
+                'type' => 'required|exists:vehicle_types,slug',
                 'service_mode' => 'required|in:taxi,shared,rental,goods',
                 'seats' => 'required|integer|min:1|max:100',
                 'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
@@ -3387,7 +3455,7 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $business = Business::where('created_by', Auth::id())->findOrFail($businessId);
             $vehicle = Vehicle::where('business_id', $business->id)->findOrFail($vehicleId);
             $validated = $request->validate([
-                'name' => 'required|string|max:255', 'service_mode' => 'required|in:taxi,shared,rental,goods',
+                'name' => 'required|string|max:255', 'type' => 'nullable|exists:vehicle_types,slug', 'service_mode' => 'required|in:taxi,shared,rental,goods',
                 'seats' => 'required|integer|min:1|max:100', 'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
                 'capacity_unit' => 'required|in:seats,kg,tons,vehicle', 'base_fare' => 'required|numeric|min:0',
                 'fare_per_km' => 'required|numeric|min:0', 'availability_status' => 'required|in:available,busy,offline',

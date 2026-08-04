@@ -15,7 +15,13 @@
     <h4 class="text-white font-medium mb-4">Add transport option</h4>
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <input name="name" required class="input-dark" placeholder="Vehicle name">
-        <select name="type" class="input-dark">@foreach(['car','bolero','suv','van','auto','bike','bus','truck','pickup','tempo'] as $type)<option value="{{ $type }}">{{ ucfirst($type) }}</option>@endforeach</select>
+        <select name="type" class="input-dark" required>
+            @forelse($vehicleTypes ?? [] as $type)
+                <option value="{{ $type->slug }}">{{ $type->name }}</option>
+            @empty
+                <option value="">No vehicle types configured</option>
+            @endforelse
+        </select>
         <select name="service_mode" class="input-dark"><option value="taxi">Taxi / ride</option><option value="shared">Shared seats</option><option value="rental">Rental</option><option value="goods">Truck / goods</option></select>
         <input type="number" name="seats" value="4" min="1" required class="input-dark" placeholder="Seats">
         <div class="flex"><input type="number" name="capacity_value" step="0.01" min="0" class="input-dark" placeholder="Load capacity"><select name="capacity_unit" class="input-dark"><option value="seats">seats</option><option value="kg">kg</option><option value="tons">tons</option><option value="vehicle">vehicle</option></select></div>
@@ -43,6 +49,13 @@
     </div>
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <input name="name" value="{{ $vehicle->name }}" required class="input-dark">
+        <select name="type" class="input-dark">
+            @forelse($vehicleTypes ?? [] as $type)
+                <option value="{{ $type->slug }}" {{ $vehicle->type === $type->slug ? 'selected' : '' }}>{{ $type->name }}</option>
+            @empty
+                <option value="{{ $vehicle->type }}">{{ ucfirst($vehicle->type) }}</option>
+            @endforelse
+        </select>
         <select name="service_mode" class="input-dark">@foreach(['taxi','shared','rental','goods'] as $mode)<option value="{{ $mode }}" {{ $vehicle->service_mode === $mode ? 'selected' : '' }}>{{ ucfirst($mode) }}</option>@endforeach</select>
         <input type="number" name="seats" value="{{ $vehicle->seats }}" min="1" required class="input-dark">
         <div class="flex"><input type="number" name="capacity_value" value="{{ $vehicle->capacity_value }}" step="0.01" class="input-dark"><select name="capacity_unit" class="input-dark">@foreach(['seats','kg','tons','vehicle'] as $unit)<option {{ $vehicle->capacity_unit === $unit ? 'selected' : '' }}>{{ $unit }}</option>@endforeach</select></div>
