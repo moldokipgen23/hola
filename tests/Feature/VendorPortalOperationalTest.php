@@ -8,6 +8,8 @@ use App\Models\Pincode;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class VendorPortalOperationalTest extends TestCase
@@ -70,6 +72,45 @@ class VendorPortalOperationalTest extends TestCase
 
         $this->actingAs($other)->get(route('vendor.vehicles', $business->id))->assertNotFound();
         $this->get(route('vendor.trips', $business->id))->assertNotFound();
+    }
+
+    public function test_vendor_can_upload_service_photo_and_room_size(): void
+    {
+        Storage::fake('public');
+        [$owner, $business] = $this->business('hotels-lodges', ['bookings' => true]);
+
+        $this->actingAs($owner)->post(route('vendor.services.store', $business->id), [
+            'name' => 'Deluxe Room', 'description' => 'Two guest room',
+            'booking_mode' => 'stay', 'price' => 1500, 'price_unit' => 'night',
+            'size_label' => '250 sq ft',
+            'image' => UploadedFile::fake()->image('room.jpg', 800, 600),
+            'inventory_units' => 2, 'unit_label' => 'room',
+            'min_stay_nights' => 1, 'is_active' => 1,
+        ])->assertRedirect(route('vendor.services', $business->id));
+
+        $service = Service::where('business_id', $business->id)->firstOrFail();
+        $this->assertEquals('250 sq ft', $service->size_label);
+        $this->assertNotNull($service->image);
+        Storage::disk('public')->assertExists(str_replace('storage/', '', $service->image));
+
+        $this->get(route('vendor.services', $business->id))->assertOk()->assertSee('250 sq ft');
+        $this->get(route('vendor.services.create', $business->id))->assertOk()->assertSee('Photo');
+        $this->get(route('vendor.services.edit', ['businessId' => $business->id, 'id' => $service->id]))->assertOk()->assertSee('250 sq ft');
+    }
+
+    public function test_vendor_can_set_ground_size_on_turf(): void
+    {
+        [$owner, $business] = $this->business('sports-fitness', ['bookings' => true, 'turf' => true]);
+
+        $this->actingAs($owner)->post(route('vendor.services.store', $business->id), [
+            'name' => 'Football Ground', 'booking_mode' => 'slot', 'price' => 1000,
+            'price_unit' => 'hour', 'duration' => 60, 'capacity' => 20,
+            'size_label' => '6v6', 'is_active' => 1,
+        ])->assertRedirect(route('vendor.services', $business->id));
+
+        $this->assertDatabaseHas('services', [
+            'business_id' => $business->id, 'name' => 'Football Ground', 'size_label' => '6v6',
+        ]);
     }
 
     private function business(string $categorySlug, array $modules): array

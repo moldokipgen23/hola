@@ -6,7 +6,7 @@
 @section('content')
 @php $mode = old('booking_mode', $service->booking_mode ?? 'appointment'); @endphp
 <div class="max-w-3xl mx-auto">
-    <form method="POST" action="{{ isset($service) ? route('vendor.services.update', ['businessId' => $business->id, 'id' => $service->id]) : route('vendor.services.store', $business->id) }}">
+    <form method="POST" enctype="multipart/form-data" action="{{ isset($service) ? route('vendor.services.update', ['businessId' => $business->id, 'id' => $service->id]) : route('vendor.services.store', $business->id) }}">
         @csrf
         @if(isset($service)) @method('PUT') @endif
 
@@ -35,6 +35,22 @@
             <div>
                 <label class="block text-sm font-medium text-slate-400 mb-1">Description</label>
                 <textarea name="description" rows="3" class="input-dark">{{ old('description', $service->description ?? '') }}</textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Photo</label>
+                    @if(isset($service) && $service->image)
+                        <img src="{{ asset($service->image) }}" alt="{{ $service->name }}" class="w-40 h-28 object-cover rounded-lg mb-2 border border-slate-700">
+                    @endif
+                    <input type="file" name="image" accept="image/jpeg,image/png,image/jpg,image/webp" class="input-dark">
+                    <p class="text-xs text-slate-500 mt-1">JPG, PNG or WebP. Max 4 MB.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1" id="size-label">Size / Ground type</label>
+                    <input type="text" name="size_label" value="{{ old('size_label', $service->size_label ?? '') }}" maxlength="60" class="input-dark" id="size-input" placeholder="e.g. 250 sq ft">
+                    <p class="text-xs text-slate-500 mt-1" id="size-help">Room size, ground type or item size shown to customers.</p>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -100,6 +116,15 @@ function syncBookingMode() {
     document.querySelectorAll('.non-stay-field').forEach(el => el.style.display = mode === 'stay' ? 'none' : 'block');
     document.getElementById('capacity-label').textContent = mode === 'seat' ? 'Total seats per slot' : 'People capacity';
     document.getElementById('inventory-label').textContent = mode === 'stay' ? 'Number of rooms / units' : (mode === 'slot' ? 'Courts / units available' : 'Simultaneous units');
+    const sizeMeta = {
+        appointment: ['Size', 'e.g. Medium, 2-seater', 'Size of the item being booked.'],
+        slot: ['Ground / court size', 'e.g. 6v6, 7v7, half-court', 'Ground size or court type for this slot.'],
+        stay: ['Room size', 'e.g. 250 sq ft, 2 double beds', 'Room size, bed type or capacity shown to guests.'],
+        seat: ['Seat / row size', 'e.g. Front row, A1–A10', 'Seat type, section or row label.']
+    }[mode];
+    document.getElementById('size-label').textContent = sizeMeta[0];
+    document.getElementById('size-input').placeholder = sizeMeta[1];
+    document.getElementById('size-help').textContent = sizeMeta[2];
     document.getElementById('mode-help').textContent = {
         appointment: 'Customer chooses a date and start time. Capacity prevents overlapping requests.',
         slot: 'Create fixed weekly slots after saving. Each slot controls simultaneous courts or units.',

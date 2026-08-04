@@ -3458,6 +3458,8 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'size_label' => 'nullable|string|max:60',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
                 'price' => 'required|numeric|min:0',
                 'booking_mode' => 'required|in:appointment,slot,stay,seat',
                 'price_unit' => 'required|in:booking,hour,night,person,seat',
@@ -3479,6 +3481,13 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $validated['inventory_units'] = $validated['inventory_units'] ?? 1;
             $validated['slug'] = Str::slug($validated['name']).'-'.Str::random(5);
             $validated['is_active'] = $request->has('is_active');
+
+            if ($request->hasFile('image')) {
+                $filename = 'services/'.Str::slug($validated['name']).'-'.Str::random(5).'.'.$request->file('image')->getClientOriginalExtension();
+                \Illuminate\Support\Facades\Storage::disk('public')->put($filename, file_get_contents($request->file('image')));
+                $validated['image'] = 'storage/'.$filename;
+            }
+
             Service::create($validated);
 
             return redirect()->route('vendor.services', $business->id)->with('success', 'Service created.');
@@ -3501,6 +3510,8 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'size_label' => 'nullable|string|max:60',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
                 'price' => 'required|numeric|min:0',
                 'booking_mode' => 'required|in:appointment,slot,stay,seat',
                 'price_unit' => 'required|in:booking,hour,night,person,seat',
@@ -3520,6 +3531,16 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
             $validated['has_fixed_slots'] = in_array($validated['booking_mode'], ['slot', 'seat'], true);
             $validated['duration'] = $validated['duration'] ?? 60;
             $validated['inventory_units'] = $validated['inventory_units'] ?? 1;
+
+            if ($request->hasFile('image')) {
+                $filename = 'services/'.Str::slug($validated['name']).'-'.Str::random(5).'.'.$request->file('image')->getClientOriginalExtension();
+                \Illuminate\Support\Facades\Storage::disk('public')->put($filename, file_get_contents($request->file('image')));
+                $validated['image'] = 'storage/'.$filename;
+                if ($service->image) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete(str_replace('storage/', '', $service->image));
+                }
+            }
+
             $service->update($validated);
 
             return redirect()->route('vendor.services', $business->id)->with('success', 'Service updated.');

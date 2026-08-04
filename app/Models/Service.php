@@ -12,6 +12,8 @@ class Service extends Model
         'business_id',
         'name',
         'description',
+        'image',
+        'size_label',
         'price',
         'price_unit',
         'check_in_time',

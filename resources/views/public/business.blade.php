@@ -211,15 +211,23 @@
                     <div class="space-y-3">
                         @foreach($business->services->where('is_active', true) as $service)
                             <div class="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:border-primary-200 transition">
-                                <div class="flex-1">
-                                    <h3 class="text-sm font-semibold text-slate-900">{{ $service->name }}</h3>
-                                    @if($service->description)
-                                        <p class="text-xs text-slate-500 mt-0.5">{{ \Illuminate\Support\Str::limit($service->description, 80) }}</p>
+                                <div class="flex items-start gap-3 flex-1">
+                                    @if($service->image)
+                                        <img src="{{ asset($service->image) }}" alt="{{ $service->name }}" class="w-16 h-14 object-cover rounded-lg border border-slate-100">
                                     @endif
-                                    <div class="flex items-center gap-2 mt-1">
-                                        @if($service->duration)
-                                            <span class="text-xs text-slate-400">⏱ {{ $service->duration }} min</span>
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-slate-900">{{ $service->name }}</h3>
+                                        @if($service->size_label)
+                                            <p class="text-xs text-slate-500 mt-0.5">{{ $service->size_label }}</p>
                                         @endif
+                                        @if($service->description)
+                                            <p class="text-xs text-slate-500 mt-0.5">{{ \Illuminate\Support\Str::limit($service->description, 80) }}</p>
+                                        @endif
+                                        <div class="flex items-center gap-2 mt-1">
+                                            @if($service->duration)
+                                                <span class="text-xs text-slate-400">⏱ {{ $service->duration }} min</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="text-right ml-4">

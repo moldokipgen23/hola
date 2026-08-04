@@ -25,7 +25,19 @@
         <tbody>
             @forelse($services ?? [] as $service)
                 <tr>
-                    <td class="font-medium">{{ $service->name }}</td>
+                    <td>
+                        <div class="flex items-center gap-3">
+                            @if($service->image)
+                                <img src="{{ asset($service->image) }}" alt="{{ $service->name }}" class="w-10 h-8 object-cover rounded-md border border-slate-700">
+                            @endif
+                            <div>
+                                <div class="font-medium">{{ $service->name }}</div>
+                                @if($service->size_label)
+                                    <div class="text-xs text-slate-400">{{ $service->size_label }}</div>
+                                @endif
+                            </div>
+                        </div>
+                    </td>
                     <td><span class="badge badge-blue">{{ ucfirst($service->booking_mode ?? 'appointment') }}</span></td>
                     <td class="text-sm text-slate-400">
                         @if($service->booking_mode === 'stay')
