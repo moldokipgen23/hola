@@ -134,4 +134,56 @@ class AdminBusinessOwnersTest extends TestCase
             ->assertSee(route('admin.businesses.verify', $business->id))
             ->assertSee(route('admin.users.ban', $owner->id));
     }
+
+    public function test_business_owner_detail_page_shows_owner_business_modules_and_stats(): void
+    {
+        $this->seed(LaunchPhase1Seeder::class);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $owner = User::factory()->create(['role' => 'owner', 'name' => 'Priya Owner', 'email' => 'priya@example.com']);
+        $category = $this->category('Restaurants', 'ordering');
+        $business = $this->ownedBusiness($owner, $category, ['name' => 'Priya Kitchen']);
+
+        $order = \App\Models\Order::create([
+            'business_id' => $business->id,
+            'order_number' => 'DETAIL-001',
+            'customer_name' => 'Customer',
+            'customer_phone' => '9876543210',
+            'total' => 250,
+            'status' => 'delivered',
+            'payment_status' => 'paid',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.vendors.business', $business->id))
+            ->assertOk()
+            ->assertSee('Priya Kitchen')
+            ->assertSee('Priya Owner')
+            ->assertSee('priya@example.com')
+            ->assertSee('Restaurants')
+            ->assertSee('Shopping')
+            ->assertSee('Verified')
+            ->assertSee(route('admin.users.ban', $owner->id))
+            ->assertSee(route('admin.businesses.edit', $business->id));
+
+        $this->assertNotNull($order->id);
+    }
+
+    public function test_business_owners_export_returns_csv_with_owner_and_business(): void
+    {
+        $this->seed(LaunchPhase1Seeder::class);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $owner = User::factory()->create(['role' => 'owner', 'name' => 'Ravi Export', 'email' => 'ravi@example.com']);
+        $category = $this->category('Groceries', 'ordering');
+        $this->ownedBusiness($owner, $category, ['name' => 'Ravi Mart']);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.vendors.export'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+
+        $this->assertStringContainsString('Ravi Mart', $response->getContent());
+        $this->assertStringContainsString('Ravi Export', $response->getContent());
+        $this->assertStringContainsString('ravi@example.com', $response->getContent());
+        $this->assertStringContainsString('Shopping', $response->getContent());
+    }
 }

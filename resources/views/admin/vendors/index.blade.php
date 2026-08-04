@@ -14,7 +14,10 @@
         <h3 class="text-white font-semibold text-lg">All Business Owners</h3>
         <p class="text-slate-500 text-sm mt-1">{{ $vendors->total() }} owned businesses</p>
     </div>
-    <a href="{{ route('admin.businesses.create') }}" class="btn-primary">Add Business</a>
+    <div class="flex gap-2">
+        <a href="{{ route('admin.vendors.export', request()->except(['page'])) }}" class="btn-ghost">Export CSV</a>
+        <a href="{{ route('admin.businesses.create') }}" class="btn-primary">Add Business</a>
+    </div>
 </div>
 
 <!-- Business type tabs -->
@@ -140,7 +143,7 @@
                 </td>
                 <td>
                     <div class="flex gap-2 flex-wrap">
-                        <a href="{{ route('admin.businesses.show', $business->id) }}" class="px-3 py-1.5 text-xs rounded-lg bg-white/5 text-slate-300 hover:bg-white/10 transition">View</a>
+                        <a href="{{ route('admin.vendors.business', $business->id) }}" class="px-3 py-1.5 text-xs rounded-lg bg-white/5 text-slate-300 hover:bg-white/10 transition">View</a>
                         <a href="{{ route('admin.businesses.edit', $business->id) }}" class="px-3 py-1.5 text-xs rounded-lg bg-white/5 text-slate-300 hover:bg-white/10 transition">Edit</a>
                         @if($business->verification_status !== 'verified')
                             <form method="POST" action="{{ route('admin.businesses.verify', $business->id) }}">

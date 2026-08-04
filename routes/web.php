@@ -2101,6 +2101,145 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         return view('admin.vendors.index', compact('vendors', 'categories'));
     })->name('vendors');
 
+    // Business Owner detail — owner + business info, enabled modules, 30-day stats.
+    Route::get('/vendors/business/{id}', function ($id) {
+        $business = \App\Models\Business::with(['createdBy', 'category'])->findOrFail($id);
+        abort_unless($business->created_by, 404);
+
+        $since = now()->subDays(30);
+
+        $stats = [
+            'orders' => $business->orders()->where('created_at', '>=', $since)->count(),
+            'bookings' => $business->bookings()->where('created_at', '>=', $since)->count(),
+            'revenue' => (float) $business->orders()
+                ->where('created_at', '>=', $since)
+                ->whereNotIn('status', ['cancelled', 'rejected'])
+                ->sum('total'),
+            'reviews_count' => $business->reviews()->count(),
+            'rating' => round((float) $business->reviews()->avg('rating'), 1),
+        ];
+
+        $counts = [
+            'products' => $business->products()->count(),
+            'services' => $business->services()->count(),
+            'vehicles' => $business->vehicles()->count(),
+        ];
+
+        if ($business->hasModule('transport')) {
+            $typeLabel = 'Taxi';
+        } elseif ($business->hasModule('bookings')) {
+            $typeLabel = 'Booking';
+        } elseif ($business->hasModule('orders') || $business->hasModule('catalog')) {
+            $typeLabel = 'Shopping';
+        } else {
+            $typeLabel = 'Directory';
+        }
+
+        $modules = [
+            'shopping' => $business->hasModule('catalog') || $business->hasModule('orders'),
+            'booking' => $business->hasModule('bookings'),
+            'taxi' => $business->hasModule('transport'),
+        ];
+
+        $recentOrders = $business->orders()->latest()->take(5)->get();
+
+        return view('admin.vendors.business', compact('business', 'stats', 'counts', 'recentOrders', 'typeLabel', 'modules'));
+    })->name('vendors.business');
+
+    // Export current Business Owners filter as CSV.
+    Route::get('/vendors/export', function () {
+        $query = \App\Models\Business::query()
+            ->with(['createdBy', 'category'])
+            ->whereNotNull('created_by');
+
+        if ($search = request('search')) {
+            $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+            $query->where(function ($q) use ($safe) {
+                $q->where('name', 'like', $safe)
+                    ->orWhereHas('createdBy', function ($oq) use ($safe) {
+                        $oq->where('name', 'like', $safe)->orWhere('email', 'like', $safe);
+                    });
+            });
+        }
+
+        if ($type = request('type')) {
+            $query->where(function ($q) use ($type) {
+                if ($type === 'shopping') {
+                    $q->where('enabled_modules->catalog', true)->orWhere('enabled_modules->orders', true);
+                } elseif ($type === 'booking') {
+                    $q->where('enabled_modules->bookings', true);
+                } elseif ($type === 'taxi') {
+                    $q->where('enabled_modules->transport', true);
+                } elseif ($type === 'directory') {
+                    $q->where(function ($sub) {
+                        $sub->whereNull('enabled_modules')
+                            ->orWhere('enabled_modules', '[]')
+                            ->orWhere('enabled_modules', '{}')
+                            ->orWhereNot(function ($modules) {
+                                $modules->where('enabled_modules->catalog', true)
+                                    ->orWhere('enabled_modules->orders', true)
+                                    ->orWhere('enabled_modules->bookings', true)
+                                    ->orWhere('enabled_modules->transport', true);
+                            });
+                    });
+                }
+            });
+        }
+
+        if ($categoryId = request('category_id')) {
+            $query->where('category_id', $categoryId);
+        }
+
+        if ($status = request('verification_status')) {
+            $query->where('verification_status', $status);
+        }
+
+        if (request('owner_status') === 'banned') {
+            $query->whereHas('createdBy', fn ($q) => $q->whereNotNull('banned_at'));
+        } elseif (request('owner_status') === 'active') {
+            $query->whereHas('createdBy', fn ($q) => $q->whereNull('banned_at'));
+        }
+
+        $businesses = $query->orderBy('name')->get();
+
+        $typeOf = function ($business) {
+            if ($business->hasModule('transport')) {
+                return 'Taxi';
+            }
+            if ($business->hasModule('bookings')) {
+                return 'Booking';
+            }
+            if ($business->hasModule('orders') || $business->hasModule('catalog')) {
+                return 'Shopping';
+            }
+            return 'Directory';
+        };
+
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, ['Owner', 'Owner Email', 'Owner Phone', 'Business', 'Type', 'Sub-Type', 'Verification', 'Owner Status', 'Address']);
+        foreach ($businesses as $business) {
+            fputcsv($handle, [
+                $business->createdBy->name ?? '',
+                $business->createdBy->email ?? '',
+                $business->createdBy->phone ?? '',
+                $business->name,
+                $typeOf($business),
+                $business->category->name ?? '',
+                $business->verification_status,
+                $business->createdBy ? ($business->createdBy->banned_at ? 'suspended' : 'active') : '',
+                $business->address ?? '',
+            ]);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="business-owners-'.now()->format('Y-m-d-His').'.csv"',
+        ]);
+    })->name('vendors.export');
+
     Route::get('/vendors/{id}', function ($id) {
         $vendor = User::where('role', 'owner')->findOrFail($id);
         $businesses = Business::where('created_by', $vendor->id)->with('category')->get();
