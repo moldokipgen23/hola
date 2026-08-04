@@ -79,6 +79,14 @@
                                 @csrf @method('PATCH')
                                 <button type="submit" class="text-red-400 hover:text-red-300">Reject</button>
                             </form>
+                        @elseif($claim->status === 'approved' && $claim->business && $claim->business->verification_status !== 'verified')
+                            <span class="badge badge-yellow">Awaiting verify</span>
+                            <form method="POST" action="{{ route('admin.businesses.verify', $claim->business_id) }}" class="inline">
+                                @csrf
+                                <button type="submit" class="text-blue-400 hover:text-blue-300">Verify</button>
+                            </form>
+                        @elseif($claim->status === 'approved' && $claim->business && $claim->business->verification_status === 'verified')
+                            <span class="badge badge-green">Verified</span>
                         @endif
                     </td>
                 </tr>

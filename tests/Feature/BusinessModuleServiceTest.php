@@ -162,6 +162,7 @@ class BusinessModuleServiceTest extends TestCase
             'slug' => 'module-test-business-'.uniqid(),
             'address' => 'Test Road',
             'source' => 'vendor',
+            'verification_status' => 'verified',
         ], $attributes));
     }
 }

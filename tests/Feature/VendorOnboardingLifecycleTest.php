@@ -15,7 +15,7 @@ class VendorOnboardingLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_claim_approval_auto_verifies_directory_only_business(): void
+    public function test_claim_approval_assigns_ownership_but_keeps_business_pending_until_admin_verify(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $claimant = User::factory()->create(['role' => 'customer']);
@@ -33,10 +33,16 @@ class VendorOnboardingLifecycleTest extends TestCase
 
         $business->refresh();
         $this->assertSame('claimed', $business->claim_status);
-        $this->assertSame('verified', $business->verification_status);
+        $this->assertSame('pending', $business->verification_status);
         $this->assertTrue($business->is_active);
         $this->assertSame($claimant->id, $business->created_by);
         $this->assertSame('owner', $claimant->refresh()->role);
+
+        $this->actingAs($admin)
+            ->post(route('admin.businesses.verify', $business->id))
+            ->assertRedirect();
+
+        $this->assertSame('verified', $business->refresh()->verification_status);
     }
 
     public function test_claim_approval_keeps_transactional_business_pending_until_admin_verify(): void
@@ -99,10 +105,31 @@ class VendorOnboardingLifecycleTest extends TestCase
         $this->assertSame('verified', $business->refresh()->verification_status);
     }
 
+    public function test_setup_wizard_requires_admin_verification(): void
+    {
+        $vendor = User::factory()->create(['role' => 'owner']);
+        $business = $this->business([
+            'created_by' => $vendor->id,
+            'enabled_modules' => [],
+            'verification_status' => 'pending',
+        ]);
+
+        $this->actingAs($vendor)
+            ->post(route('vendor.businesses.setup.post', $business->id), ['offer' => 'book'])
+            ->assertRedirect(route('vendor.dashboard'))
+            ->assertSessionHas('error');
+
+        $this->assertFalse($business->refresh()->hasModule('bookings'));
+    }
+
     public function test_choosing_take_bookings_enables_bookings_module(): void
     {
         $vendor = User::factory()->create(['role' => 'owner']);
-        $business = $this->business(['created_by' => $vendor->id, 'enabled_modules' => []]);
+        $business = $this->business([
+            'created_by' => $vendor->id,
+            'enabled_modules' => [],
+            'verification_status' => 'verified',
+        ]);
 
         $this->actingAs($vendor)
             ->post(route('vendor.businesses.setup.post', $business->id), ['offer' => 'book'])
@@ -115,7 +142,11 @@ class VendorOnboardingLifecycleTest extends TestCase
     public function test_choosing_sell_products_applies_retail_template(): void
     {
         $vendor = User::factory()->create(['role' => 'owner']);
-        $business = $this->business(['created_by' => $vendor->id, 'enabled_modules' => []]);
+        $business = $this->business([
+            'created_by' => $vendor->id,
+            'enabled_modules' => [],
+            'verification_status' => 'verified',
+        ]);
 
         $this->actingAs($vendor)
             ->post(route('vendor.businesses.setup.post', $business->id), ['offer' => 'sell'])

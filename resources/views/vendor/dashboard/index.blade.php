@@ -12,7 +12,22 @@
 
 @php
     $needsSetup = $businesses->contains(fn ($b) => $b->enabled_modules === null);
+    $pendingVerification = $businesses->first(fn ($b) => $b->verification_status === 'pending');
 @endphp
+
+@if($pendingVerification)
+<div class="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-xl p-5 mb-8">
+    <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/30 flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M12 3l9 16H3l9-16z"/></svg>
+        </div>
+        <div class="flex-1">
+            <h4 class="text-white font-semibold">{{ $pendingVerification->name }} is pending verification</h4>
+            <p class="text-slate-400 text-sm mt-1">Your business is listed in the directory now. Once an admin verifies it, you'll be able to choose what you offer and enable your storefront, bookings and features.</p>
+        </div>
+    </div>
+</div>
+@endif
 
 @if($needsSetup)
 <div class="bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-xl p-5 mb-8">

@@ -1160,14 +1160,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::patch('/claims/{id}/approve', function ($id) {
         $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
         $claim->update(['status' => 'approved']);
-        // Phase 6 lifecycle: directory-only listings auto-verify (low risk);
-        // transactional businesses stay `pending` until an admin verifies them.
-        $claim->business->update(array_merge(
-            ['claim_status' => 'claimed', 'created_by' => $claim->user_id],
-            $claim->business->isDirectoryOnly()
-                ? ['verification_status' => 'verified', 'is_active' => true]
-                : [],
-        ));
+        // Phase 6 lifecycle: ownership is transferred on claim approval, but the
+        // business stays a directory listing (verification_status remains pending)
+        // until an admin explicitly verifies it and it becomes a working vendor.
+        $claim->business->update([
+            'claim_status' => 'claimed',
+            'created_by' => $claim->user_id,
+            'is_active' => true,
+        ]);
         if ($claim->user->role === 'customer') {
             $claim->user->update(['role' => 'owner']);
         }
@@ -1196,12 +1196,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
         foreach ($ids as $id) {
             $claim = ClaimRequest::with(['user', 'business'])->findOrFail($id);
             $claim->update(['status' => 'approved']);
-            $claim->business->update(array_merge(
-                ['claim_status' => 'claimed', 'created_by' => $claim->user_id],
-                $claim->business->isDirectoryOnly()
-                    ? ['verification_status' => 'verified', 'is_active' => true]
-                    : [],
-            ));
+            $claim->business->update([
+                'claim_status' => 'claimed',
+                'created_by' => $claim->user_id,
+                'is_active' => true,
+            ]);
             if ($claim->user->role === 'customer') {
                 $claim->user->update(['role' => 'owner']);
             }
@@ -2998,6 +2997,12 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
 
         Route::put('/businesses/{id}/modules', function (Request $request, $id) {
             $business = Business::where('created_by', Auth::id())->findOrFail($id);
+
+            if ($business->verification_status !== 'verified') {
+                return redirect()->route('vendor.businesses.modules', $business->id)
+                    ->with('error', 'Your business is pending admin verification. You can enable features once it is verified.');
+            }
+
             $validated = $request->validate([
                 'modules' => 'nullable|array',
                 'modules.*' => 'in:catalog,orders,bookings,inventory,transport,turf',
@@ -3023,6 +3028,14 @@ Route::prefix('vendor')->name('vendor.')->middleware('web')->group(function () {
         Route::post('/businesses/{id}/setup', function (Request $request, $id) {
             $user = Auth::user();
             $business = Business::where('created_by', $user->id)->findOrFail($id);
+
+            // Phase 6 lifecycle: a business must be admin-verified before it can
+            // become a working vendor (enable sell/book modules).
+            if ($business->verification_status !== 'verified') {
+                return redirect()->route('vendor.dashboard')
+                    ->with('error', 'Your business is pending admin verification. Once verified, you can choose what you offer.');
+            }
+
             $validated = $request->validate([
                 'offer' => 'required|in:sell,book,list',
             ]);

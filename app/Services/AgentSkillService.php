@@ -850,9 +850,9 @@ EXISTING CATEGORIES:
 - {$catList}
 
 RULES:
-1. category MUST be one of the existing categories above, or null when none fits
-2. Never invent a category in the category field
-3. When category is null, provide suggested_category with a concise suggestion for admin review
+1. category MUST be one of the existing categories above when a close match exists
+2. When no existing category fits, set category to null and provide suggested_category with a concise new category name — it will be AUTO-CREATED, so be specific and useful (e.g. "Pet Grooming", "Car Rental")
+3. Never set category to a name that is not in the existing list
 4. For businesses with "current_category" field — only change it if the current one is WRONG
 
 Return ONLY a JSON array with: source, source_id, category, suggested_category, changed.
@@ -887,7 +887,7 @@ EOT;
         }
 
         $categorized = 0;
-        $suggestionsCreated = 0;
+        $categoriesCreated = 0;
         $changed = 0;
 
         foreach ($mappings as $map) {
@@ -902,23 +902,19 @@ EOT;
             }
 
             $catName = $catName ? $canonicalCategories->get(Str::lower(trim((string) $catName))) : null;
-            if (! $catName) {
-                if ($suggestedCategory) {
-                    $item = $source === 'import' ? $items->firstWhere('id', $sourceId) : null;
-                    $business = $source === 'business' ? $existingCategorized->firstWhere('id', $sourceId) : null;
-                    $suggestion = app(TaxonomyService::class)->suggestUnknown(
-                        $suggestedCategory,
-                        agent: $agent,
-                        importItem: $item,
-                        business: $business,
-                        evidence: ['ai_mapping' => $map],
-                        sourceProvider: 'ai_classifier',
-                        confidence: 0.5,
-                    );
 
-                    $suggestionsCreated += $suggestion->wasRecentlyCreated ? 1 : 0;
+            // No existing match: auto-create the suggested category (directory/listing bucket)
+            // so the AI can build out its own taxonomy while importing.
+            if (! $catName && $suggestedCategory) {
+                $created = false;
+                $category = $this->findOrCreateSuggestedCategory($suggestedCategory, $agent, $created);
+                $categoriesCreated += $created ? 1 : 0;
+                if ($category) {
+                    $catName = $category->name;
                 }
+            }
 
+            if (! $catName) {
                 continue;
             }
 
@@ -957,7 +953,6 @@ EOT;
                                 'confidence' => 0.5,
                             ]
                         );
-                        $suggestionsCreated += $suggestion->wasRecentlyCreated ? 1 : 0;
                         $changed++;
                     }
                 }
@@ -967,11 +962,35 @@ EOT;
         return [
             'count' => count($businessList),
             'imported' => $categorized,
-            'categories_created' => 0,
-            'suggestions_created' => $suggestionsCreated,
+            'categories_created' => $categoriesCreated,
+            'suggestions_created' => 0,
             'existing_reorganized' => $changed,
             'cost' => round(($result['usage']['total_tokens'] ?? 0) * 0.00000014, 4),
         ];
+    }
+
+    private function findOrCreateSuggestedCategory(string $name, AiAgent $agent, bool &$created): ?Category
+    {
+        $title = Str::of($name)->replace('_', ' ')->squish()->title()->toString();
+        $existing = Category::where('is_canonical', true)->whereRaw('LOWER(name) = ?', [Str::lower($title)])->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $data = [
+            'name' => $title,
+            'slug' => Str::slug($title),
+            'module_type' => 'directory',
+            'is_canonical' => true,
+            'is_active' => true,
+            'description' => 'Auto-created by AI categorization agent.',
+        ];
+        Category::applyTaxonomy($data);
+        $category = Category::create($data);
+        $created = true;
+
+        return $category;
     }
 
     private function duplicateDetector(AiAgent $agent, AiAgentTask $task): array
