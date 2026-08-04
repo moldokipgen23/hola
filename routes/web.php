@@ -2752,7 +2752,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Product Categories — per-business storefront categories under a Shop section.
     Route::get('/product-categories', function (\Illuminate\Http\Request $request) {
-        $businesses = \App\Models\Business::with('primaryClassification')->orderBy('name')->get();
+        $businesses = \App\Models\Business::where(function ($q) {
+                $q->where('enabled_modules->catalog', true)->orWhere('enabled_modules->orders', true);
+            })
+            ->with('primaryClassification')->orderBy('name')->get();
         $business = $businesses->firstWhere('id', $request->query('business_id'))
             ?? $businesses->first();
 

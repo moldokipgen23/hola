@@ -35,10 +35,19 @@ class AdminSidebarTest extends TestCase
             ->assertSee('>Users</p>', false)
             ->assertSee('>Fulfillment</p>', false)
             ->assertSee('>Analytics</p>', false)
-            ->assertSee('>Content</p>', false)
             ->assertSee('>Settings</p>', false)
             ->assertSee('>System</p>', false)
-            ->assertSee('>AI Agents</p>', false);
+            ->assertSee('>AI Agents</p>', false)
+            ->assertSeeInOrder([
+                '>Overview</p>',
+                '>Directory</p>',
+                '>Users</p>',
+                '>Fulfillment</p>',
+                '>Analytics</p>',
+                '>Settings</p>',
+                '>System</p>',
+                '>AI Agents</p>',
+            ]);
     }
 
     public function test_admin_sidebar_hides_shop_department_in_phase_one_launch(): void
@@ -75,7 +84,6 @@ class AdminSidebarTest extends TestCase
             ->assertSee('>Orders</p>', false)
             ->assertSee('href="' . route('admin.products') . '"', false)
             ->assertSee('href="' . route('admin.orders') . '"', false)
-            ->assertSee('href="' . route('admin.bookings') . '"', false)
             ->assertSee('href="' . route('admin.services') . '"', false)
             ->assertSee('href="' . route('admin.businesses') . '"', false);
     }

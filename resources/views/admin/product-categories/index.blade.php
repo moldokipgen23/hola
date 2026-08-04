@@ -12,7 +12,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <p class="text-slate-400 text-sm">Per-business storefront categories, grouped under Shop sections.</p>
-            <p class="text-slate-500 text-xs mt-1">Pick a business to manage its product categories. These are independent from Directory business classifications.</p>
+            <p class="text-slate-500 text-xs mt-1">Only shopping businesses appear here. Pick one to manage its product categories.</p>
         </div>
     </div>
 

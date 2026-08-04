@@ -33,6 +33,15 @@ class AdminNavService
         $badges = $this->badges();
         $isPower = $this->isPowerUser();
 
+        $usersItems = [
+            ['label' => 'Customers', 'route' => 'admin.users*', 'icon' => 'users'],
+            ['label' => 'Business Owners', 'route' => 'admin.vendors*', 'icon' => 'sellers'],
+        ];
+
+        if ($isPower) {
+            $usersItems[] = ['label' => 'Staff', 'route' => 'admin.staff*', 'icon' => 'staff'];
+        }
+
         $menu = [
             [
                 'title' => 'Overview',
@@ -55,7 +64,6 @@ class AdminNavService
                 'feature' => 'world.shop',
                 'items' => [
                     ['label' => 'All Orders', 'route' => 'admin.orders*', 'icon' => 'orders', 'badge' => $badges['pending_orders'] ?? 0],
-                    ['label' => 'Bookings', 'route' => 'admin.bookings*', 'icon' => 'bookings', 'feature' => 'world.book', 'badge' => $badges['pending_bookings'] ?? 0],
                 ],
             ],
             [
@@ -68,6 +76,7 @@ class AdminNavService
                     ['label' => 'Services', 'route' => 'admin.services*', 'icon' => 'services', 'feature' => 'world.book'],
                 ],
             ],
+            ['title' => 'Users', 'items' => $usersItems],
             [
                 'title' => 'Fulfillment',
                 'items' => [
@@ -85,14 +94,6 @@ class AdminNavService
                 ],
             ],
             [
-                'title' => 'Content',
-                'items' => [
-                    ['label' => 'Homepage', 'route' => 'admin.homepage*', 'icon' => 'homepage'],
-                    ['label' => 'Featured', 'route' => 'admin.featured*', 'icon' => 'star'],
-                    ['label' => 'Coming-soon Interest', 'route' => 'admin.area-interests*', 'icon' => 'interest'],
-                ],
-            ],
-            [
                 'title' => 'Settings',
                 'items' => [
                     ['label' => 'Launch Controls', 'route' => 'admin.feature-flags*', 'icon' => 'flag', 'badge' => $badges['enabled_flags'] ?? 0, 'badge_suffix' => ' ON'],
@@ -101,17 +102,6 @@ class AdminNavService
                 ],
             ],
         ];
-
-        $usersItems = [
-            ['label' => 'Customers', 'route' => 'admin.users*', 'icon' => 'users'],
-            ['label' => 'Business Owners', 'route' => 'admin.vendors*', 'icon' => 'sellers'],
-        ];
-
-        if ($isPower) {
-            $usersItems[] = ['label' => 'Staff', 'route' => 'admin.staff*', 'icon' => 'staff'];
-        }
-
-        $menu[] = ['title' => 'Users', 'items' => $usersItems];
 
         $systemItems = [
             ['label' => 'Transactions', 'route' => 'admin.transactions*', 'icon' => 'transactions'],
