@@ -274,7 +274,7 @@
         <div class="fixed inset-0 bg-black/50 z-40 hidden" id="overlay" onclick="toggleSidebar()"></div>
 
         <!-- Main -->
-        <div class="flex-1 flex flex-col main-content main-bg overflow-hidden md:ml-64">
+        <div class="flex-1 flex flex-col main-content main-bg overflow-hidden">
             <!-- Header -->
             <header class="top-header px-6 py-4 flex items-center justify-between flex-shrink-0">
                 <div class="flex items-center gap-4">
