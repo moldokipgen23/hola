@@ -141,6 +141,17 @@ if (! function_exists('resolveApprovedImportTaxonomy')) {
                 ->first();
         }
 
+        // Fallback: deterministic keyword classifier on name/types/address.
+        // Guards against generic Google types like "establishment" ever being
+        // used as a category again.
+        if (! $category) {
+            $category = classifyBusinessByKeywords(
+                (string) ($data['name'] ?? ''),
+                is_array($data['types'] ?? null) ? $data['types'] : [],
+                (string) ($data['address'] ?? ''),
+            );
+        }
+
         if (! $category) {
             return null;
         }
@@ -166,6 +177,98 @@ if (! function_exists('resolveApprovedImportTaxonomy')) {
             'category_id' => $category->id,
             'subcategory_id' => $subcategory?->id,
         ];
+    }
+}
+
+if (! function_exists('classifyBusinessByKeywords')) {
+    /**
+     * Deterministic keyword classifier for business names/types/address.
+     *
+     * Google's Places API returns generic types like "establishment" first,
+     * so importers must NEVER treat the first type as the category. This maps
+     * a business to the correct local category via ordered keyword rules
+     * (most specific first) against name + types + address.
+     *
+     * Returns the matching Category or null when nothing confidently matches.
+     */
+    function classifyBusinessByKeywords(string $name, array $types = [], ?string $address = null): ?\App\Models\Category
+    {
+        $haystack = mb_strtolower(implode(' ', array_filter([
+            $name,
+            implode(' ', $types),
+            $address ?? '',
+        ])));
+
+        // [category_slug, [keywords...]]. Matching is by LONGEST matched
+        // keyword, so a specific term ("pharmacy") always beats a generic one
+        // ("store") for the same business.
+        $rules = [
+            'football-turf' => ['football turf', 'turf ground', 'football ground', 'football field', 'astro turf', 'playfield', 'leisure turf', 'arena turf', 'sports turf', 'turf', 'football club', 'false 9'],
+            'salons' => ['salon', 'saloon', 'unisex hair', 'hair studio', 'haircut', 'barber', 'hair and beauty'],
+            'beauty-parlours' => ['beauty parlour', 'beauty parlor'],
+            'beauty-wellness' => ['beauty spa', 'spa and', 'waxing', 'eyebrow', 'threading', 'nail art', 'skin care', 'makeover', 'bridal'],
+            'pharmacies' => ['pharmacy', 'medical store', 'medical shop', 'drugstore', 'chemist', 'medico', 'medicine store'],
+            'hospitals' => ['hospital'],
+            'clinics' => ['clinic', 'dental', 'dentist', 'doctor', 'medical centre', 'medical center', 'healthcare centre', 'health centre', 'healthcare center', 'health institute', 'health institute'],
+            'schools' => ['high school', 'public school', 'english school', 'playschool', 'school', 'academy', 'foundation school', 'residential school'],
+            'colleges' => ['college', 'university'],
+            'tuition-centers' => ['tuition', 'coaching', 'tutorial', 'learning centre', 'learning center', 'classes', 'study centre', 'study center', 'nios'],
+            'music-school' => ['music school', 'music academy', 'singing class', 'guitar school'],
+            'dance-school' => ['dance school', 'dance academy'],
+            'electronics-tech' => ['mobile', 'electronics', 'computer', 'laptop', 'mobile repair', 'phone repair', 'cell phone', 'cctv', 'gadget', 'tronics'],
+            'gyms' => ['gym', 'gymnasium', 'workout'],
+            'sports-fitness' => ['sports complex', 'sports arena', 'badminton', 'basketball', 'boxing', 'martial arts', 'sports club', 'sports centre', 'sports center', 'swimming pool', 'arena'],
+            'restaurants' => ['restaurant', 'eatery', 'diner', 'canteen', 'dhaba', 'food court', 'bhojanalya'],
+            'cafes' => ['coffee shop', 'coffee house', 'cafe', 'pattisserie', 'ice cream parlour', 'ice cream parlor'],
+            'food-restaurants' => ['fast food', 'bakery', 'sweet shop', 'tiffin', 'snack bar', 'food stall', 'biryani', 'momos', 'catering service'],
+            'hotels' => ['hotel'],
+            'guest-houses' => ['guest house', 'guesthouse', 'lodge', 'inn'],
+            'homestays' => ['homestay', 'home stay', 'floating homestay'],
+            'resorts' => ['resort'],
+            'laundry-dry-cleaning' => ['laundry', 'dryclean', 'dry clean', 'dry-cleaning', 'dhobi', 'ironing'],
+            'catering-food-service' => ['catering', 'banquet'],
+            'taxi-services' => ['taxi', 'cab service', 'car rental', 'auto rental', 'travel agency'],
+            'transport' => ['bus service', 'transport', 'logistics', 'courier', 'parcel service', 'truck'],
+            'automobiles' => ['garage', 'mechanic', 'automobile', 'auto repair', 'car service', 'bike service', 'tyre', 'workshop', 'spare part', 'showroom', 'motor'],
+            'home-local-services' => ['electrician', 'plumber', 'carpenter', 'painter', 'tailor', 'taylor', 'welding', 'welder', 'photographer', 'photographic', 'photoshop', 'photo studio', 'printing press', 'print press', 'xerox', 'repair shop', 'maintenance', 'pest control', 'interior', 'furniture', 'hardware'],
+            'churches' => ['church', 'chapel', 'christian fellowship', 'congregation'],
+            'post-offices' => ['post office', 'india post', 'speed post'],
+            'fire-emergency-services' => ['fire station', 'fire brigade'],
+            'government-public-services' => ['government', 'government office', 'secretariat', 'collectorate', 'tehsil', 'police station', 'police', 'court', 'bank', 'atm', 'municipal', 'electricity office', 'water supply', 'public service', 'panchayat', 'administrative', 'mspdcl', ' office'],
+            'parks' => ['public park', 'city park', 'garden', 'park'],
+            'religious-community-places' => ['temple', 'mosque', 'masjid', 'gurdwara', 'monastery', 'mission compound'],
+            'general-store' => ['general store', 'grocery', 'provision', 'supermarket', 'department store', 'emporium', 'hardware store', 'electrical store', 'variety store', 'stationery', 'book store', 'sports shop', 'clothing store', 'garment', 'tailoring shop', 'bazaar', 'bazar', 'wholesale', 'distributor', 'supplier', 'vending', 'enterprise', 'trading'],
+        ];
+
+        $best = null;
+        $bestLen = 0;
+        foreach ($rules as $slug => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($haystack, $keyword) && mb_strlen($keyword) > $bestLen) {
+                    $best = $slug;
+                    $bestLen = mb_strlen($keyword);
+                }
+            }
+        }
+
+        if ($best === null) {
+            return null;
+        }
+
+        // Resolve the category: prefer an active canonical category by slug,
+        // falling back to any active category with that slug or name.
+        $category = \App\Models\Category::active()
+            ->where('is_canonical', true)
+            ->where('slug', $best)
+            ->first()
+            ?? \App\Models\Category::active()
+                ->where('slug', $best)
+                ->first()
+            ?? \App\Models\Category::active()
+                ->where('name', \Illuminate\Support\Str::headline(str_replace('-', ' ', $best)))
+                ->first();
+
+        return $category;
     }
 }
 

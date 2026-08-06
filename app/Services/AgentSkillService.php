@@ -1454,7 +1454,15 @@ EOT;
                 'website' => $website,
                 'rating' => $rating,
                 'total_ratings' => $reviews,
-                'category' => is_array($type) ? ($type[0] ?? null) : $type,
+                // Never use the first Google type (usually the generic
+                // "establishment") as the category — classify by keywords so
+                // turfs land in "Football Turf", mobiles in "Electronics", etc.
+                'category' => classifyBusinessByKeywords(
+                    $cleanName,
+                    is_array($type) ? $type : [$type],
+                    $address,
+                )?->name,
+                'types' => is_array($type) ? $type : ($type ? [$type] : []),
                 'latitude' => $place['gps_coordinates']['latitude'] ?? null,
                 'longitude' => $place['gps_coordinates']['longitude'] ?? null,
             ];
