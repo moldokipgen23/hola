@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
 use App\Http\Controllers\Api\CartController;
@@ -140,6 +141,11 @@ Route::post('/businesses/{slug}/track', [BusinessController::class, 'trackAction
 Route::get('/businesses/{slug}/related', [BusinessController::class, 'related']);
 Route::get('/businesses/{slug}/services', [BusinessController::class, 'services'])->middleware('launch:world.book,module.bookings');
 Route::get('/businesses/by-id/{id}/services', [BusinessController::class, 'publicServices'])->middleware('launch:world.book,module.bookings');
+
+// Business-scoped appointment booking flow
+Route::get('/businesses/{slug}/staff', [AppointmentController::class, 'staff'])->middleware('launch:world.book,module.bookings');
+Route::get('/businesses/{slug}/availability', [AppointmentController::class, 'availability'])->middleware('launch:world.book,module.bookings');
+Route::get('/businesses/{slug}/slots', [AppointmentController::class, 'slots'])->middleware('launch:world.book,module.bookings');
 
 // Public booking & order
 Route::post('/businesses/{slug}/bookings', [PublicBookingController::class, 'storeBooking'])->middleware(['launch:world.book,module.bookings', 'auth.optional', 'throttle:20,1']);
