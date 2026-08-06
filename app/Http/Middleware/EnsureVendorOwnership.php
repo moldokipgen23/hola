@@ -2,10 +2,13 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Booking;
 use App\Models\Business;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\Service;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureVendorOwnership
@@ -132,7 +135,8 @@ class EnsureVendorOwnership
         $productId = $request->route('id') ?? $request->route('productId');
 
         if ($productId) {
-            $product = \App\Models\Product::find($productId);
+            $product = Product::find($productId);
+
             return $product?->business_id;
         }
 
@@ -144,7 +148,8 @@ class EnsureVendorOwnership
         $orderId = $request->route('id');
 
         if ($orderId) {
-            $order = \App\Models\Order::find($orderId);
+            $order = Order::find($orderId);
+
             return $order?->business_id;
         }
 
@@ -156,7 +161,8 @@ class EnsureVendorOwnership
         $bookingId = $request->route('id');
 
         if ($bookingId) {
-            $booking = \App\Models\Booking::find($bookingId);
+            $booking = Booking::find($bookingId);
+
             return $booking?->business_id;
         }
 
@@ -168,7 +174,8 @@ class EnsureVendorOwnership
         $serviceId = $request->route('id') ?? $request->route('serviceId');
 
         if ($serviceId) {
-            $service = \App\Models\Service::find($serviceId);
+            $service = Service::find($serviceId);
+
             return $service?->business_id;
         }
 

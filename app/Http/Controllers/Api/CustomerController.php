@@ -24,6 +24,72 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function showOrder(Request $request, $id)
+    {
+        $order = Order::with([
+            'business:id,name,slug,photos,phone,whatsapp',
+            'items' => fn ($q) => $q->with('product:id,name,images'),
+        ])->findOrFail($id);
+
+        if ($order->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        return response()->json(['order' => $order]);
+    }
+
+    public function trackOrder(Request $request, $id)
+    {
+        $order = Order::with('business:id,name,slug,photos,phone,whatsapp')->findOrFail($id);
+
+        if ($order->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        return response()->json(['tracking' => $order->trackingTimeline()]);
+    }
+
+    public function lookupOrder(Request $request)
+    {
+        $validated = $request->validate([
+            'phone' => 'required|string|max:20',
+            'client_reference' => 'required|string|max:64',
+        ]);
+
+        $order = Order::with(['business:id,name,slug,photos,phone,whatsapp', 'items'])
+            ->where('customer_phone', $validated['phone'])
+            ->where('client_reference', $validated['client_reference'])
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $order) {
+            return response()->json(['message' => 'No order found for this phone and reference.', 'order' => null], 404);
+        }
+
+        return response()->json([
+            'order' => [
+                'id' => $order->id,
+                'client_reference' => $order->client_reference,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'payment_status' => $order->payment_status,
+                'payment_method' => $order->payment_method,
+                'delivery_method' => $order->delivery_method,
+                'subtotal' => $order->subtotal,
+                'tax' => $order->tax,
+                'delivery_fee' => $order->delivery_fee,
+                'discount' => $order->discount,
+                'total' => $order->total,
+                'estimated_ready_at' => $order->estimated_ready_at?->toIso8601String(),
+                'confirmed_at' => $order->confirmed_at?->toIso8601String(),
+                'ready_at' => $order->ready_at?->toIso8601String(),
+                'delivered_at' => $order->delivered_at?->toIso8601String(),
+                'business' => $order->business?->only(['id', 'name', 'slug', 'photos', 'phone', 'whatsapp']),
+                'items' => $order->items,
+            ],
+        ]);
+    }
+
     public function myBookings(Request $request)
     {
         return response()->json([
@@ -31,6 +97,43 @@ class CustomerController extends Controller
                 ->with(['business:id,name,slug,photos', 'service:id,name,price'])
                 ->orderByDesc('created_at')
                 ->paginate(20),
+        ]);
+    }
+
+    public function lookupBooking(Request $request)
+    {
+        // Require both phone AND the booking reference so a phone number alone
+        // cannot enumerate strangers' booking histories.
+        $validated = $request->validate([
+            'phone' => 'required|string|max:20',
+            'client_reference' => 'required|string|max:64',
+        ]);
+
+        $booking = Booking::with(['business:id,name,slug,photos', 'service:id,name,price'])
+            ->where('customer_phone', $validated['phone'])
+            ->where('client_reference', $validated['client_reference'])
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $booking) {
+            return response()->json(['message' => 'No booking found for this phone and reference.', 'booking' => null], 404);
+        }
+
+        return response()->json([
+            'booking' => [
+                'id' => $booking->id,
+                'client_reference' => $booking->client_reference,
+                'booking_type' => $booking->booking_type,
+                'status' => $booking->status,
+                'payment_status' => $booking->payment_status,
+                'booking_date' => $booking->booking_date?->toDateString(),
+                'check_in_date' => $booking->check_in_date?->toDateString(),
+                'check_out_date' => $booking->check_out_date?->toDateString(),
+                'start_time' => $booking->start_time?->format('H:i'),
+                'total_price' => $booking->total_price,
+                'business' => $booking->business?->only(['id', 'name', 'slug', 'photos']),
+                'service' => $booking->service?->only(['id', 'name', 'price']),
+            ],
         ]);
     }
 
@@ -60,6 +163,43 @@ class CustomerController extends Controller
         $booking = $workflow->cancelByCustomer($booking, $request->reason);
 
         return response()->json(['message' => 'Booking cancelled.', 'booking' => $booking]);
+    }
+
+    public function showBooking(Request $request, $id)
+    {
+        $booking = Booking::with(['business:id,name,slug,photos,phone', 'service', 'timeSlot'])->findOrFail($id);
+
+        if ($booking->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        return response()->json(['booking' => $booking]);
+    }
+
+    public function rescheduleBooking(Request $request, $id, BookingWorkflowService $workflow)
+    {
+        $booking = Booking::with(['business', 'service'])->findOrFail($id);
+
+        if ($booking->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $validated = $request->validate([
+            'to_date' => 'required|date',
+            'to_time' => 'nullable|date_format:H:i',
+            'to_slot_id' => 'nullable|integer',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $booking = $workflow->reschedule(
+            $booking,
+            $validated['to_date'],
+            $validated['to_time'] ?? null,
+            isset($validated['to_slot_id']) ? (string) $validated['to_slot_id'] : null,
+            $validated['reason'] ?? null,
+        );
+
+        return response()->json(['message' => 'Booking rescheduled.', 'booking' => $booking]);
     }
 
     public function reorder(Request $request, $id, OrderPlacementService $orders)

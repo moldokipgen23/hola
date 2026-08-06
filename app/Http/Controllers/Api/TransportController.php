@@ -14,7 +14,7 @@ class TransportController extends Controller
 {
     public function vehicles($slug)
     {
-        $business = Business::active()->inServiceableArea()->where('slug', $slug)->firstOrFail();
+        $business = Business::active()->where('slug', $slug)->firstOrFail();
         $vehicles = $business->vehicles()->where('is_active', true)->get();
 
         return response()->json(compact('vehicles'));
@@ -22,7 +22,7 @@ class TransportController extends Controller
 
     public function estimateFare(Request $request, $slug)
     {
-        $business = Business::active()->inServiceableArea()->where('slug', $slug)->firstOrFail();
+        $business = Business::active()->where('slug', $slug)->firstOrFail();
 
         $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
@@ -51,7 +51,7 @@ class TransportController extends Controller
 
     public function bookTrip(Request $request, $slug, TripPlacementService $trips)
     {
-        $business = Business::active()->inServiceableArea()->where('slug', $slug)->firstOrFail();
+        $business = Business::active()->where('slug', $slug)->firstOrFail();
 
         if (! $business->hasTransportModule()) {
             return response()->json(['message' => 'Transport not available for this business.'], 422);

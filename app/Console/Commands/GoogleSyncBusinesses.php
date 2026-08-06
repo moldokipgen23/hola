@@ -163,7 +163,7 @@ class GoogleSyncBusinesses extends Command
                         $newPhotos = [];
                         foreach (array_slice($data['photos'], 0, 10) as $photo) {
                             if (! empty($photo['photo_reference'])) {
-                                $newPhotos[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
+                                $newPhotos[] = ['photo_reference' => $photo['photo_reference']];
                             }
                         }
                         if (! empty($newPhotos)) {

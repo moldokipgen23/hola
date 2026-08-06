@@ -270,6 +270,16 @@ class DatabaseSeeder extends Seeder
             Setting::set($key, $value, 'smtp');
         }
 
+        // ─── Transport master data + demo inventory ───
+        // Routes (master data) then demo vendors/vehicles/schedules/rentals.
+        // Both are idempotent (firstOrCreate / updateOrCreate) and safe to
+        // re-run, so they can stay wired even while the Ride world is still
+        // behind the `world.ride` launch flag.
+        $this->call(TransportRouteSeeder::class);
+        $this->call(DemoTransportSeeder::class);
+        $this->call(CitySeeder::class);
+        $this->call(SubscriptionPlanSeeder::class);
+
         // Phase-1 launch surface: Directory + Turf only.
         $this->call(LaunchPhase1Seeder::class);
     }

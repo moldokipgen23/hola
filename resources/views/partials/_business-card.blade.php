@@ -2,9 +2,9 @@
 
 @php
     $photo = null;
-    if (!empty($business->photos) && is_array($business->photos) && count($business->photos) > 0) {
-        $p = $business->photos[0];
-        $photo = str_starts_with($p, 'http') ? $p : asset($p);
+    $primary = $business->primaryPhoto();
+    if ($primary) {
+        $photo = str_starts_with($primary, 'http') ? $primary : asset($primary);
     }
 
     $priceRange = $business->price_range ?? null;
@@ -36,9 +36,9 @@
 
 @if($variant === 'photo')
     {{-- Photo Card (for grid layouts) --}}
-    <a href="/business/{{ $business->slug }}" class="business-card group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:border-primary-200 hover:shadow-lg hover:shadow-primary-500/5 transition-all duration-300">
+    <div class="business-card group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:border-primary-200 hover:shadow-lg hover:shadow-primary-500/5 transition-all duration-300">
         {{-- Photo --}}
-        <div class="h-48 bg-slate-100 relative overflow-hidden">
+        <a href="/business/{{ $business->slug }}" class="block h-48 bg-slate-100 relative overflow-hidden">
             @if($photo)
                 <img src="{{ $photo }}" alt="{{ $business->name }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy">
             @else
@@ -68,10 +68,12 @@
             @if($priceRange)
                 <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/90 text-slate-700 text-xs font-semibold shadow-lg backdrop-blur-sm">{{ $priceLabels[$priceRange] ?? '' }}</span>
             @endif
-        </div>
+        </a>
         {{-- Info --}}
         <div class="p-4">
-            <h3 class="text-base font-bold text-slate-900 truncate group-hover:text-primary-600 transition-colors mb-1">{{ $business->name }}</h3>
+            <a href="/business/{{ $business->slug }}">
+                <h3 class="text-base font-bold text-slate-900 truncate group-hover:text-primary-600 transition-colors mb-1">{{ $business->name }}</h3>
+            </a>
             <div class="flex items-center gap-2 mb-2">
                 @if($business->category)
                     <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-[11px] font-semibold">
@@ -105,8 +107,34 @@
                     @endif
                 </div>
             @endif
+            {{-- Book / Call / WhatsApp CTA (matches app booking capability) --}}
+            @php
+                $bookCap = $business->bookingCapability();
+            @endphp
+            @if(($bookCap['can_book_online'] ?? false) || $business->phone || $business->whatsapp)
+                <div class="mt-3 flex gap-2">
+                    @if($bookCap['can_book_online'] ?? false)
+                        <a href="/business/{{ $business->slug }}?action=book" class="flex-1 text-center px-3 py-2 rounded-xl bg-primary-600 text-white text-xs font-semibold hover:bg-primary-700 transition-colors">
+                            Book Now
+                        </a>
+                    @elseif($business->whatsapp)
+                        <a href="https://wa.me/{{ preg_replace('/\D/', '', $business->whatsapp) }}" target="_blank" rel="noopener" class="flex-1 text-center px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors">
+                            WhatsApp
+                        </a>
+                        @if($business->phone)
+                            <a href="tel:{{ $business->phone }}" class="flex-1 text-center px-3 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors">
+                                Call
+                            </a>
+                        @endif
+                    @elseif($business->phone)
+                        <a href="tel:{{ $business->phone }}" class="flex-1 text-center px-3 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors">
+                            Call Now
+                        </a>
+                    @endif
+                </div>
+            @endif
         </div>
-    </a>
+    </div>
 
 @elseif($variant === 'compact')
     {{-- Compact Card (for horizontal lists, carousels) --}}

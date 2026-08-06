@@ -3,9 +3,14 @@
 namespace App\Models;
 
 use App\Services\BusinessModuleService;
+use App\Services\Experience\BusinessExperienceService;
+use App\Services\LaunchControlService;
+use App\Services\MonetizationService;
+use App\Services\PlanGate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Business extends Model
@@ -31,6 +36,7 @@ class Business extends Model
         'photos',
         'photos_downloaded_at',
         'working_hours',
+        'timezone',
         'claim_status',
         'verification_status',
         'source',
@@ -52,12 +58,16 @@ class Business extends Model
         'price_range',
         'delivery_radius_km',
         'pincode',
+        'city_id',
         'state',
         'last_synced_at',
         'created_by',
         'enabled_modules',
         'module_config',
         'payment_methods',
+        'tax_percent',
+        'discount_amount',
+        'commission_percent',
         'primary_experience',
         'enabled_experiences',
         'experience_config',
@@ -73,6 +83,7 @@ class Business extends Model
         'created_by' => 'integer',
         'photos' => 'array',
         'working_hours' => 'array',
+        'timezone' => 'string',
         'photos_downloaded_at' => 'datetime',
         'latitude' => 'float',
         'longitude' => 'float',
@@ -136,14 +147,20 @@ class Business extends Model
 
     public function updateRatingStats(): void
     {
-        $this->average_rating = round($this->reviews()->avg('rating'), 1);
-        $this->review_count = $this->reviews()->count();
+        $approved = $this->reviews()->where('status', 'approved');
+        $this->average_rating = round((float) $approved->avg('rating'), 1);
+        $this->review_count = $approved->count();
         $this->saveQuietly();
     }
 
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class);
     }
 
     public function subcategory(): BelongsTo
@@ -222,6 +239,130 @@ class Business extends Model
         return $this->hasMany(Order::class)->orderByDesc('created_at');
     }
 
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(BusinessSubscription::class)->latestOfMany();
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(BusinessSubscription::class);
+    }
+
+    /**
+     * Can this business use the given plan feature? (e.g. 'bookings', 'shopping', 'featured')
+     */
+    public function can(string $feature): bool
+    {
+        return app(PlanGate::class)->can($this, $feature);
+    }
+
+    /**
+     * The active subscription plan (or the free default).
+     */
+    public function plan(): SubscriptionPlan
+    {
+        return app(PlanGate::class)->planFor($this);
+    }
+
+    /**
+     * The first displayable photo as a string (handles photo_reference arrays
+     * that the AI importer may store before they are downloaded server-side).
+     */
+    public function primaryPhoto(): ?string
+    {
+        $photos = $this->resolvedPhotoUrls();
+        if (empty($photos)) {
+            return null;
+        }
+
+        // Prefer photos already stored locally/CDN (they load without extra keys).
+        foreach ($photos as $photo) {
+            if (! str_contains($photo, 'maps.googleapis.com/')) {
+                return $photo;
+            }
+        }
+
+        return $photos[0];
+    }
+
+    /**
+     * All displayable photos as plain string URLs. photo_reference arrays are
+     * expanded into real Google Places photo URLs at serialization time so the
+     * app/API never receives raw reference maps (which break strict parsing).
+     */
+    public function photoUrls(): array
+    {
+        return $this->resolvedPhotoUrls();
+    }
+
+    /**
+     * Resolve the raw `photos` column into displayable URLs.
+     *
+     * - Local/CDN paths (storage/..., http...) are kept as-is.
+     * - Google Places photo URLs that lack a `key` are rebuilt with the
+     *   configured key, so the app never receives a guaranteed-400 URL.
+     * - Google photo_reference arrays are expanded server-side with the key.
+     * - If no key is configured, key-less Google URLs are dropped so clients
+     *   don't attempt to load broken images.
+     */
+    private function resolvedPhotoUrls(): array
+    {
+        if (empty($this->photos) || ! is_array($this->photos)) {
+            return [];
+        }
+
+        $apiKey = \App\Models\Setting::get('api_key_google_places')
+            ?? config('services.google.places_api_key');
+
+        $urls = [];
+        foreach ($this->photos as $photo) {
+            if (is_string($photo) && $photo !== '') {
+                if (str_contains($photo, 'maps.googleapis.com/maps/api/place/photo')) {
+                    if (str_contains($photo, 'key=')) {
+                        $urls[] = $photo;
+                    } elseif ($apiKey) {
+                        $urls[] = $photo
+                            .(str_contains($photo, '?') ? '&' : '?')
+                            .'key='.rawurlencode($apiKey);
+                    }
+                    // else: no key configured — drop the guaranteed-400 URL.
+                } else {
+                    $urls[] = $photo;
+                }
+            } elseif (is_array($photo) && ! empty($photo['photo_reference']) && $apiKey) {
+                $urls[] = 'https://maps.googleapis.com/maps/api/place/photo'
+                    .'?photoreference='.rawurlencode($photo['photo_reference'])
+                    .'&maxwidth=800&key='.rawurlencode($apiKey);
+            }
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    /**
+     * Plan + feature summary for the app/vendor UI.
+     */
+    public function planInfo(): array
+    {
+        $plan = $this->plan();
+        $subscription = $this->subscription;
+        $planGate = app(PlanGate::class);
+
+        return [
+            'plan' => $plan->name,
+            'plan_slug' => $plan->slug,
+            'plan_id' => $plan->id,
+            'subscription_status' => $subscription?->status ?? 'free',
+            'renews_at' => $subscription?->ends_at?->toDateString(),
+            'commission_percent' => app(MonetizationService::class)->commissionPercentFor($this),
+            'max_active_services' => $planGate->maxActiveServices($this),
+            'features' => collect(array_keys(PlanGate::FEATURES))
+                ->mapWithKeys(fn ($key) => [$key => $this->can($key)])
+                ->all(),
+        ];
+    }
+
     public function deliveryZones(): HasMany
     {
         return $this->hasMany(DeliveryZone::class);
@@ -245,6 +386,21 @@ class Business extends Model
     public function trips(): HasMany
     {
         return $this->hasMany(Trip::class)->orderByDesc('created_at');
+    }
+
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(VehicleSchedule::class)->orderBy('departure_date')->orderBy('departure_time');
+    }
+
+    public function scheduleBookings(): HasMany
+    {
+        return $this->hasMany(ScheduleBooking::class);
+    }
+
+    public function vehicleRentals(): HasMany
+    {
+        return $this->hasMany(VehicleRental::class);
     }
 
     // Multi-classification relationships
@@ -354,6 +510,51 @@ class Business extends Model
     public function hasModule(string $module): bool
     {
         return (bool) (app(BusinessModuleService::class)->effectiveFor($this)[$module] ?? false);
+    }
+
+    /**
+     * Unified "Discover & Book" capability — used by the app's single discover
+     * page. A business can be booked directly in-app only when it is claimed,
+     * verified, has the bookings module enabled, is globally switched on, and
+     * has at least one ready booking experience. Otherwise the app shows a
+     * call/WhatsApp CTA via `book_cta`.
+     */
+    public function bookingCapability(): array
+    {
+        $launchControl = app(LaunchControlService::class);
+        $experienceService = app(BusinessExperienceService::class);
+
+        $claimed = (bool) $this->created_by;
+        $verified = ($this->verification_status ?? 'pending') === 'verified';
+        $moduleOn = $launchControl->moduleEnabled('bookings') && $this->hasModule('bookings');
+
+        $experienceBase = $this->enabled_experiences;
+        if ($experienceBase === null || $experienceBase === []) {
+            $experienceBase = $moduleOn ? ['appointment', 'stay', 'turf', 'seat_event'] : ['directory'];
+        }
+
+        $readiness = $experienceService->calculateReadinessForExperiences($this, $experienceBase);
+        $experiences = $launchControl->filterExperiences($experienceBase);
+        $readyExperiences = collect($experiences)->filter(
+            fn (string $experience) => $experience !== 'directory'
+                && ($readiness[$experience]['ready'] ?? false)
+                && $launchControl->experienceEnabled($experience),
+        )->values()->all();
+
+        $canBookOnline = $claimed && $verified && $moduleOn && count($readyExperiences) > 0;
+
+        $cta = $canBookOnline ? 'in_app' : (($this->whatsapp ?? $this->phone) ? 'call_or_whatsapp' : 'none');
+
+        return [
+            'can_book_online' => $canBookOnline,
+            'book_cta' => $cta,
+            'ready_experiences' => $readyExperiences,
+            'primary_experience' => $readyExperiences[0] ?? null,
+            'contact' => [
+                'phone' => $this->phone,
+                'whatsapp' => $this->whatsapp,
+            ],
+        ];
     }
 
     public function effectiveModules(): array

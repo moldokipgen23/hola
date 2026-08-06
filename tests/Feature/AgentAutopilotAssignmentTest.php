@@ -64,6 +64,17 @@ class AgentAutopilotAssignmentTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_autopilot_accepts_serpapi_business_search_skill(): void
+    {
+        AiAgent::query()->delete();
+        $this->agent('SerpAPI Agent', ['serpapi_business_search']);
+
+        $this->artisan('agent:auto-run', ['--skill' => 'serpapi_business_search', '--dry-run' => true])
+            ->expectsOutputToContain('SerpAPI searching')
+            ->expectsOutputToContain('SerpAPI Agent')
+            ->assertSuccessful();
+    }
+
     private function agent(string $name, array $skills, string $status = 'active'): AiAgent
     {
         return AiAgent::create([

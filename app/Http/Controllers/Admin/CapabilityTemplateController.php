@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\CapabilityTemplate;
+use App\Services\BusinessModuleService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class CapabilityTemplateController extends Controller
 {
@@ -39,7 +41,7 @@ class CapabilityTemplateController extends Controller
         ]);
 
         if (empty($validated['slug'])) {
-            $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
+            $validated['slug'] = Str::slug($validated['name']);
         }
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['enabled_modules'] = array_fill_keys($validated['enabled_modules'] ?? [], true);
@@ -66,7 +68,7 @@ class CapabilityTemplateController extends Controller
         ]);
 
         if (empty($validated['slug'])) {
-            $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
+            $validated['slug'] = Str::slug($validated['name']);
         }
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['enabled_modules'] = array_fill_keys($validated['enabled_modules'] ?? [], true);
@@ -104,7 +106,7 @@ class CapabilityTemplateController extends Controller
 
         $business = Business::findOrFail($validated['business_id']);
 
-        $moduleService = app(\App\Services\BusinessModuleService::class);
+        $moduleService = app(BusinessModuleService::class);
         $current = $moduleService->effectiveFor($business);
         foreach ($template->enabled_modules ?? [] as $module => $enabled) {
             if ($enabled && isset($current[$module])) {

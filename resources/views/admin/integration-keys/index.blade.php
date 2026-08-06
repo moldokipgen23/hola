@@ -61,17 +61,15 @@
                     <input type="text" name="name" required placeholder="e.g. Eiho One Directory" class="input-dark text-sm w-full">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Tenant</label>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Purpose</label>
                     <select name="tenant_type" class="input-dark text-sm w-full">
-                        <option value="hola">Eiho One</option>
+                        <option value="hola">Eiho One Platform</option>
                         <option value="ai_agent">AI Agent</option>
-                        <option value="restaurant">Restaurant ERP</option>
-                        <option value="school">School ERP</option>
-                        <option value="shop">Shopping</option>
+                        <option value="shop">Shopping / Vendor App</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Scopes</label>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Access Level</label>
                     <select name="scopes" class="input-dark text-sm w-full">
                         <option value="*">Full Access</option>
                         <option value="businesses:read">Businesses (read only)</option>

@@ -7,8 +7,8 @@ use App\Observers\SubcategoryObserver;
 use App\Services\AdminNavService;
 use App\Services\LaunchControlService;
 use Illuminate\Pagination\Paginator;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {

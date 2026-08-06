@@ -275,7 +275,7 @@
                                                 @continue
                                             @endif
 
-                                            <a href="{{ route(str_replace('*', '', $item['route'])) }}" class="sidebar-link {{ request()->routeIs($item['route']) ? 'active' : '' }}">
+                                            <a href="{{ $item['url'] ?? route(str_replace('*', '', $item['route'])) }}" class="sidebar-link {{ request()->routeIs($item['route']) ? 'active' : '' }}">
                                                 <x-admin.icon :name="$item['icon']" class="w-5 h-5" />
                                                 <span>{{ $item['label'] }}</span>
                                                 @if (($item['badge'] ?? 0) > 0)

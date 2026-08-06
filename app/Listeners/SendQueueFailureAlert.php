@@ -15,9 +15,7 @@ class SendQueueFailureAlert implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue;
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle(object $event): void
     {
@@ -59,7 +57,7 @@ class SendQueueFailureAlert implements ShouldQueue
             'business_id' => $businessId,
             'type' => 'queue_failure',
             'title' => 'System Task Failed',
-            'body' => "A background task has failed and may affect your business. Our team has been notified.",
+            'body' => 'A background task has failed and may affect your business. Our team has been notified.',
             'data' => [
                 'job_class' => $jobClass,
                 'queue' => $queue,

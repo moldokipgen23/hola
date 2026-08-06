@@ -8,7 +8,7 @@
     $qualAgents = \App\Models\AiAgent::whereJsonContains('skills', 'quality_checker')->get();
     $descAgents = \App\Models\AiAgent::whereJsonContains('skills', 'description_writer')->get();
     $allBatches = \App\Models\ImportBatch::where('pending', '>', 0)->orderByDesc('created_at')->get();
-    $pendingCount = \App\Models\ImportItem::where('status', 'pending')->count();
+    $pendingCount = \App\Models\ImportItem::inPipeline()->count();
     $dupCount = \App\Models\ImportItem::where('status', 'duplicate')->count();
 @endphp
 
@@ -269,18 +269,34 @@
                     </div>
 
                     <div class="flex gap-2">
-                        <form method="POST" action="{{ route('admin.import.approve', $item->id) }}">
-                            @csrf
-                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-sm hover:bg-emerald-500/30">
-                                Approve
-                            </button>
-                        </form>
-                        <form method="POST" action="{{ route('admin.import.reject', $item->id) }}">
-                            @csrf
-                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30">
-                                Reject
-                            </button>
-                        </form>
+                        @if($item->status === 'duplicate' && $item->duplicate_of)
+                            <form method="POST" action="{{ route('admin.import.merge', $item->id) }}">
+                                @csrf
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 text-sm hover:bg-purple-500/30"
+                                    onclick="return confirm('Merge this duplicate into the existing business? Missing fields will be copied over.')">
+                                    Merge
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.import.reject', $item->id) }}">
+                                @csrf
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30">
+                                    Reject
+                                </button>
+                            </form>
+                        @else
+                            <form method="POST" action="{{ route('admin.import.approve', $item->id) }}">
+                                @csrf
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-sm hover:bg-emerald-500/30">
+                                    Approve
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.import.reject', $item->id) }}">
+                                @csrf
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30">
+                                    Reject
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
             </div>

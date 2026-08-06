@@ -89,7 +89,7 @@ class VendorSetup extends Model
             && $this->photos_uploaded
             && $this->operating_hours_set;
 
-        if ($allDone && !$this->completed_at) {
+        if ($allDone && ! $this->completed_at) {
             $this->update(['completed_at' => now()]);
         }
     }

@@ -56,7 +56,7 @@ class SmsService
         }
 
         try {
-            $response = Http::timeout(10)->post("https://api.msg91.com/api/v5/otp", [
+            $response = Http::timeout(10)->post('https://api.msg91.com/api/v5/otp', [
                 'mobile' => $cleanPhone,
                 'otp' => $otp,
                 'authkey' => $authKey,

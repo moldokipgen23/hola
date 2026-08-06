@@ -15,7 +15,7 @@ class BusinessNormalizeCapabilities extends Command
 {
     public function handle(): int
     {
-        $dryRun = !$this->option('apply');
+        $dryRun = ! $this->option('apply');
 
         if ($dryRun) {
             $this->warn('DRY-RUN MODE — no changes will be written. Use --apply to persist.');
@@ -46,6 +46,7 @@ class BusinessNormalizeCapabilities extends Command
             // module type in the onboarding wizard.
             if ($business->claim_status === 'unclaimed') {
                 $counts['unchanged']++;
+
                 continue;
             }
 
@@ -70,14 +71,14 @@ class BusinessNormalizeCapabilities extends Command
                 $this->line("  [{$business->id}] {$business->name}: service_type {$business->service_type} -> {$legacyServiceType}");
             }
             if ($isBookableChanged) {
-                $this->line("  [{$business->id}] {$business->name}: is_bookable " . ($business->is_bookable ? 'true' : 'false') . " -> " . ($legacyIsBookable ? 'true' : 'false'));
+                $this->line("  [{$business->id}] {$business->name}: is_bookable ".($business->is_bookable ? 'true' : 'false').' -> '.($legacyIsBookable ? 'true' : 'false'));
             }
 
             // 3. Assign experience types from category/subcategory
             $experienceResult = $this->assignExperiences($business, $normalized);
             if ($experienceResult['assigned']) {
                 $counts['experience_assigned']++;
-                $this->line("  [{$business->id}] {$business->name}: primary_experience={$experienceResult['primary']}, enabled=" . json_encode($experienceResult['enabled']));
+                $this->line("  [{$business->id}] {$business->name}: primary_experience={$experienceResult['primary']}, enabled=".json_encode($experienceResult['enabled']));
             }
             if ($experienceResult['ambiguous']) {
                 $counts['ambiguous_queued']++;
@@ -100,7 +101,7 @@ class BusinessNormalizeCapabilities extends Command
             if ($anyChange) {
                 $counts['normalized']++;
 
-                if (!$dryRun) {
+                if (! $dryRun) {
                     DB::transaction(function () use ($business, $normalized, $legacyServiceType, $legacyIsBookable, $experienceResult) {
                         $business->enabled_modules = $normalized;
                         $business->service_type = $legacyServiceType;
@@ -145,7 +146,7 @@ class BusinessNormalizeCapabilities extends Command
             || ($business->enabled_experiences ?? []) !== $enabled
             || ($business->experience_config ?? []) !== $config;
 
-        $ambiguous = !$rule && ($normalized['orders'] || $normalized['bookings'] || $normalized['transport'] || $normalized['turf']);
+        $ambiguous = ! $rule && ($normalized['orders'] || $normalized['bookings'] || $normalized['transport'] || $normalized['turf']);
 
         return [
             'primary' => $primary,
@@ -175,6 +176,7 @@ class BusinessNormalizeCapabilities extends Command
             };
             $config[$exp] = ['availability_mode' => $mode];
         }
+
         return $config;
     }
 
@@ -301,11 +303,11 @@ class BusinessNormalizeCapabilities extends Command
             ]
         );
 
-        if (!empty($ambiguous)) {
+        if (! empty($ambiguous)) {
             $this->warn("\nAmbiguous businesses requiring manual review ({$counts['ambiguous_queued']}):");
             foreach ($ambiguous as $a) {
                 $this->line("  ID {$a['id']}: {$a['name']} (cat: {$a['category']}, sub: {$a['subcategory']})");
-                $this->line("    -> suggested primary: {$a['suggested_primary']}, enabled: " . json_encode($a['suggested_enabled']));
+                $this->line("    -> suggested primary: {$a['suggested_primary']}, enabled: ".json_encode($a['suggested_enabled']));
             }
         }
 

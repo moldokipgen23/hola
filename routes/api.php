@@ -3,8 +3,10 @@
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessController;
+use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\CityController;
 use App\Http\Controllers\Api\ClaimController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DeliveryConfigController;
@@ -14,8 +16,8 @@ use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OwnerDashboardController;
 use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\PlatformFeatureController;
 use App\Http\Controllers\Api\PincodeController;
+use App\Http\Controllers\Api\PlatformFeatureController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PublicBookingController;
 use App\Http\Controllers\Api\PushTokenController;
@@ -26,7 +28,9 @@ use App\Http\Controllers\Api\SearchAnalyticsController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\TimeSlotController;
+use App\Http\Controllers\Api\TransportBookingController;
 use App\Http\Controllers\Api\TransportController;
+use App\Http\Controllers\Api\VehicleRentalController;
 use App\Http\Controllers\Api\VendorSetupController;
 use App\Models\AreaInterest;
 use App\Models\Business;
@@ -121,12 +125,15 @@ Route::get('/categories/{id}/filters', function ($id) {
 });
 
 Route::get('/businesses', [BusinessController::class, 'index']);
+Route::get('/cities', [CityController::class, 'index']);
+Route::get('/cities/{slug}', [CityController::class, 'show']);
 Route::get('/businesses/featured', [BusinessController::class, 'featured']);
 Route::get('/businesses/trending', [BusinessController::class, 'trending']);
 Route::get('/businesses/new', [BusinessController::class, 'newlyAdded']);
 Route::get('/businesses/nearby', [BusinessController::class, 'nearby']);
 Route::get('/businesses/by-category/{slug}', [BusinessController::class, 'byCategory']);
 Route::get('/businesses/by-id/{id}', [BusinessController::class, 'showById']);
+Route::get('/businesses/clusters', [BusinessController::class, 'clusters']);
 Route::get('/businesses/{slug}', [BusinessController::class, 'show']);
 Route::post('/businesses/{slug}/track', [BusinessController::class, 'trackAction'])
     ->middleware('throttle:30,1');
@@ -138,10 +145,34 @@ Route::get('/businesses/by-id/{id}/services', [BusinessController::class, 'publi
 Route::post('/businesses/{slug}/bookings', [PublicBookingController::class, 'storeBooking'])->middleware(['launch:world.book,module.bookings', 'auth.optional', 'throttle:20,1']);
 Route::post('/businesses/{slug}/orders', [PublicBookingController::class, 'storeOrder'])->middleware(['launch:world.shop,module.orders', 'auth.optional', 'throttle:20,1']);
 
+// Server-side cart (signed-in user or guest token via X-Guest-Token header)
+Route::get('/businesses/{slug}/cart', [CartController::class, 'show'])->middleware(['launch:world.shop,module.orders', 'auth.optional', 'throttle:30,1']);
+Route::post('/businesses/{slug}/cart/items', [CartController::class, 'add'])->middleware(['launch:world.shop,module.orders', 'auth.optional', 'throttle:30,1']);
+Route::put('/businesses/{slug}/cart/items/{productId}', [CartController::class, 'update'])->middleware(['launch:world.shop,module.orders', 'auth.optional', 'throttle:30,1']);
+Route::delete('/businesses/{slug}/cart/items/{productId}', [CartController::class, 'remove'])->middleware(['launch:world.shop,module.orders', 'auth.optional', 'throttle:30,1']);
+
 // Transport (taxi/vehicle booking)
 Route::get('/businesses/{slug}/vehicles', [TransportController::class, 'vehicles'])->middleware('launch:world.ride,module.transport');
 Route::post('/businesses/{slug}/trips/estimate', [TransportController::class, 'estimateFare'])->middleware('launch:world.ride,module.transport');
 Route::post('/businesses/{slug}/trips', [TransportController::class, 'bookTrip'])->middleware(['launch:world.ride,module.transport', 'auth.optional', 'throttle:20,1']);
+
+// Transport seat booking (route + date + visual seat selection)
+Route::get('/transport/routes', [TransportBookingController::class, 'routes'])->middleware('launch:world.ride,module.transport');
+Route::get('/transport/search', [TransportBookingController::class, 'search'])->middleware('launch:world.ride,module.transport');
+Route::get('/transport/businesses', [TransportBookingController::class, 'businessesForRoute'])->middleware('launch:world.ride,module.transport');
+Route::get('/transport/schedules/{id}', [TransportBookingController::class, 'showSchedule'])->middleware('launch:world.ride,module.transport');
+Route::post('/transport/schedules/{id}/book', [TransportBookingController::class, 'book'])
+    ->middleware(['launch:world.ride,module.transport', 'auth.optional', 'throttle:20,1']);
+Route::get('/transport/my-bookings', [TransportBookingController::class, 'myBookings'])
+    ->middleware(['launch:world.ride,module.transport', 'auth:sanctum']);
+
+// Vehicle hire / rental (per-date availability)
+Route::get('/transport/rentals/businesses', [VehicleRentalController::class, 'businesses'])->middleware('launch:world.ride,module.transport');
+Route::get('/transport/rentals/businesses/{slug}', [VehicleRentalController::class, 'vehicles'])->middleware('launch:world.ride,module.transport');
+Route::post('/transport/rentals/vehicles/{id}/book', [VehicleRentalController::class, 'book'])
+    ->middleware(['launch:world.ride,module.transport', 'auth.optional', 'throttle:20,1']);
+Route::get('/transport/rentals/my', [VehicleRentalController::class, 'my'])
+    ->middleware(['launch:world.ride,module.transport', 'auth:sanctum']);
 
 // Delivery Zones
 Route::get('/businesses/{slug}/delivery-zones', [DeliveryZoneController::class, 'index']);
@@ -155,14 +186,24 @@ Route::middleware('auth:sanctum')->group(function () {
     // My Bookings & Orders (customer view)
     Route::get('/my-bookings', [CustomerController::class, 'myBookings']);
     Route::get('/my-orders', [CustomerController::class, 'myOrders']);
+    Route::get('/my-orders/{id}', [CustomerController::class, 'showOrder']);
+    Route::get('/my-orders/{id}/track', [CustomerController::class, 'trackOrder']);
     Route::put('/my-orders/{id}/cancel', [CustomerController::class, 'cancelOrder']);
     Route::put('/my-bookings/{id}/cancel', [CustomerController::class, 'cancelBooking']);
+    Route::get('/my-bookings/{id}', [CustomerController::class, 'showBooking']);
+    Route::put('/my-bookings/{id}/reschedule', [CustomerController::class, 'rescheduleBooking']);
     Route::post('/my-orders/{id}/reorder', [CustomerController::class, 'reorder']);
 
     // My Trips (customer view)
     Route::get('/my-trips', [TransportController::class, 'myTrips']);
     Route::put('/my-trips/{id}/cancel', [TransportController::class, 'cancelTrip']);
 });
+
+// Phone-based order lookup (anonymous customers who ordered without an account)
+Route::get('/orders/lookup', [CustomerController::class, 'lookupOrder'])->middleware('launch:world.shop,module.orders');
+
+// Phone-based booking lookup (anonymous customers who booked without an account)
+Route::get('/bookings/lookup', [CustomerController::class, 'lookupBooking'])->middleware('launch:world.book,module.bookings');
 
 Route::get('/businesses/{business}/reviews', [ReviewController::class, 'index']);
 
@@ -340,6 +381,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/owner/businesses/{businessId}/orders/{orderId}', [OwnerDashboardController::class, 'showOrder']);
     Route::put('/owner/businesses/{businessId}/orders/{orderId}/status', [OwnerDashboardController::class, 'updateOrderStatus']);
     Route::put('/owner/businesses/{businessId}/orders/{orderId}/payment-status', [OwnerDashboardController::class, 'updateOrderPaymentStatus']);
+    Route::post('/owner/businesses/{businessId}/orders/{orderId}/refund', [OwnerDashboardController::class, 'refundOrder']);
     Route::delete('/owner/businesses/{businessId}/orders/{orderId}', [OwnerDashboardController::class, 'destroyOrder']);
 
     // Owner Vehicles
@@ -407,6 +449,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/settings', [SettingController::class, 'update']);
 
     // Admin reviews management
+    Route::get('/reviews/moderation', [ReviewController::class, 'moderation']);
+    Route::patch('/reviews/{review}/moderate', [ReviewController::class, 'moderate']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 });
 

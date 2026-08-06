@@ -63,16 +63,7 @@ class TaxonomySuggestionController extends Controller
             }
 
             $category = $validated['action'] === 'create_category'
-                ? Category::firstOrCreate(
-                    ['slug' => Str::slug($validated['category_name'])],
-                    [
-                        'name' => $validated['category_name'],
-                        'icon' => '📂',
-                        'module_type' => 'directory',
-                        'is_active' => true,
-                        'is_canonical' => true,
-                    ]
-                )
+                ? $this->createCategoryFromSuggestion($validated)
                 : Category::active()->where('is_canonical', true)->findOrFail($validated['category_id']);
 
             if (! $category->is_canonical) {
@@ -101,7 +92,17 @@ class TaxonomySuggestionController extends Controller
             }
 
             if ($suggestion->suggestion_type === 'business_reclassification' && $suggestion->business) {
-                $suggestion->business->update(['category_id' => $category->id]);
+                $suggestion->business->syncPrimaryClassification($category->id, 'taxonomy_review');
+            }
+
+            if ($suggestion->importItem) {
+                $data = $suggestion->importItem->data;
+                $data['category'] = $category->name;
+                $data['category_id'] = $category->id;
+                $suggestion->importItem->update([
+                    'data' => $data,
+                    'confidence' => min(($suggestion->importItem->confidence ?? 0.5) + 0.2, 1.0),
+                ]);
             }
 
             $suggestion->update([
@@ -114,5 +115,31 @@ class TaxonomySuggestionController extends Controller
         });
 
         return back()->with('success', 'Taxonomy suggestion reviewed.');
+    }
+
+    /**
+     * Create a canonical category for an approved suggestion. Runs applyTaxonomy
+     * so world_id/level are derived from module_type (world browsing depends on it).
+     */
+    private function createCategoryFromSuggestion(array $validated): Category
+    {
+        $name = trim((string) $validated['category_name']);
+
+        $existing = Category::where('slug', Str::slug($name))->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $data = [
+            'name' => $name,
+            'slug' => Str::slug($name),
+            'icon' => '📂',
+            'module_type' => 'directory',
+            'is_active' => true,
+            'is_canonical' => true,
+        ];
+        Category::applyTaxonomy($data);
+
+        return Category::create($data);
     }
 }

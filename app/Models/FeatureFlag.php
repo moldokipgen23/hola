@@ -12,6 +12,7 @@ class FeatureFlag extends Model
         static::saved(fn () => LaunchControlService::clearCache());
         static::deleted(fn () => LaunchControlService::clearCache());
     }
+
     protected $fillable = [
         'key',
         'name',

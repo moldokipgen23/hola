@@ -53,6 +53,19 @@
                 <input type="text" name="address" value="{{ old('address') }}" required class="input-dark">
             </div>
 
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">City *</label>
+                <select name="city_id" required class="input-dark">
+                    <option value="">Select city</option>
+                    @foreach($cities as $city)
+                        <option value="{{ $city->id }}" {{ old('city_id') == $city->id ? 'selected' : '' }}>
+                            {{ $city->name }}{{ $city->state ? ' — '.$city->state : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-xs text-slate-500 mt-1">Applies to Discovery & Booking. Shopping is available in Lamka only.</p>
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Phone</label>

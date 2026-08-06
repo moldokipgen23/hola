@@ -60,4 +60,9 @@ class Service extends Model
     {
         return $this->hasMany(TimeSlot::class);
     }
+
+    public function resources(): HasMany
+    {
+        return $this->hasMany(BookableResource::class);
+    }
 }

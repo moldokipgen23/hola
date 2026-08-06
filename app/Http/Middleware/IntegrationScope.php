@@ -17,7 +17,7 @@ class IntegrationScope
         }
 
         foreach ($scopes as $scope) {
-            if (!in_array($scope, $authScopes)) {
+            if (! in_array($scope, $authScopes)) {
                 return response()->json([
                     'error' => 'insufficient_scope',
                     'message' => "Missing required scope: {$scope}",

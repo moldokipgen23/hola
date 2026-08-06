@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,8 +16,8 @@ class OrderWorkflowService
         'preparing' => ['ready', 'cancelled'],
         'ready' => ['out_for_delivery', 'cancelled'],
         'out_for_delivery' => ['delivered'],
-        'delivered' => [],
-        'cancelled' => [],
+        'delivered' => ['refunded'],
+        'cancelled' => ['refunded'],
         'rejected' => [],
         'refunded' => [],
     ];
@@ -52,7 +53,9 @@ class OrderWorkflowService
 
             $timestamp = match ($status) {
                 'confirmed' => 'confirmed_at',
+                'preparing' => 'preparing_at',
                 'ready' => 'ready_at',
+                'out_for_delivery' => 'out_for_delivery_at',
                 'delivered' => 'delivered_at',
                 'cancelled' => 'cancelled_at',
                 'rejected' => 'rejected_at',
@@ -63,6 +66,22 @@ class OrderWorkflowService
             }
 
             $lockedOrder->update($updates);
+
+            // Record platform commission when an order is delivered (cash collected).
+            if ($status === 'delivered' && $lockedOrder->business) {
+                try {
+                    app(MonetizationService::class)->recordCommission(
+                        $lockedOrder->business,
+                        Order::class,
+                        $lockedOrder->id,
+                        (float) ($lockedOrder->total ?? 0),
+                    );
+                } catch (\Throwable $e) {
+                    // Commission must never fail the order workflow.
+                }
+            }
+
+            NotificationService::orderStatusChanged($lockedOrder, $status);
 
             return $lockedOrder->fresh()->load('items');
         });
@@ -80,6 +99,66 @@ class OrderWorkflowService
             $lockedOrder->update(['payment_status' => 'paid', 'payment_method' => 'cash']);
 
             return $lockedOrder->fresh();
+        });
+    }
+
+    /**
+     * Refund a paid order: set status to `refunded`, stamp refunded_at, record
+     * a refund Transaction and release inventory back to the products.
+     * Only paid, non-refunded orders can be refunded (server-side amount only).
+     */
+    public function refund(Order $order, ?string $reason = null): Order
+    {
+        return DB::transaction(function () use ($order, $reason) {
+            $lockedOrder = Order::with('items')->lockForUpdate()->findOrFail($order->id);
+
+            if (! in_array($lockedOrder->status, ['delivered', 'cancelled'], true)) {
+                throw ValidationException::withMessages([
+                    'status' => "Cannot refund an order in '{$lockedOrder->status}' status.",
+                ]);
+            }
+
+            if ($lockedOrder->payment_status !== 'paid') {
+                throw ValidationException::withMessages(['payment_status' => 'Only paid orders can be refunded.']);
+            }
+
+            $alreadyRefunded = Transaction::where('billable_type', Order::class)
+                ->where('billable_id', $lockedOrder->id)
+                ->where('type', 'refund')
+                ->where('status', 'completed')
+                ->exists();
+
+            if ($alreadyRefunded) {
+                throw ValidationException::withMessages(['status' => 'A refund transaction already exists for this order.']);
+            }
+
+            Transaction::create([
+                'user_id' => $lockedOrder->user_id,
+                'billable_type' => Order::class,
+                'billable_id' => $lockedOrder->id,
+                'type' => 'refund',
+                'amount' => $lockedOrder->total,
+                'currency' => 'INR',
+                'status' => 'completed',
+                'payment_method' => $lockedOrder->payment_method,
+                'metadata' => [
+                    'order_number' => $lockedOrder->order_number,
+                    'reason' => $reason,
+                ],
+            ]);
+
+            $this->releaseInventory($lockedOrder);
+
+            $lockedOrder->update([
+                'status' => 'refunded',
+                'payment_status' => 'refunded',
+                'refunded_at' => now(),
+                'refund_reason' => $reason,
+            ]);
+
+            NotificationService::orderStatusChanged($lockedOrder, 'refunded');
+
+            return $lockedOrder->fresh()->load('items');
         });
     }
 

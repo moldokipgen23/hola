@@ -40,7 +40,7 @@ class ClassificationAuditController extends Controller
         }
 
         if ($search = request('search')) {
-            $safe = '%' . str_replace(['%', '_'], ['\%', '\_'], $search) . '%';
+            $safe = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
             $query->where(function ($q) use ($safe) {
                 $q->where('businesses.name', 'like', $safe)
                     ->orWhere('categories.name', 'like', $safe);

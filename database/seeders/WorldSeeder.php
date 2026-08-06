@@ -150,8 +150,8 @@ class WorldSeeder extends Seeder
                 'icon' => 'directions_car',
                 'description' => 'Get around town or ship goods',
                 'sort_order' => 2,
-                'is_active' => false,
-                'is_primary' => false,
+                'is_active' => true,
+                'is_primary' => true,
                 'nav_config' => [
                     'search_placeholder' => 'Enter pickup location...',
                 ],
@@ -200,11 +200,10 @@ class WorldSeeder extends Seeder
     {
         $levelOne = [
             'shop' => ['module_type' => 'ordering', 'categories' => [
-                ['Restaurants', 'restaurants'],
                 ['Grocery', 'grocery'],
+                ['Food', 'food'],
                 ['Medicine', 'medicine'],
-                ['Electronics', 'electronics'],
-                ['General', 'general'],
+                ['General Shopping', 'general-shopping'],
             ]],
             'book' => ['module_type' => 'booking', 'categories' => [
                 ['Taxi', 'taxi'],

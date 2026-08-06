@@ -142,7 +142,7 @@ class SearchController extends Controller
 
         $businessQuery = Business::active()->search($query)->with(['category', 'area']);
         if ($world) {
-            $businessQuery->whereHas('classifications', fn($q) => $q->where('world_id', $world->id));
+            $businessQuery->whereHas('classifications.category', fn ($q) => $q->where('world_id', $world->id));
         }
         $businesses = $businessQuery->limit($limit)->get();
 
@@ -152,15 +152,15 @@ class SearchController extends Controller
         }
         $categories = $categoryQuery->limit(5)->get();
 
-        $productQuery = Product::active()->where('name', 'like', $safe)->with('business');
+        $productQuery = Product::active()->where('name', 'like', $safe)->with('business')->whereHas('business', fn ($q) => $q->active()->ofModule('catalog'));
         if ($world) {
-            $productQuery->whereHas('business', fn($q) => $q->whereHas('classifications', fn($q2) => $q2->where('world_id', $world->id)));
+            $productQuery->whereHas('business', fn ($q) => $q->whereHas('classifications.category', fn ($q2) => $q2->where('world_id', $world->id)));
         }
         $products = $productQuery->limit($limit)->get();
 
         $serviceQuery = Service::where('is_active', true)->where('name', 'like', $safe)->with('business');
         if ($world) {
-            $serviceQuery->whereHas('business', fn($q) => $q->whereHas('classifications', fn($q2) => $q2->where('world_id', $world->id)));
+            $serviceQuery->whereHas('business', fn ($q) => $q->whereHas('classifications.category', fn ($q2) => $q2->where('world_id', $world->id)));
         }
         $services = $serviceQuery->limit($limit)->get();
 
@@ -170,15 +170,16 @@ class SearchController extends Controller
             $sections[] = [
                 'type' => 'businesses',
                 'label' => 'Businesses',
-                'items' => $businesses->map(fn($b) => [
+                'items' => $businesses->map(fn ($b) => [
                     'id' => $b->id,
                     'name' => $b->name,
                     'slug' => $b->slug,
                     'category' => $b->category?->name,
-                    'rating' => $b->rating,
+                    'rating' => $b->average_rating,
                     'review_count' => $b->review_count,
                     'area' => $b->area?->name,
-                    'photo' => $b->photo,
+                    'photo' => is_array($b->photos) && isset($b->photos[0]) ? $b->photos[0] : null,
+                    'booking' => $b->bookingCapability(),
                 ]),
             ];
         }
@@ -187,7 +188,7 @@ class SearchController extends Controller
             $sections[] = [
                 'type' => 'categories',
                 'label' => 'Categories',
-                'items' => $categories->map(fn($c) => [
+                'items' => $categories->map(fn ($c) => [
                     'id' => $c->id,
                     'name' => $c->name,
                     'slug' => $c->slug,
@@ -201,7 +202,7 @@ class SearchController extends Controller
             $sections[] = [
                 'type' => 'products',
                 'label' => 'Products',
-                'items' => $products->map(fn($p) => [
+                'items' => $products->map(fn ($p) => [
                     'id' => $p->id,
                     'name' => $p->name,
                     'slug' => $p->slug,
@@ -216,7 +217,7 @@ class SearchController extends Controller
             $sections[] = [
                 'type' => 'services',
                 'label' => 'Services',
-                'items' => $services->map(fn($s) => [
+                'items' => $services->map(fn ($s) => [
                     'id' => $s->id,
                     'name' => $s->name,
                     'price' => $s->price,

@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Business;
-use App\Models\Category;
 use App\Models\ImportBatch;
 use App\Models\ImportItem;
 use App\Models\Pincode;
+use App\Models\Setting;
+use App\Services\ImportMergeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -27,7 +28,7 @@ class ImportController extends Controller
 
     public function review(Request $request)
     {
-        $query = ImportItem::where('status', 'pending')
+        $query = ImportItem::inPipeline()
             ->with('batch:id,name,source');
 
         if ($request->batch_id) {
@@ -48,44 +49,14 @@ class ImportController extends Controller
         $item = ImportItem::with('batch')->findOrFail($id);
         $data = $item->data;
 
-        // DUPLICATE CHECK: Skip if business already exists (exclude soft-deleted)
-        $existingBusiness = null;
-
-        // Check by google_place_id (external_id)
-        if (! empty($item->external_id)) {
-            $existingBusiness = Business::withoutTrashed()->where('external_id', $item->external_id)->first();
-        }
-
-        // Check by name + similar address
-        if (! $existingBusiness && ! empty($data['name'])) {
-            $existingBusiness = Business::withoutTrashed()->whereRaw('LOWER(name) = ?', [Str::lower(trim($data['name']))])->first();
-            if ($existingBusiness && ! empty($data['address'])) {
-                // Verify address is also similar
-                $existingAddr = Str::lower($existingBusiness->address);
-                $newAddr = Str::lower($data['address']);
-                similar_text($existingAddr, $newAddr, $percent);
-                if ($percent < 50) {
-                    $existingBusiness = null; // Different address, allow import
-                }
-            }
-        }
-
-        // Check by phone number
-        if (! $existingBusiness && ! empty($data['phone'])) {
-            $normalizedPhone = Str::replace([' ', '-', '(', ')', '+'], '', $data['phone']);
-            $existingBusiness = Business::withoutTrashed()->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', '') = ?", [$normalizedPhone])->first();
-        }
+        // DUPLICATE CHECK — flag for merge (linked via duplicate_of) instead of rejecting.
+        $existingBusiness = app(ImportMergeService::class)->findExistingDuplicate($item);
 
         if ($existingBusiness) {
-            $item->update([
-                'status' => 'rejected',
-                'notes' => "Duplicate of existing business: {$existingBusiness->name} (ID: {$existingBusiness->id})",
-            ]);
-            $item->batch->increment('rejected');
-            $item->batch->decrement('pending');
+            app(ImportMergeService::class)->flagDuplicate($item, $existingBusiness);
 
             return response()->json([
-                'message' => "Skipped: Business already exists ({$existingBusiness->name})",
+                'message' => "Duplicate: Business already exists ({$existingBusiness->name}). Flagged for merge.",
                 'duplicate_of' => $existingBusiness->id,
                 'skipped' => true,
             ]);
@@ -106,13 +77,23 @@ class ImportController extends Controller
             $slug .= '-'.Str::random(5);
         }
 
-        // Download photos if available
+        // Download photos if available (never store provider URLs with API keys)
         $photos = [];
         if (! empty($data['photos']) && is_array($data['photos'])) {
-            foreach ($data['photos'] as $photoUrl) {
+            $apiKey = Setting::get('api_key_google_places') ?? config('services.google.places_api_key');
+            foreach ($data['photos'] as $photoEntry) {
+                $photoUrl = null;
+                if (is_string($photoEntry)) {
+                    $photoUrl = $photoEntry;
+                } elseif (is_array($photoEntry) && ! empty($photoEntry['photo_reference']) && $apiKey) {
+                    $photoUrl = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photoEntry['photo_reference']}&maxwidth=800&key={$apiKey}";
+                }
+                if (! $photoUrl) {
+                    continue;
+                }
                 try {
                     $response = Http::timeout(10)->get($photoUrl);
-                    if ($response->successful()) {
+                    if ($response->successful() && strlen($response->body()) > 100) {
                         $ext = 'jpg';
                         $filename = 'businesses/'.$slug.'_'.Str::random(6).'.'.$ext;
                         Storage::disk('public')->put($filename, $response->body());
@@ -166,6 +147,10 @@ class ImportController extends Controller
             'is_active' => true,
         ]);
 
+        // Single write-path: keep businesses.category_id and the classification
+        // table in sync so imported businesses appear in the Directory world.
+        $business->syncPrimaryClassification($categoryId, 'import_approved');
+
         $item->update([
             'status' => 'approved',
             'business_id' => $business->id,
@@ -194,10 +179,31 @@ class ImportController extends Controller
         return response()->json(['message' => 'Item rejected.']);
     }
 
+    public function merge($id)
+    {
+        $item = ImportItem::with('duplicateOf')->findOrFail($id);
+        $existing = $item->duplicateOf;
+
+        if (! $existing) {
+            return response()->json([
+                'message' => 'This item is not linked to an existing business. Approve it first to flag the duplicate.',
+            ], 422);
+        }
+
+        $fieldsCopied = app(ImportMergeService::class)->merge($item);
+
+        return response()->json([
+            'message' => "Merged into {$existing->name}.",
+            'duplicate_of' => $existing->id,
+            'fields_copied' => $fieldsCopied,
+            'status' => $item->status,
+        ]);
+    }
+
     public function approveAll(Request $request)
     {
         $batchId = $request->batch_id;
-        $query = ImportItem::where('status', 'pending');
+        $query = ImportItem::inPipeline();
 
         if ($batchId) {
             $query->where('batch_id', $batchId);

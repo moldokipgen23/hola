@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 class ClassifyUnclassifiedBusinesses extends Command
 {
     protected $signature = 'eiho:classify-unclassified';
+
     protected $description = 'Auto-classify businesses that have no active classification';
 
     public function handle(): int
@@ -24,6 +25,7 @@ class ClassifyUnclassifiedBusinesses extends Command
 
         if ($unclassified->isEmpty()) {
             $this->info('All active businesses are classified.');
+
             return 0;
         }
 
@@ -60,11 +62,10 @@ class ClassifyUnclassifiedBusinesses extends Command
                 $this->line("  Activated classification for: {$business->name} (ID: {$business->id})");
                 $created++;
             } else {
-                // Create new classification
+                // Create new classification (world is derived via category.world_id)
                 DB::table('business_classifications')->insert([
                     'business_id' => $business->id,
                     'category_id' => $categoryId,
-                    'world_id' => $worldId,
                     'is_primary' => 1,
                     'is_active' => 1,
                     'created_at' => now(),

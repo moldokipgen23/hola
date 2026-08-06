@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Area;
 use App\Models\Business;
+use App\Models\Pincode;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -13,9 +14,10 @@ class DemoVendorsSeeder extends Seeder
 {
     public function run(): void
     {
-        $pincode = \App\Models\Pincode::where('state', 'Manipur')->where('serviceable', true)->first();
+        $pincode = Pincode::where('state', 'Manipur')->where('serviceable', true)->first();
         if (! $pincode) {
             $this->command->error('No serviceable pincode found in Manipur. Run ImportPincodes first.');
+
             return;
         }
 
@@ -56,7 +58,7 @@ class DemoVendorsSeeder extends Seeder
 
             $slug = Str::slug($data['business']['name']);
             if (Business::withTrashed()->where('slug', $slug)->exists()) {
-                $slug .= '-' . Str::random(4);
+                $slug .= '-'.Str::random(4);
             }
 
             $modules = match ($data['business']['module_type']) {

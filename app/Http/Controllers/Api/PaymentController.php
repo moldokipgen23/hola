@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Setting;
 use App\Models\Transaction;
 use App\Models\Trip;
+use App\Services\LaunchControlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Razorpay\Api\Api;
@@ -20,7 +21,7 @@ class PaymentController extends Controller
         // Single source of truth: LaunchControlService `payments.online` is the master
         // kill-switch (defaults OFF). The legacy Setting can only narrow this — it can
         // never turn online payments on while the platform flag is off.
-        if (! app(\App\Services\LaunchControlService::class)->enabled('payments.online')) {
+        if (! app(LaunchControlService::class)->enabled('payments.online')) {
             return false;
         }
 
@@ -29,6 +30,10 @@ class PaymentController extends Controller
 
     private function razorpay(): Api
     {
+        if (! class_exists(Api::class)) {
+            abort(503, 'Online payment gateway is not configured on this server.');
+        }
+
         return new Api(config('services.razorpay.key_id'), config('services.razorpay.key_secret'));
     }
 
@@ -42,7 +47,6 @@ class PaymentController extends Controller
         }
 
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:1',
             'currency' => 'nullable|string|size:3',
             'type' => 'required|in:order,booking,trip',
             'reference_id' => 'required|integer',
@@ -51,8 +55,16 @@ class PaymentController extends Controller
 
         $gateway = $validated['gateway'] ?? 'razorpay';
         $currency = $validated['currency'] ?? 'INR';
-        $amountPaise = (int) round($validated['amount'] * 100);
-        $receipt = $validated['type'].'_'.$validated['reference_id'].'_'.time();
+
+        // Server-side amount + ownership: never trust a client-supplied amount.
+        $record = $this->resolveOwnedRecord($request, $validated['type'], (int) $validated['reference_id']);
+        $amount = (float) ($record->total_price ?? $record->total ?? $record->fare ?? $record->price ?? 0);
+        if ($amount <= 0) {
+            return response()->json(['message' => 'This record has no payable amount.'], 422);
+        }
+
+        $amountPaise = (int) round($amount * 100);
+        $receipt = $validated['type'].'_'.$validated['reference_id'].'_'.$record->updated_at?->timestamp ?? $validated['reference_id'];
 
         if ($gateway === 'cashfree') {
             $env = config('services.cashfree.env', 'TEST');
@@ -62,21 +74,9 @@ class PaymentController extends Controller
 
             $orderId = 'CF_'.$receipt;
 
-            $customerName = 'Customer';
-            $customerPhone = '9999999999';
-            $customerEmail = 'customer@example.com';
-
-            $model = match ($validated['type']) {
-                'order' => Order::class,
-                'booking' => Booking::class,
-                'trip' => Trip::class,
-            };
-            $record = $model::find($validated['reference_id']);
-            if ($record) {
-                $customerName = $record->customer_name ?? 'Customer';
-                $customerPhone = $record->customer_phone ?? '9999999999';
-                $customerEmail = $record->customer_email ?? 'customer@example.com';
-            }
+            $customerName = $record->customer_name ?? 'Customer';
+            $customerPhone = $record->customer_phone ?? '9999999999';
+            $customerEmail = $record->customer_email ?? 'customer@example.com';
 
             $response = Http::withHeaders([
                 'x-api-version' => '2023-08-01',
@@ -85,7 +85,7 @@ class PaymentController extends Controller
                 'Content-Type' => 'application/json',
             ])->post($baseUrl.'/orders', [
                 'order_id' => $orderId,
-                'order_amount' => (float) $validated['amount'],
+                'order_amount' => $amount,
                 'order_currency' => $currency,
                 'order_note' => $validated['type'].' #'.$validated['reference_id'],
                 'customer_details' => [
@@ -131,6 +131,34 @@ class PaymentController extends Controller
         ]);
     }
 
+    /**
+     * Resolve an order/booking/trip and verify the requesting user owns it.
+     */
+    private function resolveOwnedRecord(Request $request, string $type, int $referenceId)
+    {
+        $model = match ($type) {
+            'order' => Order::class,
+            'booking' => Booking::class,
+            'trip' => Trip::class,
+        };
+
+        $record = $model::with('business')->find($referenceId);
+        if (! $record) {
+            abort(404, 'Record not found.');
+        }
+
+        $user = $request->user();
+        $owned = $user
+            ? $record->user_id === $user->id || $record->business?->created_by === $user->id
+            : false;
+
+        if (! $owned) {
+            abort(403, 'You do not own this record.');
+        }
+
+        return $record;
+    }
+
     public function verifyPayment(Request $request)
     {
         if (! $this->onlinePaymentsEnabled()) {
@@ -152,6 +180,17 @@ class PaymentController extends Controller
 
         $gateway = $validated['gateway'] ?? 'razorpay';
 
+        // Ownership must be verified before any gateway work.
+        $record = $this->resolveOwnedRecord($request, $validated['type'], (int) $validated['reference_id']);
+
+        // Idempotency: an already-paid record must not be re-processed.
+        if (($record->payment_status ?? '') === 'paid') {
+            return response()->json([
+                'message' => 'Payment already verified.',
+                'payment_status' => 'paid',
+            ]);
+        }
+
         if ($gateway === 'razorpay') {
             try {
                 $this->razorpay()->utility->verifyPaymentSignature([
@@ -164,14 +203,6 @@ class PaymentController extends Controller
             }
         }
 
-        $model = match ($validated['type']) {
-            'order' => Order::class,
-            'booking' => Booking::class,
-            'trip' => Trip::class,
-        };
-
-        $record = $model::findOrFail($validated['reference_id']);
-
         $update = ['payment_status' => 'paid'];
         if ($gateway === 'razorpay') {
             $update['razorpay_order_id'] = $validated['razorpay_order_id'];
@@ -183,12 +214,18 @@ class PaymentController extends Controller
         }
         $record->update($update);
 
+        $model = match ($validated['type']) {
+            'order' => Order::class,
+            'booking' => Booking::class,
+            'trip' => Trip::class,
+        };
+
         Transaction::create([
             'user_id' => $request->user()?->id ?? 0,
             'billable_type' => $model,
             'billable_id' => $record->id,
             'type' => $validated['type'],
-            'amount' => $record->total ?? $record->fare ?? 0,
+            'amount' => $record->total_price ?? $record->total ?? $record->fare ?? 0,
             'currency' => 'INR',
             'status' => 'completed',
             'payment_method' => $gateway,

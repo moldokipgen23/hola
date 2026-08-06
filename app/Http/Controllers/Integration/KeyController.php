@@ -24,7 +24,7 @@ class KeyController extends BaseController
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'scopes' => 'required|array',
-            'scopes.*' => 'string|in:' . implode(',', Scopes::all()),
+            'scopes.*' => 'string|in:'.implode(',', Scopes::all()),
             'tenant_type' => 'nullable|string|max:50',
             'tenant_id' => 'nullable|integer|exists:users,id',
             'allowed_ips' => 'nullable|array',
@@ -54,6 +54,7 @@ class KeyController extends BaseController
     public function show(Request $request, $id)
     {
         $key = IntegrationApiKey::findOrFail($id);
+
         return $this->ok($key->makeHidden('key_hash'));
     }
 
@@ -64,7 +65,7 @@ class KeyController extends BaseController
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'scopes' => 'sometimes|array',
-            'scopes.*' => 'string|in:' . implode(',', Scopes::all()),
+            'scopes.*' => 'string|in:'.implode(',', Scopes::all()),
             'allowed_ips' => 'nullable|array',
             'allowed_ips.*' => 'ip',
             'expires_at' => 'nullable|date',
@@ -79,6 +80,7 @@ class KeyController extends BaseController
     {
         $key = IntegrationApiKey::findOrFail($id);
         $key->update(['is_revoked' => true]);
+
         return $this->ok(null, 'API key revoked.');
     }
 

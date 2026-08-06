@@ -74,6 +74,22 @@
             @endforeach
         </div>
 
+        <div class="glass-card p-5 rounded-lg mt-5">
+            <h4 class="text-white font-medium mb-3">Pricing & Charges</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Tax percentage (%)</label>
+                    <input type="number" name="tax_percent" value="{{ $business->tax_percent ?? 0 }}" min="0" max="100" step="0.01" class="input-dark w-full">
+                    <p class="text-xs text-slate-500 mt-1">Applied to every order subtotal (e.g. GST 5%).</p>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Discount amount (₹)</label>
+                    <input type="number" name="discount_amount" value="{{ $business->discount_amount ?? 0 }}" min="0" step="0.01" class="input-dark w-full">
+                    <p class="text-xs text-slate-500 mt-1">Flat discount deducted from every order total.</p>
+                </div>
+            </div>
+        </div>
+
         <div class="glass-card p-5 rounded-lg mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <p class="text-xs text-slate-500">
                 Payments remain offline/COD. Customers contact and transact directly with your business.

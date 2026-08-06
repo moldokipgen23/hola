@@ -127,6 +127,7 @@
                     <p class="text-xs text-slate-500 mt-1">Choose how this business can serve customers.</p>
                 </div>
                 <a href="{{ route('admin.businesses.modules', $business->id) }}" class="btn-primary text-sm">Manage modules</a>
+                <a href="{{ route('admin.businesses.monetization', $business->id) }}" class="btn-ghost text-sm">Monetization</a>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 @php

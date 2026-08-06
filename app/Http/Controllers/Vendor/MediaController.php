@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Vendor;
 
 use App\Http\Controllers\Controller;
+use App\Models\Business;
 use App\Models\MediaLibrary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,7 +15,7 @@ class MediaController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $businessIds = \App\Models\Business::where('created_by', $user->id)->pluck('id');
+        $businessIds = Business::where('created_by', $user->id)->pluck('id');
 
         $query = MediaLibrary::where('user_id', $user->id)
             ->orWhereIn('business_id', $businessIds);

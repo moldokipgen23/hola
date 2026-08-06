@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Business;
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\User;
 use Database\Seeders\LaunchPhase1Seeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -143,7 +144,7 @@ class AdminBusinessOwnersTest extends TestCase
         $category = $this->category('Restaurants', 'ordering');
         $business = $this->ownedBusiness($owner, $category, ['name' => 'Priya Kitchen']);
 
-        $order = \App\Models\Order::create([
+        $order = Order::create([
             'business_id' => $business->id,
             'order_number' => 'DETAIL-001',
             'customer_name' => 'Customer',

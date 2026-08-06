@@ -5,7 +5,7 @@
 
 @section('content')
 <form method="GET" class="glass-card p-4 rounded-xl mb-4">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div>
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Search user or business..." class="input-dark w-full">
         </div>
@@ -18,15 +18,26 @@
             </select>
         </div>
         <div>
+            <select name="status" class="input-dark w-full">
+                <option value="">All Status</option>
+                <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approved</option>
+                <option value="hidden" {{ request('status') == 'hidden' ? 'selected' : '' }}>Hidden</option>
+            </select>
+        </div>
+        <div>
             <input type="text" name="business_id" value="{{ request('business_id') }}" placeholder="Business ID..." class="input-dark w-full">
         </div>
         <div>
             <button type="submit" class="btn-primary px-6 w-full">Filter</button>
         </div>
     </div>
-    <div class="flex gap-2 mt-3">
+    <div class="flex gap-3 mt-3 flex-wrap">
         <a href="{{ route('admin.reviews') }}" class="btn-ghost">Clear</a>
-        <span class="text-slate-500 text-sm self-center ml-2">{{ $reviews->total() }} reviews</span>
+        <a href="{{ route('admin.reviews', ['status' => 'pending']) }}" class="badge {{ request('status') == 'pending' ? 'badge-yellow' : 'bg-white/5 text-slate-400' }}">Pending: {{ $counts['pending'] }}</a>
+        <a href="{{ route('admin.reviews', ['status' => 'approved']) }}" class="badge {{ request('status') == 'approved' ? 'badge-green' : 'bg-white/5 text-slate-400' }}">Approved: {{ $counts['approved'] }}</a>
+        <a href="{{ route('admin.reviews', ['status' => 'hidden']) }}" class="badge {{ request('status') == 'hidden' ? 'badge-red' : 'bg-white/5 text-slate-400' }}">Hidden: {{ $counts['hidden'] }}</a>
+        <span class="text-slate-500 text-sm self-center">{{ $reviews->total() }} reviews</span>
     </div>
 </form>
 
@@ -38,6 +49,7 @@
                 <th>Business</th>
                 <th>Rating</th>
                 <th>Comment</th>
+                <th>Photo</th>
                 <th>Status</th>
                 <th>Date</th>
                 <th>Actions</th>
@@ -59,24 +71,58 @@
                             @endfor
                         </div>
                     </td>
-                    <td class="text-sm max-w-xs truncate">{{ $review->comment ?? '-' }}</td>
+                    <td class="text-sm max-w-xs truncate">{{ $review->comment ?? '-' }}
+                        @if($review->moderation_reason)
+                            <div class="text-xs text-amber-400 mt-1">Reason: {{ $review->moderation_reason }}</div>
+                        @endif
+                    </td>
                     <td>
-                        @if($review->owner_response)
-                            <span class="badge badge-green">Responded</span>
+                        @if($review->photo)
+                            <img src="{{ Storage::url($review->photo) }}" class="w-10 h-10 rounded object-cover" alt="Review photo">
                         @else
-                            <span class="badge badge-yellow">Pending</span>
+                            <span class="text-slate-600 text-xs">—</span>
+                        @endif
+                    </td>
+                    <td>
+                        @php
+                            $statusColors = [
+                                'approved' => 'badge-green',
+                                'pending' => 'badge-yellow',
+                                'hidden' => 'badge-red',
+                            ];
+                        @endphp
+                        <span class="badge {{ $statusColors[$review->status] ?? 'badge-yellow' }}">{{ ucfirst($review->status) }}</span>
+                        @if($review->flagged_at)
+                            <div class="text-xs text-red-400 mt-1">Flagged {{ $review->flagged_at->format('M d') }}</div>
                         @endif
                     </td>
                     <td class="text-sm text-slate-400">{{ $review->created_at->format('M d, Y') }}</td>
                     <td class="text-sm">
-                        <form method="POST" action="{{ route('admin.reviews.destroy', $review->id) }}" data-confirm="Delete this review?" class="inline">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="text-red-400 hover:text-red-300">Delete</button>
-                        </form>
+                        <div class="flex gap-2 flex-wrap">
+                            @if($review->status !== 'approved')
+                            <form method="POST" action="{{ route('admin.reviews.moderate', $review->id) }}" class="inline">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="status" value="approved">
+                                <button type="submit" class="text-green-400 hover:text-green-300">Approve</button>
+                            </form>
+                            @endif
+                            @if($review->status !== 'hidden')
+                            <form method="POST" action="{{ route('admin.reviews.moderate', $review->id) }}" class="inline">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="status" value="hidden">
+                                <input type="text" name="reason" placeholder="Reason..." class="input-dark w-40 py-1 text-xs">
+                                <button type="submit" class="text-amber-400 hover:text-amber-300">Hide</button>
+                            </form>
+                            @endif
+                            <form method="POST" action="{{ route('admin.reviews.destroy', $review->id) }}" data-confirm="Delete this review?" class="inline">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="text-red-400 hover:text-red-300">Delete</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="text-center text-slate-400 py-8">No reviews found.</td></tr>
+                <tr><td colspan="8" class="text-center text-slate-400 py-8">No reviews found.</td></tr>
             @endforelse
         </tbody>
     </table>

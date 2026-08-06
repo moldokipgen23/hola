@@ -47,6 +47,7 @@ class IntegrationApiKey extends Model
     public function hasScope(string $scope): bool
     {
         $scopes = $this->scopes ?? [];
+
         return in_array('*', $scopes) || in_array($scope, $scopes);
     }
 
@@ -56,12 +57,13 @@ class IntegrationApiKey extends Model
         if (in_array('*', $keyScopes)) {
             return true;
         }
-        return !empty(array_intersect($scopes, $keyScopes));
+
+        return ! empty(array_intersect($scopes, $keyScopes));
     }
 
     public static function generateKey(string $name, array $scopes = ['*'], ?array $tenant = null, ?int $createdBy = null, ?array $allowedIps = null, ?string $expiresAt = null): array
     {
-        $raw = 'ehl_' . Str::random(48);
+        $raw = 'ehl_'.Str::random(48);
         $prefix = substr($raw, 0, 8);
 
         $key = static::create([
@@ -94,7 +96,7 @@ class IntegrationApiKey extends Model
             return false;
         }
 
-        if ($this->allowed_ips && !in_array($ip, $this->allowed_ips)) {
+        if ($this->allowed_ips && ! in_array($ip, $this->allowed_ips)) {
             return false;
         }
 

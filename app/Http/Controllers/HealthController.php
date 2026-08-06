@@ -68,7 +68,7 @@ class HealthController extends Controller
         if ($files->isEmpty()) {
             return [
                 'status' => 'warning',
-                'message' => 'No backup files found in ' . $backupDir,
+                'message' => 'No backup files found in '.$backupDir,
                 'latest_backup' => null,
                 'backup_age_hours' => null,
                 'backup_size_mb' => null,

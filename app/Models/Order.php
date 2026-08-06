@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Order extends Model
 {
@@ -37,11 +38,15 @@ class Order extends Model
         'notes',
         'cancellation_reason',
         'confirmed_at',
+        'preparing_at',
         'ready_at',
+        'out_for_delivery_at',
         'delivered_at',
         'cancelled_at',
         'rejection_reason',
         'rejected_at',
+        'refund_reason',
+        'refunded_at',
         'inventory_released_at',
         'metadata',
     ];
@@ -55,10 +60,13 @@ class Order extends Model
         'customer_latitude' => 'decimal:7',
         'customer_longitude' => 'decimal:7',
         'confirmed_at' => 'datetime',
+        'preparing_at' => 'datetime',
         'ready_at' => 'datetime',
+        'out_for_delivery_at' => 'datetime',
         'delivered_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'rejected_at' => 'datetime',
+        'refunded_at' => 'datetime',
         'inventory_released_at' => 'datetime',
         'estimated_ready_at' => 'datetime',
         'metadata' => 'array',
@@ -77,6 +85,11 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function transactions(): MorphMany
+    {
+        return $this->morphMany(Transaction::class, 'billable');
     }
 
     public function scopePending($query)
@@ -134,5 +147,82 @@ class Order extends Model
     public function markRejected(?string $reason = null): void
     {
         $this->update(['status' => 'rejected', 'rejected_at' => now(), 'rejection_reason' => $reason]);
+    }
+
+    /**
+     * Ordered delivery timeline. Only reached steps carry a timestamp. Terminal
+     * (cancelled/rejected/refunded) steps short-circuit the remaining steps.
+     */
+    public function trackingTimeline(): array
+    {
+        $steps = [];
+
+        if ($this->terminalStatus()) {
+            $label = match ($this->status) {
+                'cancelled' => 'cancelled',
+                'rejected' => 'rejected',
+                'refunded' => 'refunded',
+                default => $this->status,
+            };
+            $at = $this->{($this->status === 'cancelled' ? 'cancelled_at' : 'rejected_at')};
+
+            return [
+                'timeline' => [[
+                    'status' => $this->status,
+                    'label' => ucfirst($label),
+                    'at' => $at?->toIso8601String() ?: $this->updated_at?->toIso8601String(),
+                ]],
+                'current_status' => $this->status,
+                'delivery_method' => $this->delivery_method,
+            ];
+        }
+
+        $map = [
+            'pending' => ['pending', 'Order placed', 'created_at'],
+            'confirmed' => ['confirmed', 'Order confirmed', 'confirmed_at'],
+            'preparing' => ['preparing', 'Being prepared', 'preparing_at'],
+            'ready' => ['ready', $this->delivery_method === 'pickup' ? 'Ready for pickup' : 'Ready for delivery', 'ready_at'],
+            'out_for_delivery' => ['out_for_delivery', 'Out for delivery', 'out_for_delivery_at'],
+            'delivered' => ['delivered', 'Delivered', 'delivered_at'],
+        ];
+
+        $reached = $this->trackingIndex($this->status);
+
+        $orderKeys = array_keys($map);
+        foreach ($orderKeys as $index => $step) {
+            $status = $map[$step][0];
+            $at = $this->{$map[$step][2]};
+
+            $steps[] = [
+                'status' => $status,
+                'label' => $map[$step][1],
+                'at' => $at?->toIso8601String(),
+                'reached' => $index <= $reached,
+            ];
+        }
+
+        return [
+            'timeline' => $steps,
+            'current_status' => $this->status,
+            'delivery_method' => $this->delivery_method,
+        ];
+    }
+
+    private function terminalStatus(): bool
+    {
+        return in_array($this->status, ['cancelled', 'rejected', 'refunded'], true);
+    }
+
+    private function trackingIndex(string $status): int
+    {
+        return match ($status) {
+            'pending' => 0,
+            'confirmed' => 1,
+            'preparing' => 2,
+            'ready' => 3,
+            'out_for_delivery' => 4,
+            'delivered' => 5,
+            default => -1,
+        };
     }
 }

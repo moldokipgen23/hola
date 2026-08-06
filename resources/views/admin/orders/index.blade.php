@@ -1,34 +1,40 @@
 @extends('layouts.admin')
 
-@section('title', 'Orders')
-@section('header', 'All Orders')
-
-@section('content')
 @php
-    $typeTabs = ['shopping' => 'Shopping', 'booking' => 'Booking', 'taxi' => 'Taxi'];
-    $filterQuery = request()->except(['type', 'page']);
+    $businessTypeId = $businessTypeId ?? 0;
+    $typeCounts = $typeCounts ?? [];
+    $filterQuery = request()->except(['business_type', 'page']);
 @endphp
 
+@section('title', 'Shopping Orders')
+@section('header', 'Shopping Orders')
+
+@section('content')
 <div class="flex justify-between items-center mb-4">
-    <h3 class="text-white font-semibold text-lg">All Orders</h3>
-    <span class="text-slate-500 text-sm">{{ $orders->total() }} orders</span>
+    <div>
+        <h3 class="text-white font-semibold text-lg">Shopping Orders</h3>
+        <p class="text-slate-500 text-sm mt-1">{{ $orders->total() }} orders</p>
+    </div>
 </div>
 
-<!-- Business type tabs -->
+<!-- Shopping business type tabs -->
 <div class="flex gap-1 mb-4 border-b border-white/10 overflow-x-auto">
     <a href="{{ route('admin.orders', $filterQuery) }}"
-        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ ! request('type') ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
-        All
+        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ ! $businessTypeId ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+        All ({{ array_sum($typeCounts) }})
     </a>
-    @foreach($typeTabs as $key => $label)
-        <a href="{{ route('admin.orders', array_merge($filterQuery, ['type' => $key])) }}"
-            class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ request('type') == $key ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
-            {{ $label }}
+    @foreach($businessTypes as $type)
+        <a href="{{ route('admin.orders', array_merge($filterQuery, ['business_type' => $type->id])) }}"
+            class="px-4 py-2.5 text-sm font-medium whitespace-nowrap {{ $businessTypeId === $type->id ? 'text-white border-b-2 border-emerald-500' : 'text-slate-400 hover:text-white' }}">
+            {{ $type->name }} ({{ $typeCounts[$type->id] ?? 0 }})
         </a>
     @endforeach
 </div>
 
 <form method="GET" class="glass-card p-4 rounded-xl mb-4">
+    @if($businessTypeId)
+        <input type="hidden" name="business_type" value="{{ $businessTypeId }}">
+    @endif
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div class="md:col-span-1">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by customer name or order #..."
@@ -49,8 +55,9 @@
         <div>
             <select name="payment_status" class="input-dark w-full">
                 <option value="">All Payment</option>
-                <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+                <option value="pending" {{ request('payment_status') == 'pending' ? 'selected' : '' }}>Pending</option>
                 <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid</option>
+                <option value="failed" {{ request('payment_status') == 'failed' ? 'selected' : '' }}>Failed</option>
                 <option value="refunded" {{ request('payment_status') == 'refunded' ? 'selected' : '' }}>Refunded</option>
             </select>
         </div>
@@ -126,8 +133,9 @@
                 <td>
                     @php
                         $paymentClasses = [
-                            'unpaid' => 'badge-red',
+                            'pending' => 'badge-yellow',
                             'paid' => 'badge-green',
+                            'failed' => 'badge-red',
                             'refunded' => 'bg-orange-500/20 text-orange-400',
                         ];
                     @endphp
@@ -137,10 +145,13 @@
                 </td>
                 <td class="text-slate-400 text-xs">{{ $order->created_at->format('M d, Y') }}</td>
                 <td>
-                    <form method="POST" action="{{ route('admin.orders.destroy', $order->id) }}" data-confirm="Delete order #{{ $order->order_number }}?" class="inline">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="text-red-400 hover:text-red-300 text-sm font-medium">Delete</button>
-                    </form>
+                    <div class="flex gap-2">
+                        <a href="{{ route('admin.orders.show', $order->id) }}" class="text-sky-400 hover:text-sky-300 text-sm font-medium">View</a>
+                        <form method="POST" action="{{ route('admin.orders.destroy', $order->id) }}" data-confirm="Delete order #{{ $order->order_number }}?" class="inline">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="text-red-400 hover:text-red-300 text-sm font-medium">Delete</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             @empty

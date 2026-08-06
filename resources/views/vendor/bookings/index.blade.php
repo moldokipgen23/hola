@@ -6,7 +6,10 @@
 @section('content')
 <div class="flex justify-between items-center mb-6">
     <h3 class="text-white font-semibold text-lg">Manage Bookings</h3>
-    <span class="text-slate-500 text-sm">{{ $bookings->total() }} bookings</span>
+    <div class="flex items-center gap-3">
+        <span class="text-slate-500 text-sm">{{ $bookings->total() }} bookings</span>
+        <a href="{{ route('vendor.calendar', $business->id) }}" class="btn-ghost">Calendar</a>
+    </div>
 </div>
 
 <form method="GET" class="glass-card p-4 rounded-xl mb-4">
@@ -168,7 +171,6 @@
         <h3 class="text-white font-semibold text-lg mb-4">Reschedule Booking</h3>
         <form id="rescheduleForm" method="POST">
             @csrf @method('PUT')
-            <input type="hidden" name="status" value="rescheduled">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">New Date *</label>
@@ -180,7 +182,7 @@
                 </div>
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">Reason</label>
-                    <textarea name="cancellation_reason" rows="2" class="input-dark w-full" placeholder="Optional reason..."></textarea>
+                    <textarea name="reschedule_reason" rows="2" class="input-dark w-full" placeholder="Optional reason..."></textarea>
                 </div>
             </div>
             <div class="flex gap-2 mt-6">
@@ -196,7 +198,7 @@
 <script>
 function openRescheduleModal(bookingId) {
     const form = document.getElementById('rescheduleForm');
-    form.action = `/vendor/bookings/${bookingId}/status`;
+    form.action = `/vendor/bookings/${bookingId}/reschedule`;
     document.getElementById('rescheduleModal').classList.remove('hidden');
 }
 function closeRescheduleModal() {

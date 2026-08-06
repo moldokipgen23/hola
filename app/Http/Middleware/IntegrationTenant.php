@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\IntegrationApiKey;
-use App\Models\IntegrationOAuthAccessToken;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,7 +13,7 @@ class IntegrationTenant
     {
         $auth = $request->input('integration_auth');
 
-        if (!$auth) {
+        if (! $auth) {
             return response()->json(['error' => 'unauthenticated'], 401);
         }
 

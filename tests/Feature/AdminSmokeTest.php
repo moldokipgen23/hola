@@ -64,6 +64,7 @@ class AdminSmokeTest extends TestCase
                 $response = $this->actingAs($admin)->get(route($route));
             } catch (\Throwable $e) {
                 $failures[] = "$route threw ".get_class($e).': '.$e->getMessage();
+
                 continue;
             }
 

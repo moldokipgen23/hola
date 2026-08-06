@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdminMiddleware
 {
-    private const ROLES = ['super_admin', 'admin', 'moderator'];
+    private const ROLES = ['super_admin', 'admin', 'moderator', 'manager'];
 
     public function handle(Request $request, Closure $next, ?string $level = null): Response
     {
@@ -54,6 +54,16 @@ class AdminMiddleware
             }
 
             return redirect()->route('admin.login')->with('error', 'Super admin access required.');
+        }
+
+        // Platform-level routes (staff, settings, monetization, system) require
+        // super_admin or admin. Managers/moderators are department-scoped only.
+        if ($level === 'platform' && ! in_array($user->role, ['super_admin', 'admin'], true)) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Unauthorized. Platform access required.'], 403);
+            }
+
+            return redirect()->route('admin.login')->with('error', 'Platform access required.');
         }
 
         return $next($request);

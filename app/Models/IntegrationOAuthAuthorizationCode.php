@@ -24,6 +24,7 @@ class IntegrationOAuthAuthorizationCode extends Model
     ];
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     public function client()

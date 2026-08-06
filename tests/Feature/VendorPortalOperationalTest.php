@@ -4,9 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Business;
 use App\Models\Category;
+use App\Models\FeatureFlag;
 use App\Models\Pincode;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\LaunchControlService;
+use Database\Seeders\LaunchPhase1Seeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -115,8 +118,8 @@ class VendorPortalOperationalTest extends TestCase
 
     public function test_vendor_shopping_tools_hidden_when_shop_world_disabled(): void
     {
-        $this->seed(\Database\Seeders\LaunchPhase1Seeder::class);
-        \App\Services\LaunchControlService::clearCache();
+        $this->seed(LaunchPhase1Seeder::class);
+        LaunchControlService::clearCache();
 
         [$owner, $business] = $this->business('restaurants', ['catalog' => true, 'orders' => true]);
 
@@ -124,8 +127,8 @@ class VendorPortalOperationalTest extends TestCase
         $this->actingAs($owner)->get(route('vendor.products', $business->id))
             ->assertRedirect(route('vendor.dashboard'));
 
-        \App\Models\FeatureFlag::where('key', 'world.shop')->firstOrFail()->update(['is_enabled' => true]);
-        \App\Services\LaunchControlService::clearCache();
+        FeatureFlag::where('key', 'world.shop')->firstOrFail()->update(['is_enabled' => true]);
+        LaunchControlService::clearCache();
 
         $this->actingAs($owner)->get(route('vendor.products', $business->id))->assertOk();
     }

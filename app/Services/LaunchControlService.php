@@ -51,12 +51,12 @@ class LaunchControlService
         'stay' => ['world' => 'book', 'modules' => ['bookings']],
         'turf' => ['world' => 'book', 'modules' => ['bookings', 'turf']],
         'seat_event' => ['world' => 'book', 'modules' => ['bookings']],
-        // Phase 3: the Ride bucket is folded into Booking — transport
-        // experiences gate under `book`.
-        'taxi' => ['world' => 'book', 'modules' => ['transport']],
-        'shared_transport' => ['world' => 'book', 'modules' => ['transport']],
-        'vehicle_rental' => ['world' => 'book', 'modules' => ['transport']],
-        'goods_transport' => ['world' => 'book', 'modules' => ['transport']],
+        // Transport is its own independent world (`ride`); toggling booking
+        // never affects transport and vice-versa.
+        'taxi' => ['world' => 'ride', 'modules' => ['transport']],
+        'shared_transport' => ['world' => 'ride', 'modules' => ['transport']],
+        'vehicle_rental' => ['world' => 'ride', 'modules' => ['transport']],
+        'goods_transport' => ['world' => 'ride', 'modules' => ['transport']],
     ];
 
     public function enabled(string $key): bool
@@ -84,12 +84,12 @@ class LaunchControlService
 
         return match ($slug) {
             'shop' => $this->moduleEnabled('catalog') && ($this->experienceEnabled('retail') || $this->experienceEnabled('restaurant')),
-            // Phase 3: Booking owns both appointment-style and transport
-            // experiences; the standalone `ride` bucket no longer exists.
-            'book' => ($this->moduleEnabled('bookings') && collect(['appointment', 'stay', 'turf', 'seat_event'])
-                ->contains(fn (string $experience) => $this->experienceEnabled($experience)))
-                || ($this->moduleEnabled('transport') && collect(['taxi', 'shared_transport', 'vehicle_rental', 'goods_transport'])
-                    ->contains(fn (string $experience) => $this->experienceEnabled($experience))),
+            // Booking = appointments, stays, turf, seat events only.
+            'book' => $this->moduleEnabled('bookings') && collect(['appointment', 'stay', 'turf', 'seat_event'])
+                ->contains(fn (string $experience) => $this->experienceEnabled($experience)),
+            // Transport = taxi, shared, rental, goods — fully independent of booking.
+            'ride' => $this->moduleEnabled('transport') && collect(['taxi', 'shared_transport', 'vehicle_rental', 'goods_transport'])
+                ->contains(fn (string $experience) => $this->experienceEnabled($experience)),
             'discover' => $this->enabled('experience.directory'),
             default => false,
         };

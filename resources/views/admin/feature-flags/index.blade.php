@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'App Features On/Off')
-@section('header', 'App Features On/Off')
+@section('title', 'Business Modules')
+@section('header', 'Business Modules')
 
 @section('content')
 <div class="max-w-4xl mx-auto">
@@ -10,9 +10,9 @@
     @endif
 
     <div class="glass-card p-6 rounded-xl mb-6">
-        <h2 class="text-xl font-semibold text-white">What customers can use</h2>
-        <p class="text-slate-400 text-sm mt-2">These are the only master switches. Turn one off and that whole area disappears from the website and app. Individual taxi, rental, hotel, turf, restaurant, and shop setup belongs inside each business.</p>
-        <p class="text-slate-500 text-xs mt-3">To configure one business: <a class="text-purple-300 hover:text-purple-200" href="{{ route('admin.businesses') }}">Businesses → Modules</a>.</p>
+        <h2 class="text-xl font-semibold text-white">Business Modules</h2>
+        <p class="text-slate-400 text-sm mt-2">Master switches for each business vertical: <span class="text-white">Shopping, Transport, Booking, Directory</span>. Turn one off and that whole area disappears from the website and app — each vertical is independent, so toggling one never affects another.</p>
+        <p class="text-slate-500 text-xs mt-3">Individual taxi, rental, hotel, turf, restaurant, and shop setup belongs inside each business: <a class="text-purple-300 hover:text-purple-200" href="{{ route('admin.businesses') }}">Businesses → Modules</a>.</p>
     </div>
 
     <div class="space-y-4">

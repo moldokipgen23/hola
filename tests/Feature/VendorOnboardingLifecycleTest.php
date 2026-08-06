@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Business;
-use App\Models\CapabilityTemplate;
 use App\Models\Category;
 use App\Models\ClaimRequest;
 use App\Models\Product;

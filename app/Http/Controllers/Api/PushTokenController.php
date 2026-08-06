@@ -50,7 +50,7 @@ class PushTokenController extends Controller
 
     public function test(Request $request, PushNotificationService $pushService): JsonResponse
     {
-        if (!$pushService->isConfigured()) {
+        if (! $pushService->isConfigured()) {
             return response()->json(['message' => 'Push notifications not configured'], 503);
         }
 

@@ -45,7 +45,7 @@ class GenerateIntegrationKey extends Command
         $this->newLine();
         $this->warn(' Store this key securely — it will not be shown again:');
         $this->line(' ───────────────────────────────────────────────────────────');
-        $this->line('  ' . $result['raw_key']);
+        $this->line('  '.$result['raw_key']);
         $this->line(' ───────────────────────────────────────────────────────────');
 
         return self::SUCCESS;

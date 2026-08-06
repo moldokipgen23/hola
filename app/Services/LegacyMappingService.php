@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Business;
 use App\Models\Category;
+use App\Models\Subcategory;
 use App\Models\World;
 
 class LegacyMappingService
@@ -97,7 +98,7 @@ class LegacyMappingService
 
         $subcategoryId = $business->subcategory_id;
         if ($subcategoryId && ! $business->classifications()->where('category_id', $subcategoryId)->exists()) {
-            $subcategory = \App\Models\Subcategory::find($subcategoryId);
+            $subcategory = Subcategory::find($subcategoryId);
             if ($subcategory) {
                 $parentCategory = $subcategory->category;
                 if ($parentCategory && ! $business->classifications()->where('category_id', $parentCategory->id)->exists()) {

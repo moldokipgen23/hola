@@ -32,19 +32,17 @@ class ProductCategoryDefaultsSeeder extends Seeder
             'Snacks & Beverages' => [],
             'Household Essentials' => ['Cleaning Supplies', 'Kitchen Accessories'],
         ],
-        'restaurants' => [
+        'food' => [
             'Starters' => [],
             'Main Course' => [],
             'Beverages' => [],
             'Desserts' => [],
         ],
-        'electronics' => [
+        'general-shopping' => [
+            'Fashion & Apparel' => ['Men', 'Women', 'Kids'],
             'Mobile & Accessories' => ['Mobile Phones', 'Chargers & Cables'],
             'Audio & Wearables' => ['Headphones', 'Smartwatches'],
             'Home Appliances' => [],
-        ],
-        'general' => [
-            'Fashion & Apparel' => ['Men', 'Women', 'Kids'],
             'Stationery' => [],
             'Kitchen & Home' => [],
         ],

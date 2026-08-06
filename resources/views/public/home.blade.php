@@ -4,6 +4,14 @@
 @section('description', 'Find the best restaurants, shops, services, and businesses in Lamka, Churachandpur, Manipur. Browse by category, area, or search directly.')
 
 @section('content')
+{{-- App download banner --}}
+<section class="bg-gradient-to-r from-primary-600 to-accent-600">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-center gap-2 text-white text-sm">
+        <span>📱 Get the full experience — book appointments, stays & turf in the app.</span>
+        <a href="{{ route('download') }}" class="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 font-semibold transition-colors whitespace-nowrap">Download App</a>
+    </div>
+</section>
+
 {{-- Hero Section --}}
 <section class="hero-gradient py-10 md:py-16">
     <div class="max-w-6xl mx-auto px-4 text-center">

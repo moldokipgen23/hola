@@ -47,6 +47,7 @@
                     <div class="flex-1">
                         <p class="font-semibold text-white">I take bookings</p>
                         <p class="text-xs text-slate-500 mt-1">Salon, hotel, turf, appointments — customers request times and slots.</p>
+                        <p class="text-xs text-pink-300 mt-2">As a {{ $suggestion['category_name'] ?? 'service' }} business, we'll set up {{ str_replace('_', ' ', $suggestion['experience'] ?? 'appointment') }} booking for you. You can change this later.</p>
                     </div>
                 </div>
             </label>

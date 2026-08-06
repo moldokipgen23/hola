@@ -8,7 +8,6 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class OrderPlacementService
@@ -86,10 +85,21 @@ class OrderPlacementService
                     ->filter(fn ($product) => $productIds->contains($product->id))
                     ->max('preparation_minutes');
 
+                // Server-side tax + discount from the business settings.
+                $taxAmount = round($subtotal * ((float) ($business->tax_percent ?? 0) / 100), 2);
+                $discountAmount = (float) ($business->discount_amount ?? 0);
+
+                // Per-business sequential order number (race-safe: the business
+                // row is locked for update earlier in this transaction).
+                $lastSequence = Order::where('business_id', $business->id)
+                    ->where('order_number', 'like', 'ORD-'.$business->id.'-%')
+                    ->count();
+                $orderNumber = 'ORD-'.$business->id.'-'.str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
+
                 $order = Order::create([
                     'business_id' => $business->id,
                     'user_id' => $userId,
-                    'order_number' => 'ORD-'.strtoupper(substr((string) Str::ulid(), -10)),
+                    'order_number' => $orderNumber,
                     'client_reference' => $clientReference,
                     'customer_name' => $customer['name'],
                     'customer_phone' => $customer['phone'],
@@ -107,7 +117,9 @@ class OrderPlacementService
                     'payment_method' => 'cash',
                     'subtotal' => $subtotal,
                     'delivery_fee' => $deliveryFee,
-                    'total' => $subtotal + $deliveryFee,
+                    'tax' => $taxAmount,
+                    'discount' => $discountAmount,
+                    'total' => max(0, $subtotal + $taxAmount + $deliveryFee - $discountAmount),
                     'metadata' => ['payment_mode' => 'offline'],
                 ]);
 
@@ -130,6 +142,8 @@ class OrderPlacementService
                         $product->decrement('stock', $item['quantity']);
                     }
                 }
+
+                NotificationService::newOrder($order);
 
                 return ['order' => $order->load('items'), 'duplicate' => false];
             });

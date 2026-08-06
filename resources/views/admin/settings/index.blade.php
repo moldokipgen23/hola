@@ -11,39 +11,23 @@
     <div class="flex gap-1 p-1 bg-white/5 rounded-xl mb-6 overflow-x-auto" id="settingsTabs">
         <button type="button" onclick="switchTab('general')" data-tab="general" class="settings-tab active">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            General
+            General & Branding
         </button>
-        <button type="button" onclick="switchTab('seo')" data-tab="seo" class="settings-tab">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            SEO
-        </button>
-        <button type="button" onclick="switchTab('social')" data-tab="social" class="settings-tab">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-            Social Media
-        </button>
-        <button type="button" onclick="switchTab('contact')" data-tab="contact" class="settings-tab">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-            Contact
+        <button type="button" onclick="switchTab('payment')" data-tab="payment" class="settings-tab">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+            Payments
         </button>
         <button type="button" onclick="switchTab('smtp')" data-tab="smtp" class="settings-tab">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-            SMTP / Email
+            Email / SMTP
+        </button>
+        <button type="button" onclick="switchTab('api')" data-tab="api" class="settings-tab">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            APIs & Gateways
         </button>
         <button type="button" onclick="switchTab('storage')" data-tab="storage" class="settings-tab">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
             Storage
-        </button>
-        <button type="button" onclick="switchTab('api')" data-tab="api" class="settings-tab">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-            API Keys
-        </button>
-        <button type="button" onclick="switchTab('notifications')" data-tab="notifications" class="settings-tab">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-            Notifications
-        </button>
-        <button type="button" onclick="switchTab('payment')" data-tab="payment" class="settings-tab">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-            Payment
         </button>
     </div>
 
@@ -73,97 +57,88 @@
                     <input type="text" name="settings[district]" value="{{ $settings['district'] ?? 'Churachandpur' }}" class="input-dark">
                 </div>
             </div>
+
+            <!-- Branding: logo + favicon -->
+            <div class="mt-8 border-t border-white/10 pt-6">
+                <h4 class="text-white font-semibold mb-1">Branding</h4>
+                <p class="text-slate-500 text-xs mb-4">Upload your logo and favicon — shown across the site and app.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Logo</label>
+                        <div class="flex items-center gap-3">
+                            @if(!empty($settings['logo_url']))
+                                <img src="{{ asset($settings['logo_url']) }}" class="h-12 object-contain bg-white/5 rounded border border-white/10 p-1" alt="logo">
+                            @endif
+                            <form method="POST" action="{{ route('admin.settings.upload') }}" enctype="multipart/form-data" class="flex gap-2 items-center">
+                                @csrf
+                                <input type="hidden" name="type" value="logo">
+                                <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" class="text-xs text-slate-400 file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:bg-blue-500/10 file:text-blue-300 file:border-0">
+                                <button class="btn-primary text-xs px-3 py-2">Upload</button>
+                            </form>
+                        </div>
+                        <input type="text" name="settings[logo_url]" value="{{ $settings['logo_url'] ?? '' }}" class="input-dark mt-2" placeholder="or paste logo URL">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Favicon</label>
+                        <div class="flex items-center gap-3">
+                            @if(!empty($settings['favicon_url']))
+                                <img src="{{ asset($settings['favicon_url']) }}" class="h-10 w-10 object-contain bg-white/5 rounded border border-white/10 p-1" alt="favicon">
+                            @endif
+                            <form method="POST" action="{{ route('admin.settings.upload') }}" enctype="multipart/form-data" class="flex gap-2 items-center">
+                                @csrf
+                                <input type="hidden" name="type" value="favicon">
+                                <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/svg+xml,image/x-icon" class="text-xs text-slate-400 file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:bg-blue-500/10 file:text-blue-300 file:border-0">
+                                <button class="btn-primary text-xs px-3 py-2">Upload</button>
+                            </form>
+                        </div>
+                        <input type="text" name="settings[favicon_url]" value="{{ $settings['favicon_url'] ?? '' }}" class="input-dark mt-2" placeholder="or paste favicon URL">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Footer Text</label>
+                        <input type="text" name="settings[footer_text]" value="{{ $settings['footer_text'] ?? '' }}" class="input-dark" placeholder="© 2026 Eiho One. All rights reserved.">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Meta Title (SEO)</label>
+                        <input type="text" name="settings[meta_title]" value="{{ $settings['meta_title'] ?? $settings['site_name'] ?? 'Eiho One' }}" class="input-dark">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Meta Description (SEO)</label>
+                        <textarea name="settings[meta_description]" rows="2" class="input-dark">{{ $settings['meta_description'] ?? '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Social links -->
+            <div class="mt-8 border-t border-white/10 pt-6">
+                <h4 class="text-white font-semibold mb-4">Social Media & Footer</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Facebook URL</label>
+                        <input type="text" name="settings[facebook_url]" value="{{ $settings['facebook_url'] ?? '' }}" class="input-dark" placeholder="https://facebook.com/...">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Instagram URL</label>
+                        <input type="text" name="settings[instagram_url]" value="{{ $settings['instagram_url'] ?? '' }}" class="input-dark" placeholder="https://instagram.com/...">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Contact Phone</label>
+                        <input type="text" name="settings[contact_phone]" value="{{ $settings['contact_phone'] ?? '' }}" class="input-dark">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Contact Email</label>
+                        <input type="text" name="settings[contact_email]" value="{{ $settings['contact_email'] ?? '' }}" class="input-dark">
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-6">
                 <button type="submit" class="btn-primary">Save Settings</button>
             </div>
         </div>
     </div>
 
-    <!-- Tab: SEO -->
-    <div id="tab-seo" class="tab-content" style="display:none">
-        <div class="glass-card p-6">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-purple-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-white font-semibold">SEO Settings</h3>
-                    <p class="text-slate-500 text-xs">Search engine optimization</p>
-                </div>
-            </div>
-            <div class="space-y-5">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Meta Title</label>
-                    <input type="text" name="settings[meta_title]" value="{{ $settings['meta_title'] ?? '' }}" class="input-dark" placeholder="Lamka Directory">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Meta Description</label>
-                    <textarea name="settings[meta_description]" rows="3" class="input-dark" placeholder="Discover businesses in Lamka...">{{ $settings['meta_description'] ?? '' }}</textarea>
-                </div>
-            </div>
-            <div class="mt-6">
-                <button type="submit" class="btn-primary">Save Settings</button>
-            </div>
-        </div>
-    </div>
+    <!-- Tab: SMTP (Email) -->
 
-    <!-- Tab: Social Media -->
-    <div id="tab-social" class="tab-content" style="display:none">
-        <div class="glass-card p-6">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-pink-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-white font-semibold">Social Media</h3>
-                    <p class="text-slate-500 text-xs">Social media links</p>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Facebook URL</label>
-                    <input type="url" name="settings[facebook_url]" value="{{ $settings['facebook_url'] ?? '' }}" class="input-dark" placeholder="https://facebook.com/...">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Instagram URL</label>
-                    <input type="url" name="settings[instagram_url]" value="{{ $settings['instagram_url'] ?? '' }}" class="input-dark" placeholder="https://instagram.com/...">
-                </div>
-            </div>
-            <div class="mt-6">
-                <button type="submit" class="btn-primary">Save Settings</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tab: Contact -->
-    <div id="tab-contact" class="tab-content" style="display:none">
-        <div class="glass-card p-6">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-green-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-white font-semibold">Contact Information</h3>
-                    <p class="text-slate-500 text-xs">How users can reach you</p>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Contact Email</label>
-                    <input type="email" name="settings[contact_email]" value="{{ $settings['contact_email'] ?? '' }}" class="input-dark" placeholder="hello@hola.app">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Contact Phone</label>
-                    <input type="text" name="settings[contact_phone]" value="{{ $settings['contact_phone'] ?? '' }}" class="input-dark" placeholder="+91 9876543210">
-                </div>
-            </div>
-            <div class="mt-6">
-                <button type="submit" class="btn-primary">Save Settings</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tab: SMTP -->
     <div id="tab-smtp" class="tab-content" style="display:none">
         <div class="glass-card p-6">
             <div class="flex items-center gap-3 mb-6">
@@ -391,303 +366,6 @@
         </div>
     </div>
 
-    <!-- Tab: Notifications (FREE channels) -->
-    <div id="tab-notifications" class="tab-content" style="display:none">
-        <div class="glass-card p-6">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-5 h-5 text-emerald-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-white font-semibold">Notification Channels (100% Free)</h3>
-                    <p class="text-slate-500 text-xs">Configure free channels to notify business owners to claim their listing</p>
-                </div>
-            </div>
-
-            <!-- Free Channel Info -->
-            <div class="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/20 mb-6">
-                <p class="text-emerald-400 text-xs font-semibold mb-2">Free channels available:</p>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                        <span class="text-slate-300 text-xs"><strong>Email</strong> — Gmail SMTP (500/day free)</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-                        <span class="text-slate-300 text-xs"><strong>Telegram</strong> — Bot API (unlimited free)</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
-                        <span class="text-slate-300 text-xs"><strong>WhatsApp</strong> — CallMeBot (free tier)</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="space-y-6">
-                <!-- Email Notifications -->
-                <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 text-blue-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                            </div>
-                            <div>
-                                <h4 class="text-white text-sm font-semibold">Email Notifications</h4>
-                                <p class="text-slate-500 text-xs">Uses your SMTP settings above (Gmail = free)</p>
-                            </div>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="settings[notify_email]" value="1" {{ ($settings['notify_email'] ?? '1') === '1' ? 'checked' : '' }} class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                        </label>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Notification Email (for admin alerts)</label>
-                            <input type="email" name="settings[notify_email_address]" value="{{ $settings['notify_email_address'] ?? '' }}" class="input-dark" placeholder="admin@hola.app">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Claim Invitation Subject</label>
-                            <input type="text" name="settings[notify_email_subject]" value="{{ $settings['notify_email_subject'] ?? 'Your business is on Eiho One - Claim it now!' }}" class="input-dark">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Telegram Bot (100% FREE) -->
-                <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                                <svg fill="currentColor" viewBox="0 0 24 24" class="w-4 h-4 text-blue-400"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                            </div>
-                            <div>
-                                <h4 class="text-white text-sm font-semibold">Telegram Bot <span class="text-emerald-400 text-xs">(100% FREE)</span></h4>
-                                <p class="text-slate-500 text-xs">Unlimited messages, no credit card needed</p>
-                            </div>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="settings[notify_telegram]" value="1" {{ ($settings['notify_telegram'] ?? '') === '1' ? 'checked' : '' }} class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                        </label>
-                    </div>
-                    <div class="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20 mb-4">
-                        <p class="text-blue-400 text-xs font-semibold mb-1">How to set up (2 minutes):</p>
-                        <ol class="text-slate-500 text-xs space-y-1 list-decimal list-inside">
-                            <li>Open Telegram, search for <strong>@BotFather</strong></li>
-                            <li>Send <code class="bg-slate-800 px-1 rounded">/newbot</code> → choose a name → copy the <strong>bot token</strong></li>
-                            <li>Start your bot, send a message, then visit: <code class="bg-slate-800 px-1 rounded">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code></li>
-                            <li>Copy your <strong>chat_id</code> from the response</li>
-                        </ol>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Bot Token</label>
-                            <input type="password" name="settings[telegram_bot_token]" value="{{ $settings['telegram_bot_token'] ?? '' }}" class="input-dark" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Chat ID (your phone number's chat)</label>
-                            <input type="text" name="settings[telegram_chat_id]" value="{{ $settings['telegram_chat_id'] ?? '' }}" class="input-dark" placeholder="-1001234567890">
-                            <p class="text-slate-600 text-xs mt-1">Use @userinfobot to find your chat_id</p>
-                        </div>
-                    </div>
-                    <!-- Test Telegram -->
-                    <div class="mt-4 flex gap-3">
-                        <input type="text" id="testTelegramMsg" value="Eiho One: this is a test notification." class="input-dark flex-1">
-                        <button type="button" onclick="sendTestTelegram()" class="btn-primary px-6">Send Test</button>
-                    </div>
-                </div>
-
-                <!-- WhatsApp via CallMeBot (FREE) -->
-                <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                                <svg fill="currentColor" viewBox="0 0 24 24" class="w-4 h-4 text-green-400"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                            </div>
-                            <div>
-                                <h4 class="text-white text-sm font-semibold">WhatsApp via CallMeBot <span class="text-yellow-400 text-xs">(Free tier)</span></h4>
-                                <p class="text-slate-500 text-xs">Free for personal use, limited API calls</p>
-                            </div>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="settings[notify_whatsapp]" value="1" {{ ($settings['notify_whatsapp'] ?? '') === '1' ? 'checked' : '' }} class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                        </label>
-                    </div>
-                    <div class="p-3 bg-yellow-500/5 rounded-lg border border-yellow-500/20 mb-4">
-                        <p class="text-yellow-400 text-xs font-semibold mb-1">How to set up CallMeBot (free WhatsApp API):</p>
-                        <ol class="text-slate-500 text-xs space-y-1 list-decimal list-inside">
-                            <li>Save <strong>+34 644 71 81 96</strong> (CallMeBot) in your phone contacts</li>
-                            <li>Open WhatsApp, send <code class="bg-slate-800 px-1 rounded">I allow callmebot to send me messages</code> to that number</li>
-                            <li>You'll receive an API key — paste it below</li>
-                            <li>Each business phone must also send this message to activate</li>
-                        </ol>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">CallMeBot API Key</label>
-                            <input type="password" name="settings[callmebot_api_key]" value="{{ $settings['callmebot_api_key'] ?? '' }}" class="input-dark" placeholder="Your CallMeBot API key">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Your WhatsApp Number (for admin alerts)</label>
-                            <input type="text" name="settings[admin_whatsapp]" value="{{ $settings['admin_whatsapp'] ?? '' }}" class="input-dark" placeholder="919876543210">
-                            <p class="text-slate-600 text-xs mt-1">With country code, no + sign</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Notification Schedule -->
-                <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 text-purple-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-white text-sm font-semibold">Notification Schedule</h4>
-                            <p class="text-slate-500 text-xs">When to send claim invitations to unclaimed businesses</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Days After Import</label>
-                            <input type="number" name="settings[notify_days_after_import]" value="{{ $settings['notify_days_after_import'] ?? '3' }}" class="input-dark" min="1" max="30">
-                            <p class="text-slate-600 text-xs mt-1">Wait this many days before notifying</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Max Notifications Per Day</label>
-                            <input type="number" name="settings[notify_max_per_day]" value="{{ $settings['notify_max_per_day'] ?? '20' }}" class="input-dark" min="1" max="100">
-                            <p class="text-slate-600 text-xs mt-1">Gmail free limit: 500/day</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2">Preferred Channel</label>
-                            <select name="settings[notify_preferred_channel]" class="input-dark">
-                                <option value="email" {{ ($settings['notify_preferred_channel'] ?? 'email') === 'email' ? 'selected' : '' }}>Email (Gmail - Free)</option>
-                                <option value="telegram" {{ ($settings['notify_preferred_channel'] ?? '') === 'telegram' ? 'selected' : '' }}>Telegram (Free)</option>
-                                <option value="whatsapp" {{ ($settings['notify_preferred_channel'] ?? '') === 'whatsapp' ? 'selected' : '' }}>WhatsApp (CallMeBot)</option>
-                                <option value="all" {{ ($settings['notify_preferred_channel'] ?? '') === 'all' ? 'selected' : '' }}>All Channels</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Notification Templates -->
-                <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4 text-amber-400"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-white text-sm font-semibold">Message Templates</h4>
-                            <p class="text-slate-500 text-xs">Customize the messages sent to business owners. Use variables below.</p>
-                        </div>
-                    </div>
-
-                    <!-- Variables Reference -->
-                    <div class="p-3 bg-slate-900/50 rounded-lg border border-slate-600/30 mb-5">
-                        <p class="text-slate-400 text-xs font-semibold mb-2">Available Variables (copy & paste into templates):</p>
-                        <div class="flex flex-wrap gap-2">
-                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{business_name}'}</code>
-                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{claim_url}'}</code>
-                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{site_name}'}</code>
-                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{district}'}</code>
-                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{address}'}</code>
-                            <code class="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">{'{phone}'}</code>
-                        </div>
-                    </div>
-
-                    <!-- Template: Claim Invitation -->
-                    <div class="mb-5">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Claim Invitation (sent to unclaimed businesses)</h5>
-                        </div>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                @php $claimSubject = $settings['template_claim_subject'] ?? "Your business is on {site_name} - Claim it now!"; @endphp
-                                <input type="text" name="settings[template_claim_subject]" value="{{ $claimSubject }}" class="input-dark">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                @php $claimBody = $settings['template_claim_body'] ?? "Hi! Your business \"{business_name}\" is listed on {site_name} - {district}s #1 business directory.\n\nClaim your listing for FREE to:\n- Update your business info\n- Add photos & products\n- Respond to reviews\n- Get found by more customers\n\nClaim now: {claim_url}\n\nQuestions? Reply to this message."; @endphp
-                                <textarea name="settings[template_claim_body]" rows="5" class="input-dark font-mono text-xs">{{ $claimBody }}</textarea>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Telegram/WhatsApp Message</label>
-                                @php $claimSms = $settings['template_claim_sms'] ?? "Hi! Your business \"{business_name}\" is listed on {site_name} - {district}s #1 business directory.\n\nClaim your listing for FREE to:\n- Update your business info\n- Add photos & products\n- Respond to reviews\n- Get found by more customers\n\nClaim now: {claim_url}"; @endphp
-                                <textarea name="settings[template_claim_sms]" rows="5" class="input-dark font-mono text-xs">{{ $claimSms }}</textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Template: Claim Approved -->
-                    <div class="mb-5">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Claim Approved (sent when admin approves)</h5>
-                        </div>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                @php $approvedSubject = $settings['template_approved_subject'] ?? "Your business claim has been approved!"; @endphp
-                                <input type="text" name="settings[template_approved_subject]" value="{{ $approvedSubject }}" class="input-dark">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                @php $approvedBody = $settings['template_approved_body'] ?? "Great news! Your claim for \"{business_name}\" has been approved.\n\nYou can now:\n- Edit your business details\n- Upload photos\n- Add products for sale\n- Respond to reviews\n\nLog in to get started: {claim_url}"; @endphp
-                                <textarea name="settings[template_approved_body]" rows="4" class="input-dark font-mono text-xs">{{ $approvedBody }}</textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Template: Claim Rejected -->
-                    <div class="mb-5">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="w-2 h-2 rounded-full bg-red-400"></span>
-                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Claim Rejected (sent when admin rejects)</h5>
-                        </div>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                @php $rejectedSubject = $settings['template_rejected_subject'] ?? "Update on your business claim"; @endphp
-                                <input type="text" name="settings[template_rejected_subject]" value="{{ $rejectedSubject }}" class="input-dark">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                @php $rejectedBody = $settings['template_rejected_body'] ?? "Unfortunately, your claim for \"{business_name}\" could not be verified at this time.\n\nIf you believe this is an error, please contact us or try again with valid proof of ownership.\n\nThank you for your interest in {site_name}."; @endphp
-                                <textarea name="settings[template_rejected_body]" rows="4" class="input-dark font-mono text-xs">{{ $rejectedBody }}</textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Template: Review Request (after claiming) -->
-                    <div>
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
-                            <h5 class="text-white text-xs font-semibold uppercase tracking-wider">Review Request (sent to owners after 7 days)</h5>
-                        </div>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Subject</label>
-                                @php $reviewSubject = $settings['template_review_subject'] ?? "How is your experience with {site_name}?"; @endphp
-                                <input type="text" name="settings[template_review_subject]" value="{{ $reviewSubject }}" class="input-dark">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Body</label>
-                                @php $reviewBody = $settings['template_review_body'] ?? "Hi! You claimed \"{business_name}\" on {site_name} 7 days ago.\n\nHow has it been? We would love to hear your feedback to improve the platform.\n\nYour feedback helps us serve Churachandpur better!"; @endphp
-                                <textarea name="settings[template_review_body]" rows="3" class="input-dark font-mono text-xs">{{ $reviewBody }}</textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-6">
-                <button type="submit" class="btn-primary">Save Notification Settings</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Tab: Payment -->
     <div id="tab-payment" class="tab-content" style="display:none">
         <div class="glass-card p-6">
@@ -828,6 +506,14 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).style.display = 'block';
     document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
 }
+
+// Open the right tab when landing on #payment, #seo, etc.
+(function () {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && document.getElementById('tab-' + hash)) {
+        switchTab(hash);
+    }
+})();
 
 function fill(field, value) {
     const el = document.querySelector(`[name="settings[${field}]"]`);

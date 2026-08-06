@@ -62,6 +62,9 @@
                         @if(in_array($service->booking_mode, ['slot', 'seat']))
                             <a href="{{ route('vendor.services.slots', ['businessId' => $business->id, 'serviceId' => $service->id]) }}" class="text-sky-400 hover:text-sky-300">Slots</a>
                         @endif
+                        @if(in_array($service->booking_mode, ['slot', 'stay', 'appointment']))
+                            <a href="{{ route('vendor.services.resources', ['businessId' => $business->id, 'serviceId' => $service->id]) }}" class="text-teal-400 hover:text-teal-300">Resources</a>
+                        @endif
                         <form method="POST" action="{{ route('vendor.services.destroy', ['businessId' => $business->id, 'id' => $service->id]) }}" data-confirm="Delete this service?" class="inline">
                             @csrf @method('DELETE')
                             <button type="submit" class="text-red-400 hover:text-red-300">Delete</button>

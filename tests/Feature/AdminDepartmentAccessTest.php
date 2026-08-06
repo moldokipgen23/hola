@@ -24,7 +24,7 @@ class AdminDepartmentAccessTest extends TestCase
         LaunchControlService::clearCache();
     }
 
-    private function staff(string $department, string $role = 'moderator'): User
+    private function staff(string $department, string $role = 'manager'): User
     {
         return User::factory()->create(['role' => $role, 'department' => $department]);
     }
@@ -36,16 +36,16 @@ class AdminDepartmentAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Shopping</span>', false)
-            ->assertSee('>Users</span>', false)
+            ->assertSee('>Commerce (Shopping)</span>', false)
+            ->assertSee('>Sales &amp; Customers</span>', false)
             ->assertSee('>Analytics</span>', false)
-            ->assertDontSee('>Directory</span>', false)
-            ->assertDontSee('>Booking</span>', false)
-            ->assertDontSee('>Taxi / Transport</span>', false)
-            ->assertDontSee('>Settings</span>', false)
+            ->assertDontSee('>Directory &amp; Listings</span>', false)
+            ->assertDontSee('>Bookings</span>', false)
+            ->assertDontSee('>Transport</span>', false)
+            ->assertDontSee('>Settings & Branding</span>', false)
             ->assertDontSee('>System</span>', false)
             ->assertDontSee('>AI Agents</span>', false)
-            ->assertDontSee('href="' . route('admin.staff') . '"', false);
+            ->assertDontSee('href="'.route('admin.staff').'"', false);
 
         $this->actingAs($user)->get(route('admin.products'))->assertOk();
         $this->actingAs($user)->get(route('admin.orders'))->assertOk();
@@ -65,10 +65,10 @@ class AdminDepartmentAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Booking</span>', false)
-            ->assertDontSee('>Directory</span>', false)
-            ->assertDontSee('>Shopping</span>', false)
-            ->assertDontSee('>Taxi / Transport</span>', false);
+            ->assertSee('>Bookings</span>', false)
+            ->assertDontSee('>Directory &amp; Listings</span>', false)
+            ->assertDontSee('>Commerce (Shopping)</span>', false)
+            ->assertDontSee('>Transport</span>', false);
 
         $this->actingAs($user)->get(route('admin.services'))->assertOk();
         $this->actingAs($user)->get(route('admin.bookings'))->assertOk();
@@ -85,10 +85,10 @@ class AdminDepartmentAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Taxi / Transport</span>', false)
-            ->assertDontSee('>Shopping</span>', false)
-            ->assertDontSee('>Booking</span>', false)
-            ->assertDontSee('>Directory</span>', false);
+            ->assertSee('>Transport</span>', false)
+            ->assertDontSee('>Commerce (Shopping)</span>', false)
+            ->assertDontSee('>Bookings</span>', false)
+            ->assertDontSee('>Directory &amp; Listings</span>', false);
 
         $this->actingAs($user)->get(route('admin.vehicle-types'))->assertOk();
         $this->actingAs($user)->get(route('admin.pincodes'))->assertOk();
@@ -105,10 +105,10 @@ class AdminDepartmentAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Directory</span>', false)
-            ->assertDontSee('>Shopping</span>', false)
-            ->assertDontSee('>Booking</span>', false)
-            ->assertDontSee('>Taxi / Transport</span>', false);
+            ->assertSee('>Directory &amp; Listings</span>', false)
+            ->assertDontSee('>Commerce (Shopping)</span>', false)
+            ->assertDontSee('>Bookings</span>', false)
+            ->assertDontSee('>Transport</span>', false);
 
         $this->actingAs($user)->get(route('admin.businesses'))->assertOk();
         $this->actingAs($user)->get(route('admin.claims'))->assertOk();
@@ -126,14 +126,14 @@ class AdminDepartmentAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Users</span>', false)
-            ->assertSee('>Directory</span>', false)
+            ->assertSee('>Sales &amp; Customers</span>', false)
+            ->assertSee('>Directory &amp; Listings</span>', false)
             ->assertSee('>Reviews</span>', false)
-            ->assertDontSee('>Shopping</span>', false)
-            ->assertDontSee('>Booking</span>', false)
-            ->assertDontSee('>Taxi / Transport</span>', false)
+            ->assertDontSee('>Commerce (Shopping)</span>', false)
+            ->assertDontSee('>Bookings</span>', false)
+            ->assertDontSee('>Transport</span>', false)
             ->assertDontSee('>Analytics</span>', false)
-            ->assertDontSee('>Settings</span>', false)
+            ->assertDontSee('>Settings & Branding</span>', false)
             ->assertDontSee('>System</span>', false)
             ->assertDontSee('>AI Agents</span>', false);
 
@@ -154,13 +154,13 @@ class AdminDepartmentAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Directory</span>', false)
-            ->assertSee('>Shopping</span>', false)
-            ->assertSee('>Booking</span>', false)
-            ->assertSee('>Taxi / Transport</span>', false)
-            ->assertSee('>Users</span>', false)
+            ->assertSee('>Directory &amp; Listings</span>', false)
+            ->assertSee('>Commerce (Shopping)</span>', false)
+            ->assertSee('>Bookings</span>', false)
+            ->assertSee('>Transport</span>', false)
+            ->assertSee('>Sales &amp; Customers</span>', false)
             ->assertSee('>Analytics</span>', false)
-            ->assertSee('>System</span>', false)
+            ->assertDontSee('>System</span>', false)
             ->assertDontSee('>AI Agents</span>', false);
 
         foreach (['admin.businesses', 'admin.products', 'admin.orders', 'admin.services', 'admin.bookings', 'admin.vehicle-types', 'admin.pincodes', 'admin.analytics'] as $route) {
@@ -173,9 +173,9 @@ class AdminDepartmentAccessTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'super_admin', 'department' => 'shopping']))
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Directory</span>', false)
-            ->assertSee('>Shopping</span>', false)
-            ->assertSee('>Booking</span>', false);
+            ->assertSee('>Directory &amp; Listings</span>', false)
+            ->assertSee('>Commerce (Shopping)</span>', false)
+            ->assertSee('>Bookings</span>', false);
 
         $this->actingAs(User::factory()->create(['role' => 'super_admin', 'department' => 'shopping']))
             ->get(route('admin.businesses'))

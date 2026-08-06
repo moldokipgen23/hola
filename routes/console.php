@@ -16,11 +16,17 @@ Schedule::command('agent:auto-run')->everyFourHours()->withoutOverlapping();
 // Sync businesses with Google daily (detect changes, closures, new photos)
 Schedule::command('google:sync --limit=50')->dailyAt('03:00')->withoutOverlapping();
 
+// Download external photos for imported businesses (server-side, no key exposure)
+Schedule::command('photos:download --limit=30')->everySixHours()->withoutOverlapping();
+
 // Deep change detection weekly (downloads photos, logs changes to JSON)
 Schedule::command('app:detect-business-changes --limit=500')->weeklyOn(0, '02:00')->withoutOverlapping();
 
-// Notify unclaimed businesses daily at 10am
-Schedule::command('business:notify-unclaimed --limit=20')->dailyAt('10:00')->withoutOverlapping();
+// Auto-pilot claim notifications: invite + remind unclaimed businesses.
+// Runs daily at 10am but only SENDS when `autopilot_claim_enabled` is ON.
+Schedule::command('autopilot:claim-notifications')
+    ->dailyAt('10:00')
+    ->withoutOverlapping();
 
 // Operational heartbeat and stale agent-task recovery.
 Schedule::call(function () {

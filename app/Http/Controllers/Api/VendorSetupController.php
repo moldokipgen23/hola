@@ -13,7 +13,7 @@ class VendorSetupController extends Controller
     {
         $business = $request->user()->currentBusiness;
 
-        if (!$business) {
+        if (! $business) {
             return response()->json(['message' => 'No active business'], 404);
         }
 
@@ -33,7 +33,7 @@ class VendorSetupController extends Controller
     {
         $business = $request->user()->currentBusiness;
 
-        if (!$business) {
+        if (! $business) {
             return response()->json(['message' => 'No active business'], 404);
         }
 
@@ -66,7 +66,7 @@ class VendorSetupController extends Controller
     {
         $business = $request->user()->currentBusiness;
 
-        if (!$business) {
+        if (! $business) {
             return response()->json(['message' => 'No active business'], 404);
         }
 

@@ -3,15 +3,16 @@
 namespace App\Services;
 
 use App\Models\FeatureFlag;
+use Illuminate\Database\Eloquent\Collection;
 
 class FeatureFlagService
 {
-    public function all(): \Illuminate\Database\Eloquent\Collection
+    public function all(): Collection
     {
         return FeatureFlag::orderBy('group')->orderBy('name')->get();
     }
 
-    public function enabled(): \Illuminate\Database\Eloquent\Collection
+    public function enabled(): Collection
     {
         return FeatureFlag::enabled()->orderBy('name')->get();
     }

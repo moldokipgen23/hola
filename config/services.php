@@ -87,4 +87,10 @@ return [
         'api_key' => env('CALLMEBOT_API_KEY'),
     ],
 
+    'whatsapp_meta' => [
+        'token' => env('WHATSAPP_META_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_META_PHONE_ID'),
+        'template' => env('WHATSAPP_META_TEMPLATE', 'claim_invitation'),
+    ],
+
 ];

@@ -10,6 +10,7 @@ use App\Models\DeliveryZone;
 use App\Models\Order;
 use App\Models\Pincode;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\Review;
 use App\Models\Service;
 use App\Models\TimeSlot;
@@ -96,7 +97,11 @@ class OwnerDashboardController extends Controller
                 'stats' => [
                     'total' => $business->products_count ?? $business->products()->count(),
                     'active' => $business->products()->where('is_active', true)->count(),
-                    'low_stock' => 0, // Will be calculated if inventory module enabled
+                    'low_stock' => $business->products()
+                        ->where('is_active', true)
+                        ->whereNotNull('stock')
+                        ->where('stock', '<=', 5)
+                        ->count(),
                 ],
             ],
             'bookings' => [
@@ -129,7 +134,11 @@ class OwnerDashboardController extends Controller
                     'total' => $business->products_count ?? $business->products()->count(),
                     'in_stock' => $business->products()->where('is_active', true)->count(),
                     'out_of_stock' => $business->products()->where('is_active', false)->count(),
-                    'low_stock' => 0, // TODO: add stock tracking
+                    'low_stock' => $business->products()
+                        ->where('is_active', true)
+                        ->whereNotNull('stock')
+                        ->where('stock', '<=', 5)
+                        ->count(),
                 ],
             ],
         ];
@@ -301,7 +310,7 @@ class OwnerDashboardController extends Controller
         ]);
 
         if (! empty($validated['product_category_id'])
-            && ! \App\Models\ProductCategory::where('id', $validated['product_category_id'])
+            && ! ProductCategory::where('id', $validated['product_category_id'])
                 ->where('business_id', $business->id)->exists()) {
             return response()->json(['message' => 'Category does not belong to this business.'], 422);
         }
@@ -346,7 +355,7 @@ class OwnerDashboardController extends Controller
         ]);
 
         if ($request->filled('product_category_id')
-            && ! \App\Models\ProductCategory::where('id', $request->product_category_id)
+            && ! ProductCategory::where('id', $request->product_category_id)
                 ->where('business_id', $business->id)->exists()) {
             return response()->json(['message' => 'Category does not belong to this business.'], 422);
         }
@@ -625,7 +634,7 @@ class OwnerDashboardController extends Controller
                 'reservation_units' => $validated['reservation_units'] ?? 1,
                 'seat_labels' => $validated['seat_labels'] ?? [],
             ],
-            $request->user()->id,
+            null,
         );
 
         return response()->json([
@@ -772,7 +781,7 @@ class OwnerDashboardController extends Controller
                 'latitude' => isset($validated['latitude']) ? (float) $validated['latitude'] : null,
                 'longitude' => isset($validated['longitude']) ? (float) $validated['longitude'] : null,
             ],
-            $request->user()->id,
+            null,
         );
 
         return response()->json([
@@ -808,6 +817,23 @@ class OwnerDashboardController extends Controller
         return response()->json([
             'message' => 'Cash payment marked as collected.',
             'order' => $workflow->markCashCollected($order)->load('items'),
+        ]);
+    }
+
+    public function refundOrder(Request $request, $businessId, $orderId, OrderWorkflowService $workflow)
+    {
+        $business = Business::where('created_by', $request->user()->id)->findOrFail($businessId);
+        $order = $business->orders()->findOrFail($orderId);
+
+        $validated = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $order = $workflow->refund($order, $validated['reason'] ?? null);
+
+        return response()->json([
+            'message' => 'Order refunded.',
+            'order' => $order,
         ]);
     }
 
@@ -849,12 +875,20 @@ class OwnerDashboardController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|exists:vehicle_types,slug',
-            'service_mode' => 'sometimes|in:taxi,shared,rental,goods',
-            'seats' => 'required|integer|min:1|max:50',
+            'service_mode' => 'sometimes|in:taxi,shared,rental,goods,bus',
+            'seats' => 'required|integer|min:1|max:100',
+            'seat_layout' => 'nullable|array',
+            'seat_layout.*.label' => 'required|string|max:20|distinct',
+            'seat_layout.*.row' => 'nullable|integer|min:1',
+            'seat_layout.*.col' => 'nullable|integer|min:1',
+            'seat_layout.*.deck' => 'nullable|string|max:20',
+            'seat_layout.*.type' => 'nullable|string|max:20',
             'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
             'capacity_unit' => 'nullable|in:seats,kg,tons,vehicle',
             'base_fare' => 'required|numeric|min:0',
             'fare_per_km' => 'required|numeric|min:0',
+            'price_per_day' => 'nullable|numeric|min:0',
+            'terms' => 'nullable|string|max:4000',
             'requires_quote' => 'sometimes|boolean',
             'min_km' => 'nullable|integer|min:1',
             'registration_number' => 'nullable|string|max:50',
@@ -895,12 +929,20 @@ class OwnerDashboardController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'type' => 'sometimes|exists:vehicle_types,slug',
-            'service_mode' => 'sometimes|in:taxi,shared,rental,goods',
-            'seats' => 'sometimes|integer|min:1|max:50',
+            'service_mode' => 'sometimes|in:taxi,shared,rental,goods,bus',
+            'seats' => 'sometimes|integer|min:1|max:100',
+            'seat_layout' => 'nullable|array',
+            'seat_layout.*.label' => 'required|string|max:20|distinct',
+            'seat_layout.*.row' => 'nullable|integer|min:1',
+            'seat_layout.*.col' => 'nullable|integer|min:1',
+            'seat_layout.*.deck' => 'nullable|string|max:20',
+            'seat_layout.*.type' => 'nullable|string|max:20',
             'capacity_value' => 'nullable|numeric|min:0.01|max:100000',
             'capacity_unit' => 'nullable|in:seats,kg,tons,vehicle',
             'base_fare' => 'sometimes|numeric|min:0',
             'fare_per_km' => 'sometimes|numeric|min:0',
+            'price_per_day' => 'nullable|numeric|min:0',
+            'terms' => 'nullable|string|max:4000',
             'requires_quote' => 'sometimes|boolean',
             'min_km' => 'nullable|integer|min:1',
             'registration_number' => 'nullable|string|max:50',

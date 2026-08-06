@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\PushToken;
 use App\Models\Notification;
+use App\Models\PushToken;
 use App\Models\VendorNotification;
-use App\Models\NotificationLog;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -14,6 +13,7 @@ class PushNotificationService
     private string $fcmUrl = 'https://fcm.googleapis.com/v1/projects/{project_id}/messages:send';
 
     private ?string $fcmServerKey;
+
     private ?string $fcmProjectId;
 
     public function __construct()
@@ -24,7 +24,7 @@ class PushNotificationService
 
     public function isConfigured(): bool
     {
-        return !empty($this->fcmServerKey) && !empty($this->fcmProjectId);
+        return ! empty($this->fcmServerKey) && ! empty($this->fcmProjectId);
     }
 
     public function sendToUser(int $userId, string $title, string $body, array $data = []): array
@@ -130,8 +130,9 @@ class PushNotificationService
 
     private function sendFcmMessage(string $token, string $title, string $body, array $data = []): array
     {
-        if (!$this->isConfigured()) {
-            Log::info('FCM not configured, skipping push', ['token' => substr($token, 0, 20) . '...']);
+        if (! $this->isConfigured()) {
+            Log::info('FCM not configured, skipping push', ['token' => substr($token, 0, 20).'...']);
+
             return ['success' => false, 'invalid_token' => false, 'message' => 'FCM not configured'];
         }
 
@@ -174,17 +175,19 @@ class PushNotificationService
             }
 
             Log::warning('FCM send failed', ['status' => $response->status(), 'body' => $body]);
+
             return ['success' => false, 'invalid_token' => false];
 
         } catch (\Exception $e) {
             Log::error('FCM send error', ['message' => $e->getMessage()]);
+
             return ['success' => false, 'invalid_token' => false];
         }
     }
 
     private function sendFcmBulk(array $tokens, string $title, string $body, array $data = []): array
     {
-        if (!$this->isConfigured() || empty($tokens)) {
+        if (! $this->isConfigured() || empty($tokens)) {
             return ['sent' => 0];
         }
 
@@ -211,6 +214,7 @@ class PushNotificationService
             return ['sent' => $sent];
         } catch (\Exception $e) {
             Log::error('FCM bulk send error', ['message' => $e->getMessage()]);
+
             return ['sent' => 0];
         }
     }
@@ -219,7 +223,7 @@ class PushNotificationService
     {
         $serviceAccountPath = config('services.firebase.service_account_path');
 
-        if (!$serviceAccountPath || !file_exists($serviceAccountPath)) {
+        if (! $serviceAccountPath || ! file_exists($serviceAccountPath)) {
             throw new \RuntimeException('Firebase service account not found');
         }
 
@@ -237,7 +241,7 @@ class PushNotificationService
 
         $signatureInput = "$jwtHeader.$jwtPayload";
         openssl_sign($signatureInput, $signature, $serviceAccount['private_key'], 'SHA256');
-        $jwt = "$signatureInput." . base64_encode($signature);
+        $jwt = "$signatureInput.".base64_encode($signature);
 
         $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
             'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',

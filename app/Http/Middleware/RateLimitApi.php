@@ -6,7 +6,6 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class RateLimitApi
@@ -25,10 +24,10 @@ class RateLimitApi
 
         $key = $this->resolveKey($request, $group);
 
-        $limiter = RateLimiter::optional('api-' . $group);
+        $limiter = RateLimiter::optional('api-'.$group);
 
         if ($limiter && method_exists($limiter, 'tooManyAttempts')) {
-            $rateLimiter = RateLimiter::limiter('api-' . $group, function () use ($maxAttempts) {
+            $rateLimiter = RateLimiter::limiter('api-'.$group, function () use ($maxAttempts) {
                 return \Illuminate\Cache\RateLimiter::none()->allow($maxAttempts, 1);
             });
         }

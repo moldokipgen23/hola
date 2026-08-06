@@ -111,6 +111,7 @@ class IntegrationWebhookService
     private function signPayload(array $payload, string $secret): string
     {
         $json = json_encode($payload, JSON_UNESCAPED_SLASHES);
+
         return hash_hmac('sha256', $json, $secret);
     }
 

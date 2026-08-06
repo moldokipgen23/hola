@@ -9,6 +9,8 @@ use App\Models\ClaimRequest;
 use App\Models\Pincode;
 use App\Models\Product;
 use App\Models\Report;
+use App\Rules\WorkingHours;
+use App\Services\BusinessHours;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -33,7 +35,8 @@ class AdminController extends Controller
             'whatsapp' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
             'website' => 'nullable|url|max:255',
-            'working_hours' => 'nullable|array',
+            'working_hours' => ['nullable', 'array', new WorkingHours],
+            'timezone' => 'nullable|timezone',
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
             'photos' => 'nullable|array',
@@ -48,8 +51,10 @@ class AdminController extends Controller
         $data = $request->only([
             'name', 'category_id', 'subcategory_id', 'description',
             'address', 'locality', 'district', 'latitude', 'longitude',
-            'phone', 'whatsapp', 'email', 'website', 'working_hours', 'is_featured', 'is_active',
+            'phone', 'whatsapp', 'email', 'website', 'working_hours', 'timezone', 'is_featured', 'is_active',
         ]);
+
+        $data['working_hours'] = BusinessHours::validateSchedule($data['working_hours'] ?? null)['hours'];
 
         $data['pincode'] = $pincode->pincode;
         $data['state'] = $pincode->state;
@@ -89,7 +94,8 @@ class AdminController extends Controller
             'whatsapp' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
             'website' => 'nullable|url|max:255',
-            'working_hours' => 'nullable|array',
+            'working_hours' => ['nullable', 'array', new WorkingHours],
+            'timezone' => 'nullable|timezone',
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
             'verification_status' => 'nullable|in:pending,verified,rejected',
@@ -100,9 +106,13 @@ class AdminController extends Controller
         $data = $request->only([
             'name', 'category_id', 'subcategory_id', 'description',
             'address', 'locality', 'district', 'latitude', 'longitude',
-            'phone', 'whatsapp', 'email', 'website', 'working_hours', 'is_featured', 'is_active',
+            'phone', 'whatsapp', 'email', 'website', 'working_hours', 'timezone', 'is_featured', 'is_active',
             'verification_status',
         ]);
+
+        if ($request->has('working_hours')) {
+            $data['working_hours'] = BusinessHours::validateSchedule($request->input('working_hours'))['hours'];
+        }
 
         // Handle pincode update
         if ($request->has('pincode')) {

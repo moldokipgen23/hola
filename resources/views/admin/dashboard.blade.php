@@ -11,9 +11,11 @@
             <p class="text-slate-400 text-sm mt-1">Keep the technical tools out of your daily workflow.</p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a href="{{ route('admin.businesses') }}" class="btn-ghost text-sm">1. Businesses & modules</a>
-            <a href="{{ route('admin.feature-flags') }}" class="btn-ghost text-sm">2. App Features On/Off</a>
-            <a href="{{ route('admin.autopilot') }}" class="btn-ghost text-sm">3. Autopilot</a>
+            @if(app(\App\Services\AdminNavService::class)->isPowerUser())
+                <a href="{{ route('admin.businesses') }}" class="btn-ghost text-sm">1. Businesses & modules</a>
+                <a href="{{ route('admin.feature-flags') }}" class="btn-ghost text-sm">2. App Features On/Off</a>
+                <a href="{{ route('admin.autopilot') }}" class="btn-ghost text-sm">3. Autopilot</a>
+            @endif
         </div>
     </div>
 </div>

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class IntegrationWebhook extends Model
 {
@@ -51,7 +52,7 @@ class IntegrationWebhook extends Model
     {
         static::creating(function ($webhook) {
             if (empty($webhook->secret)) {
-                $webhook->secret = 'whsec_' . \Illuminate\Support\Str::random(32);
+                $webhook->secret = 'whsec_'.Str::random(32);
             }
         });
     }

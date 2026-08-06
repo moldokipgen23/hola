@@ -5,10 +5,11 @@ namespace Tests\Feature;
 use App\Models\Business;
 use App\Models\Category;
 use App\Models\FeatureFlag;
+use App\Models\ProductCategory;
 use App\Models\ShopSection;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleType;
-use App\Models\User;
 use App\Services\LaunchControlService;
 use Database\Seeders\LaunchPhase1Seeder;
 use Database\Seeders\WorldSeeder;
@@ -93,7 +94,7 @@ class TaxonomySeparationTest extends TestCase
             'parent_id' => null,
         ]);
 
-        $fruits = \App\Models\ProductCategory::where('business_type_id', $groceryType->id)
+        $fruits = ProductCategory::where('business_type_id', $groceryType->id)
             ->where('name', 'Fruits')
             ->firstOrFail();
 

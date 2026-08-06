@@ -8,6 +8,7 @@ use App\Models\CapabilityTemplate;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\World;
+use App\Services\Experience\BusinessExperienceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -73,7 +74,7 @@ class ExperienceArchitectureTest extends TestCase
             'is_active' => true,
         ]);
 
-        $service = app(\App\Services\Experience\BusinessExperienceService::class);
+        $service = app(BusinessExperienceService::class);
 
         $this->assertTrue($service->getPrimaryExperienceReadiness($business)['ready']);
 
@@ -91,7 +92,7 @@ class ExperienceArchitectureTest extends TestCase
         $inactive = $this->business(['enabled_modules' => ['catalog' => true], 'is_active' => false]);
         $noModule = $this->business(['enabled_modules' => []]);
 
-        $service = app(\App\Services\Experience\BusinessExperienceService::class);
+        $service = app(BusinessExperienceService::class);
         $ids = $service->scopeReadyOnly(Business::query(), 'retail')->pluck('id');
 
         $this->assertTrue($ids->contains($ready->id));
@@ -101,7 +102,7 @@ class ExperienceArchitectureTest extends TestCase
 
     public function test_merged_service_set_availability_mode_requires_supported_mode(): void
     {
-        $service = app(\App\Services\Experience\BusinessExperienceService::class);
+        $service = app(BusinessExperienceService::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $service->setAvailabilityMode($this->business(), 'retail', 'nonsense');

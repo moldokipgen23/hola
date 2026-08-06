@@ -20,6 +20,7 @@ class DemoCatalogSeeder extends Seeder
 
         if ($businesses->isEmpty()) {
             $this->command->error('No verified demo vendors found. Run DemoVendorsSeeder first.');
+
             return;
         }
 
@@ -39,6 +40,7 @@ class DemoCatalogSeeder extends Seeder
     {
         if (ProductCategory::where('business_id', $business->id)->exists()) {
             $this->command->warn("Skipping {$business->name} — already has product categories.");
+
             return;
         }
 
@@ -75,6 +77,7 @@ class DemoCatalogSeeder extends Seeder
     {
         if (Service::where('business_id', $business->id)->exists()) {
             $this->command->warn("Skipping {$business->name} — already has services.");
+
             return;
         }
 

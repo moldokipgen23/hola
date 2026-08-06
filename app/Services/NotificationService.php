@@ -2,26 +2,32 @@
 
 namespace App\Services;
 
+use App\Models\Booking;
 use App\Models\Business;
 use App\Models\ClaimRequest;
 use App\Models\Conversation;
 use App\Models\Notification;
+use App\Models\Order;
 use App\Models\Report;
 use App\Models\Review;
+use App\Models\ScheduleBooking;
+use App\Models\Trip;
 use App\Models\User;
+use App\Models\VehicleRental;
 use Illuminate\Support\Facades\App;
 
 class NotificationService
 {
     private static function getPushService(): ?PushNotificationService
     {
-        if (App::runningInConsole() || !App::has('push')) {
+        if (App::runningInConsole() || ! App::has('push')) {
             try {
                 return App::make(PushNotificationService::class);
             } catch (\Exception $e) {
                 return null;
             }
         }
+
         return null;
     }
 
@@ -163,7 +169,7 @@ class NotificationService
         }
     }
 
-    public static function newOrder(\App\Models\Order $order): void
+    public static function newOrder(Order $order): void
     {
         if ($order->business && $order->business->created_by) {
             $owner = User::find($order->business->created_by);
@@ -190,7 +196,7 @@ class NotificationService
         }
     }
 
-    public static function newBooking(\App\Models\Booking $booking): void
+    public static function newBooking(Booking $booking): void
     {
         if ($booking->business && $booking->business->created_by) {
             $owner = User::find($booking->business->created_by);
@@ -214,6 +220,208 @@ class NotificationService
                     );
                 }
             }
+        }
+    }
+
+    public static function bookingStatusChanged(Booking $booking, string $status): void
+    {
+        $labels = [
+            'confirmed' => 'confirmed',
+            'cancelled' => 'cancelled',
+            'rejected' => 'rejected',
+            'completed' => 'completed',
+            'no_show' => 'marked no-show',
+            'rescheduled' => 'rescheduled',
+        ];
+        $label = $labels[$status] ?? $status;
+
+        if ($booking->business && $booking->business->created_by) {
+            $owner = User::find($booking->business->created_by);
+            if ($owner) {
+                self::create(
+                    $owner,
+                    'booking_'.$status,
+                    'Booking '.ucfirst($label),
+                    "Booking for \"{$booking->business->name}\" was {$label}.",
+                    ['booking_id' => $booking->id, 'business_id' => $booking->business_id]
+                );
+            }
+        }
+
+        if ($booking->user_id && $user = User::find($booking->user_id)) {
+            self::create(
+                $user,
+                'booking_'.$status,
+                'Booking '.ucfirst($label),
+                "Your booking with \"{$booking->business?->name}\" was {$label}.",
+                ['booking_id' => $booking->id, 'business_id' => $booking->business_id]
+            );
+        }
+    }
+
+    public static function orderStatusChanged(Order $order, string $status): void
+    {
+        $labels = [
+            'confirmed' => 'confirmed',
+            'preparing' => 'being prepared',
+            'ready' => 'ready',
+            'out_for_delivery' => 'out for delivery',
+            'delivered' => 'delivered',
+            'cancelled' => 'cancelled',
+            'rejected' => 'rejected',
+            'refunded' => 'refunded',
+        ];
+        $label = $labels[$status] ?? $status;
+
+        if ($order->business?->created_by && $owner = User::find($order->business->created_by)) {
+            self::create(
+                $owner,
+                'order_'.$status,
+                'Order '.ucfirst($label),
+                "Order #{$order->order_number} for \"{$order->business->name}\" was {$label}.",
+                ['order_id' => $order->id, 'business_id' => $order->business_id]
+            );
+        }
+
+        if ($order->user_id && $user = User::find($order->user_id)) {
+            self::create(
+                $user,
+                'order_'.$status,
+                'Order '.ucfirst($label),
+                "Your order #{$order->order_number} from \"{$order->business?->name}\" was {$label}.",
+                ['order_id' => $order->id, 'business_id' => $order->business_id]
+            );
+        }
+    }
+
+    public static function newTrip(Trip $trip): void
+    {
+        if ($trip->business?->created_by && $owner = User::find($trip->business->created_by)) {
+            self::create(
+                $owner,
+                'new_trip',
+                'New Transport Request',
+                "New trip request from {$trip->customer_name} ({$trip->pickup_location} → {$trip->drop_location}).",
+                ['trip_id' => $trip->id, 'business_id' => $trip->business_id]
+            );
+        }
+    }
+
+    public static function tripStatusChanged(Trip $trip, string $status): void
+    {
+        $labels = [
+            'confirmed' => 'confirmed',
+            'started' => 'started',
+            'completed' => 'completed',
+            'cancelled' => 'cancelled',
+        ];
+        $label = $labels[$status] ?? $status;
+
+        if ($trip->business?->created_by && $owner = User::find($trip->business->created_by)) {
+            self::create(
+                $owner,
+                'trip_'.$status,
+                'Trip '.ucfirst($label),
+                "Trip to {$trip->drop_location} was {$label}.",
+                ['trip_id' => $trip->id, 'business_id' => $trip->business_id]
+            );
+        }
+
+        if ($trip->user_id && $user = User::find($trip->user_id)) {
+            self::create(
+                $user,
+                'trip_'.$status,
+                'Trip '.ucfirst($label),
+                "Your trip to {$trip->drop_location} with \"{$trip->business?->name}\" was {$label}.",
+                ['trip_id' => $trip->id, 'business_id' => $trip->business_id]
+            );
+        }
+    }
+
+    public static function newSeatBooking(ScheduleBooking $booking): void
+    {
+        if ($booking->business?->created_by && $owner = User::find($booking->business->created_by)) {
+            self::create(
+                $owner,
+                'new_seat_booking',
+                'New Seat Booking',
+                'New seat booking for '.implode(', ', (array) $booking->seat_labels)." on {$booking->schedule?->departure_time}.",
+                ['schedule_booking_id' => $booking->id, 'business_id' => $booking->business_id]
+            );
+        }
+    }
+
+    public static function seatBookingStatusChanged(ScheduleBooking $booking, string $status): void
+    {
+        $labels = [
+            'confirmed' => 'confirmed',
+            'completed' => 'completed',
+            'cancelled' => 'cancelled',
+            'no_show' => 'marked no-show',
+        ];
+        $label = $labels[$status] ?? $status;
+
+        if ($booking->business?->created_by && $owner = User::find($booking->business->created_by)) {
+            self::create(
+                $owner,
+                'seat_booking_'.$status,
+                'Seat booking '.ucfirst($label),
+                'Seat booking '.implode(', ', (array) $booking->seat_labels)." was {$label}.",
+                ['schedule_booking_id' => $booking->id, 'business_id' => $booking->business_id]
+            );
+        }
+
+        if ($booking->user_id && $user = User::find($booking->user_id)) {
+            self::create(
+                $user,
+                'seat_booking_'.$status,
+                'Seat booking '.ucfirst($label),
+                "Your seat booking with \"{$booking->business?->name}\" was {$label}.",
+                ['schedule_booking_id' => $booking->id, 'business_id' => $booking->business_id]
+            );
+        }
+    }
+
+    public static function newVehicleRental(VehicleRental $rental): void
+    {
+        if ($rental->business?->created_by && $owner = User::find($rental->business->created_by)) {
+            self::create(
+                $owner,
+                'new_vehicle_rental',
+                'New Vehicle Hire',
+                "New hire request for {$rental->vehicle?->name} ({$rental->start_date} → {$rental->end_date}).",
+                ['vehicle_rental_id' => $rental->id, 'business_id' => $rental->business_id]
+            );
+        }
+    }
+
+    public static function vehicleRentalStatusChanged(VehicleRental $rental, string $status): void
+    {
+        $labels = [
+            'confirmed' => 'confirmed',
+            'completed' => 'completed',
+            'cancelled' => 'cancelled',
+        ];
+        $label = $labels[$status] ?? $status;
+
+        if ($rental->business?->created_by && $owner = User::find($rental->business->created_by)) {
+            self::create(
+                $owner,
+                'vehicle_rental_'.$status,
+                'Vehicle hire '.ucfirst($label),
+                "Hire of {$rental->vehicle?->name} was {$label}.",
+                ['vehicle_rental_id' => $rental->id, 'business_id' => $rental->business_id]
+            );
+        }
+
+        if ($rental->user_id && $user = User::find($rental->user_id)) {
+            self::create(
+                $user,
+                'vehicle_rental_'.$status,
+                'Vehicle hire '.ucfirst($label),
+                "Your hire of {$rental->vehicle?->name} with \"{$rental->business?->name}\" was {$label}.",
+                ['vehicle_rental_id' => $rental->id, 'business_id' => $rental->business_id]
+            );
         }
     }
 }

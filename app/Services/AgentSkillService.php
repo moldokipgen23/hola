@@ -18,13 +18,50 @@ use Illuminate\Support\Str;
 
 class AgentSkillService
 {
-    // Churachandpur district bounds (roughly)
+    // Churachandpur district bounds (roughly) — admin-configurable per setting.
     const DISTRICT_BOUNDS = [
         'north' => 24.4500,
         'south' => 24.2000,
         'east' => 93.8500,
         'west' => 93.5500,
     ];
+
+    /**
+     * District bounds for the importer, read from the `search_bounds_*`
+     * settings so the admin autopilot page can scope imports to any district.
+     * Falls back to DISTRICT_BOUNDS when the settings are empty/invalid.
+     */
+    public function districtBounds(): array
+    {
+        $settings = [
+            'north' => Setting::get('search_bounds_north'),
+            'south' => Setting::get('search_bounds_south'),
+            'east' => Setting::get('search_bounds_east'),
+            'west' => Setting::get('search_bounds_west'),
+        ];
+
+        $bounds = self::DISTRICT_BOUNDS;
+        foreach ($bounds as $key => $default) {
+            $value = $settings[$key];
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $numeric = (float) $value;
+            if (! is_numeric($value)) {
+                continue;
+            }
+
+            $valid = $key === 'north' || $key === 'south'
+                ? ($numeric >= -90 && $numeric <= 90)
+                : ($numeric >= -180 && $numeric <= 180);
+
+            if ($valid) {
+                $bounds[$key] = $numeric;
+            }
+        }
+
+        return $bounds;
+    }
 
     public function run(AiAgent $agent, AiAgentTask $task): array
     {
@@ -178,8 +215,8 @@ class AgentSkillService
 
         $places = array_slice($places, 0, $maxResults);
 
-        // FILTER: Only keep businesses within Churachandpur district bounds
-        $bounds = self::DISTRICT_BOUNDS;
+        // FILTER: Only keep businesses within the configured district bounds
+        $bounds = $this->districtBounds();
         $placesBeforeFilter = count($places);
         $places = array_filter($places, function ($place) use ($bounds) {
             $lat = $place['geometry']['location']['lat'] ?? null;
@@ -230,6 +267,20 @@ class AgentSkillService
             // Memory table might not exist yet — fall back to empty
             $agentImportedPlaceIds = [];
             $agentImportedNames = [];
+        }
+
+        // AI MEMORY: Places already waiting in the import queue (pending/review/
+        // categorized) for ANY agent. The agent must never re-import these —
+        // they will be rejected later as duplicates. This is what prevents the
+        // "same place imported 4 times" flood.
+        $queuedPlaceIds = [];
+        try {
+            $queuedPlaceIds = ImportItem::whereIn('status', ImportItem::IN_PIPELINE)
+                ->whereNotNull('external_id')
+                ->pluck('external_id')
+                ->toArray();
+        } catch (\Exception $e) {
+            $queuedPlaceIds = [];
         }
 
         // Track current search results for memory
@@ -288,6 +339,13 @@ class AgentSkillService
                 $duplicateReason = 'You already imported this business'.($importedRecord ? " on {$importedRecord->imported_at->format('M d, Y')}" : '');
             }
 
+            // DUPLICATE CHECK 1c: Already waiting in the import queue (any agent).
+            // Prevents the same place being re-imported on every overlapping search.
+            if (! $isDuplicate && $placeId && in_array($placeId, $queuedPlaceIds)) {
+                $isDuplicate = true;
+                $duplicateReason = 'Already in the import queue';
+            }
+
             // DUPLICATE CHECK 2: Same name (exact or close match) — fast in-memory check first
             $normalizedName = Str::lower(trim($name));
             $normalizedAddress = Str::lower(trim($address));
@@ -305,13 +363,30 @@ class AgentSkillService
                 $duplicateReason = 'You already imported this business';
             }
 
-            // DUPLICATE CHECK 2c: Fuzzy match — name contains or is contained in existing name (min 5 chars)
-            if (! $isDuplicate && strlen($cleanName) >= 5) {
+            // DUPLICATE CHECK 2c: Fuzzy match — only for long, distinctive names
+            // and only when similarity is very high (exact after cleaning, or one
+            // is contained in the other AND the shorter one is a full token).
+            if (! $isDuplicate && strlen($cleanName) >= 6) {
                 foreach ($existingCleanedNames as $existingName) {
-                    if (strlen($existingName) >= 5 && ($existingName === $cleanName || Str::contains($existingName, $cleanName) || Str::contains($cleanName, $existingName))) {
+                    if (strlen($existingName) < 6) {
+                        continue;
+                    }
+                    if ($existingName === $cleanName) {
                         $isDuplicate = true;
                         $duplicateReason = 'Similar name matches existing business';
                         break;
+                    }
+                    // Containment only when the shorter name is a complete word boundary
+                    // (e.g. "Lamka Restaurant" vs "Lamka Restaurant & Bar"), not loose
+                    // substring like "Salon" vs "Sun Salon & Spa".
+                    if (Str::contains($existingName, $cleanName) || Str::contains($cleanName, $existingName)) {
+                        $short = strlen($existingName) <= strlen($cleanName) ? $existingName : $cleanName;
+                        $long = strlen($existingName) > strlen($cleanName) ? $existingName : $cleanName;
+                        if (preg_match('/\b'.preg_quote($short, '/').'\b/', $long)) {
+                            $isDuplicate = true;
+                            $duplicateReason = 'Similar name matches existing business';
+                            break;
+                        }
                     }
                 }
             }
@@ -363,7 +438,12 @@ class AgentSkillService
                         if (! empty($detailData['photos'])) {
                             foreach (array_slice($detailData['photos'], 0, 10) as $photo) {
                                 if (! empty($photo['photo_reference'])) {
-                                    $photoUrls[] = "https://maps.googleapis.com/maps/api/place/photo?photoreference={$photo['photo_reference']}&maxwidth=800&key={$apiKey}";
+                                    // Never store provider URLs with embedded API keys.
+                                    // The reference is downloaded server-side later
+                                    // (photos:download) so the key never leaves the server.
+                                    $photoUrls[] = [
+                                        'photo_reference' => $photo['photo_reference'],
+                                    ];
                                 }
                             }
                         }
@@ -606,6 +686,11 @@ class AgentSkillService
         $prompt = <<<EOT
 You are a business directory researcher. List ONLY verified, real businesses that physically exist in {$area}, India. Category: {$category}.
 
+PRIORITY (import in this order):
+1. PRIVATE & PROFESSIONAL businesses (HIGHEST priority): restaurants, hotels, salons, clinics, pharmacies, schools, gyms, turf, electricians, plumbers, mechanics, shops, groceries, electronics, mobile shops, travel agents, caterers, photographers, all retail and professional services.
+2. GENERAL RETAIL & SERVICES (medium): banks, couriers, lawyers, accountants, furniture, jewellery, clothing stores, auto dealers.
+3. GOVERNMENT & PUBLIC PLACES (LOWEST priority, only include if asked): government offices, police stations, post offices, libraries, community halls, places of worship, public parks.
+
 CRITICAL RULES:
 - ONLY include businesses you are CERTAIN exist at this location
 - Include SPECIFIC addresses, real phone numbers, real names
@@ -622,6 +707,7 @@ Return ONLY a JSON array with these fields:
 - description: what they do (1 sentence)
 - website: website URL or null
 - category: from this list: {$categoryList}
+- is_public: true ONLY for government/public places (offices, police, post office, places of worship, public parks); false otherwise
 EOT;
 
         $response = Http::withHeaders([
@@ -782,7 +868,7 @@ EOT;
         $existingCategorized = collect();
 
         if ($scope === 'pending' || $scope === 'all') {
-            $query = ImportItem::where('status', 'pending')->whereNull('data->category');
+            $query = ImportItem::awaitingCategorization()->whereNull('data->category');
             if ($batchId) {
                 $query->where('batch_id', $batchId);
             }
@@ -854,8 +940,11 @@ RULES:
 2. When no existing category fits, set category to null and provide suggested_category with a concise new category name — it will be AUTO-CREATED, so be specific and useful (e.g. "Pet Grooming", "Car Rental")
 3. Never set category to a name that is not in the existing list
 4. For businesses with "current_category" field — only change it if the current one is WRONG
+5. Classify private & professional businesses (restaurants, salons, clinics, shops, electricians, mechanics, etc.) as their trade category
+6. Classify government/public places (offices, police, post offices, places of worship, public parks, banks) into directory/contact-only categories — they are NOT bookable
+7. Set "public" to true ONLY for government/public/non-profit/community places; false for every private or professional business
 
-Return ONLY a JSON array with: source, source_id, category, suggested_category, changed.
+Return ONLY a JSON array with: source, source_id, category, suggested_category, changed, public.
 
 Businesses:
 {$json}
@@ -888,6 +977,7 @@ EOT;
 
         $categorized = 0;
         $categoriesCreated = 0;
+        $suggestionsCreated = 0;
         $changed = 0;
 
         foreach ($mappings as $map) {
@@ -903,14 +993,32 @@ EOT;
 
             $catName = $catName ? $canonicalCategories->get(Str::lower(trim((string) $catName))) : null;
 
-            // No existing match: auto-create the suggested category (directory/listing bucket)
-            // so the AI can build out its own taxonomy while importing.
+            // No existing match: auto-create the category and assign it, so an
+            // imported business is never left uncategorized. The category is
+            // derived from the business, not pre-created manually. module_type
+            // is inferred so private/professional businesses become bookable
+            // and government/public places stay directory (contact-only).
             if (! $catName && $suggestedCategory) {
-                $created = false;
-                $category = $this->findOrCreateSuggestedCategory($suggestedCategory, $agent, $created);
-                $categoriesCreated += $created ? 1 : 0;
+                $category = $this->findOrCreateCategoryForSuggestion($suggestedCategory, $map);
                 if ($category) {
                     $catName = $category->name;
+                    $suggestionsCreated++;
+                } else {
+                    $item = $source === 'import' ? $items->firstWhere('id', $sourceId) : null;
+                    $biz = $source === 'business' ? $existingCategorized->firstWhere('id', $sourceId) : null;
+                    app(TaxonomyService::class)->suggestUnknown(
+                        $suggestedCategory,
+                        agent: $agent,
+                        importItem: $item,
+                        business: $biz,
+                        evidence: [
+                            'ai_mapping' => $map,
+                            'source' => $source,
+                        ],
+                        sourceProvider: 'ai_classifier',
+                        confidence: 0.5,
+                    );
+                    $suggestionsCreated++;
                 }
             }
 
@@ -926,6 +1034,7 @@ EOT;
                     $data['category_id'] = Category::where('name', $catName)->value('id');
                     $item->update([
                         'data' => $data,
+                        'status' => ImportItem::STATUS_CATEGORIZED,
                         'confidence' => min(($item->confidence ?? 0.5) + 0.15, 1.0),
                     ]);
                     $categorized++;
@@ -963,34 +1072,51 @@ EOT;
             'count' => count($businessList),
             'imported' => $categorized,
             'categories_created' => $categoriesCreated,
-            'suggestions_created' => 0,
+            'suggestions_created' => $suggestionsCreated,
             'existing_reorganized' => $changed,
             'cost' => round(($result['usage']['total_tokens'] ?? 0) * 0.00000014, 4),
         ];
     }
 
-    private function findOrCreateSuggestedCategory(string $name, AiAgent $agent, bool &$created): ?Category
+    /**
+     * Auto-create a canonical category for an AI-suggested name and infer its
+     * module_type from the business context. Private/professional trades become
+     * bookable; government/public/non-profit places stay directory.
+     */
+    private function findOrCreateCategoryForSuggestion(string $suggestedName, array $map): ?Category
     {
-        $title = Str::of($name)->replace('_', ' ')->squish()->title()->toString();
-        $existing = Category::where('is_canonical', true)->whereRaw('LOWER(name) = ?', [Str::lower($title)])->first();
+        $title = Str::of($suggestedName)->replace('_', ' ')->squish()->title()->toString();
 
+        $existing = Category::where('is_canonical', true)
+            ->whereRaw('LOWER(name) = ?', [Str::lower($title)])
+            ->first();
         if ($existing) {
             return $existing;
         }
 
+        $lower = strtolower($title);
+        $isPublic = str_contains($lower, 'government') || str_contains($lower, 'police')
+            || str_contains($lower, 'post office') || str_contains($lower, 'public')
+            || str_contains($lower, 'municipal') || str_contains($lower, 'commissioner')
+            || str_contains($lower, 'office') || str_contains($lower, 'department')
+            || str_contains($lower, 'bank') || str_contains($lower, 'atm');
+
+        $moduleType = $isPublic ? 'directory' : 'booking';
+
         $data = [
             'name' => $title,
             'slug' => Str::slug($title),
-            'module_type' => 'directory',
+            'module_type' => $moduleType,
             'is_canonical' => true,
             'is_active' => true,
-            'description' => 'Auto-created by AI categorization agent.',
+            'description' => 'Auto-created from imported business: '.($map['name'] ?? $title),
         ];
         Category::applyTaxonomy($data);
-        $category = Category::create($data);
-        $created = true;
-
-        return $category;
+        try {
+            return Category::create($data);
+        } catch (\Throwable $e) {
+            return Category::where('is_canonical', true)->whereRaw('LOWER(name) = ?', [Str::lower($title)])->first();
+        }
     }
 
     private function duplicateDetector(AiAgent $agent, AiAgentTask $task): array
@@ -999,7 +1125,7 @@ EOT;
         $batchId = $input['batch_id'] ?? null;
         $maxResults = $input['max_results'] ?? 50;
 
-        $query = ImportItem::where('status', 'pending');
+        $query = ImportItem::inPipeline();
         if ($batchId) {
             $query->where('batch_id', $batchId);
         }
@@ -1011,7 +1137,11 @@ EOT;
         foreach ($items as $item) {
             $name = Str::lower($item->data['name'] ?? '');
             if (in_array($name, $existing)) {
-                $item->update(['status' => 'duplicate', 'notes' => 'Already exists in database']);
+                $item->update(['status' => ImportItem::STATUS_DUPLICATE, 'notes' => 'Already exists in database']);
+                if ($item->batch) {
+                    $item->batch->increment('rejected');
+                    $item->batch->decrement('pending');
+                }
                 $duplicates++;
             }
         }
@@ -1034,7 +1164,7 @@ EOT;
         }
 
         $batchId = $input['batch_id'] ?? null;
-        $items = ImportItem::where('status', 'pending')
+        $items = ImportItem::inPipeline()
             ->when($batchId, fn ($q) => $q->where('batch_id', $batchId))
             ->where(function ($query) {
                 $query->whereNull('data->description')->orWhere('data->description', '');
@@ -1084,7 +1214,8 @@ EOT;
         $batchId = $input['batch_id'] ?? null;
         $maxResults = $input['max_results'] ?? 50;
 
-        $query = ImportItem::where('status', 'pending');
+        $query = ImportItem::whereIn('status', [ImportItem::STATUS_CATEGORIZED, ImportItem::STATUS_PENDING])
+            ->whereNotNull('data->category');
         if ($batchId) {
             $query->where('batch_id', $batchId);
         }
@@ -1118,7 +1249,10 @@ EOT;
                 $score += 10;
             }
 
-            $item->update(['confidence' => $score / 100]);
+            $item->update([
+                'confidence' => $score / 100,
+                'status' => ImportItem::STATUS_REVIEW,
+            ]);
             $checked++;
         }
 
@@ -1138,29 +1272,43 @@ EOT;
             throw new \Exception('CSV file not found.');
         }
 
-        $csv = array_map('str_getcsv', file($filePath));
-        $headers = array_map('strtolower', array_shift($csv));
+        $rows = $this->readCsvRows($filePath);
+        if (empty($rows)) {
+            return ['count' => 0, 'imported' => 0, 'skipped' => 0, 'batch_id' => null, 'cost' => 0];
+        }
+
+        $headers = array_values(array_filter(array_map(
+            fn ($header) => strtolower(trim((string) $header)),
+            (array) array_shift($rows)
+        ), fn ($header) => $header !== ''));
+        if (empty($headers)) {
+            throw new \Exception('CSV has no usable header row.');
+        }
+        $headerCount = count($headers);
 
         $batch = ImportBatch::create([
             'agent_id' => $agent->id,
             'source' => 'csv',
             'name' => 'CSV Import: '.basename($filePath),
-            'total' => count($csv),
+            'total' => count($rows),
             'status' => 'processing',
         ]);
 
         $imported = 0;
 
-        foreach ($csv as $row) {
-            $data = array_combine($headers, $row);
+        foreach ($rows as $rawRow) {
+            // Tolerate ragged rows: drop excess columns, pad missing ones.
+            $rawRow = (array) $rawRow;
+            $rawRow = array_pad(array_slice($rawRow, 0, $headerCount), $headerCount, null);
+            $row = array_combine($headers, $rawRow);
 
-            if (empty($data['name'])) {
+            if (empty($row['name'])) {
                 continue;
             }
 
             ImportItem::create([
                 'batch_id' => $batch->id,
-                'data' => $data,
+                'data' => array_map(fn ($value) => $value === null ? '' : $value, $row),
                 'confidence' => 0.9,
             ]);
 
@@ -1170,11 +1318,32 @@ EOT;
         $batch->update(['status' => 'completed']);
 
         return [
-            'count' => count($csv),
+            'count' => count($rows),
             'imported' => $imported,
             'batch_id' => $batch->id,
             'cost' => 0,
         ];
+    }
+
+    /**
+     * Read CSV rows with fgetcsv so quoted multi-line fields and embedded
+     * newlines are handled correctly (file() + str_getcsv would split them).
+     */
+    private function readCsvRows(string $path): array
+    {
+        $rows = [];
+        $handle = @fopen($path, 'r');
+        if ($handle === false) {
+            throw new \Exception('CSV file not readable.');
+        }
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rows[] = $row;
+        }
+
+        fclose($handle);
+
+        return $rows;
     }
 
     private function parseJsonFromResponse(string $content): ?array

@@ -36,9 +36,16 @@
             <label class="block text-slate-400 text-sm mb-1">Role</label>
             <select name="role" class="input-dark" required>
                 <option value="moderator" {{ (old('role', $isEdit ? $staff->role : '') == 'moderator') ? 'selected' : '' }}>Moderator</option>
+                <option value="manager" {{ (old('role', $isEdit ? $staff->role : '') == 'manager') ? 'selected' : '' }}>Manager</option>
                 <option value="admin" {{ (old('role', $isEdit ? $staff->role : '') == 'admin') ? 'selected' : '' }}>Admin</option>
                 <option value="super_admin" {{ (old('role', $isEdit ? $staff->role : '') == 'super_admin') ? 'selected' : '' }}>Super Admin</option>
             </select>
+            <p class="text-xs text-slate-500 mt-1">
+                <strong>Moderator:</strong> reviews, reports, content only ·
+                <strong>Manager:</strong> manages one department (businesses, bookings/orders/trips) but cannot access settings, staff, or monetization ·
+                <strong>Admin:</strong> full platform access ·
+                <strong>Super Admin:</strong> everything, including staff & system.
+            </p>
         </div>
 
         <div>

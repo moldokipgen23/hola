@@ -65,6 +65,7 @@ class BookingPlacementService
                     ->all();
                 $slot = null;
                 $checkOutDate = null;
+                $fittedResourceId = null;
                 $unitPrice = (float) $service->price;
 
                 if ($mode === 'stay') {
@@ -96,52 +97,71 @@ class BookingPlacementService
                     $duration = $nights * 1440;
                     $price = $unitPrice * $nights * $reservationUnits;
                 } elseif ($service->has_fixed_slots || in_array($mode, ['slot', 'seat'], true)) {
-                    if (empty($schedule['time_slot_id'])) {
-                        throw ValidationException::withMessages(['time_slot_id' => 'Choose an available time slot.']);
-                    }
-
-                    $slot = TimeSlot::where('service_id', $service->id)
-                        ->whereKey($schedule['time_slot_id'])
-                        ->where('is_active', true)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $slot || ($slot->day_of_week !== null && $slot->day_of_week !== $date->dayOfWeek)) {
-                        throw ValidationException::withMessages(['time_slot_id' => 'This slot is not offered on the selected date.']);
-                    }
-
-                    $consumption = $mode === 'seat' ? $partySize : ($mode === 'slot' ? $reservationUnits : $partySize);
-                    $reserved = (int) Booking::where('time_slot_id', $slot->id)
-                        ->whereDate('booking_date', $date)
-                        ->whereIn('status', ['pending', 'confirmed'])
-                        ->sum($mode === 'slot' ? 'reservation_units' : 'party_size');
-                    if ($reserved + $consumption > $slot->capacity) {
-                        throw ValidationException::withMessages(['time_slot_id' => 'This time slot does not have enough space left.']);
-                    }
-
-                    if ($mode === 'seat' && $seatLabels) {
-                        if (count($seatLabels) !== $partySize) {
-                            throw ValidationException::withMessages(['seat_labels' => 'Choose one unique seat for each guest.']);
+                    if ($service->resources()->active()->exists()) {
+                        $resourceResult = $this->placeResourceBooking(
+                            $service,
+                            $schedule,
+                            $date,
+                            $partySize,
+                            $reservationUnits,
+                            $seatLabels,
+                            $mode,
+                        );
+                        $slot = null;
+                        $startTime = $resourceResult['start_time'];
+                        $endTime = $resourceResult['end_time'];
+                        $duration = $resourceResult['duration'];
+                        $unitPrice = $resourceResult['unit_price'];
+                        $price = $resourceResult['price'];
+                        $fittedResourceId = $resourceResult['resource_id'] ?? null;
+                    } else {
+                        if (empty($schedule['time_slot_id'])) {
+                            throw ValidationException::withMessages(['time_slot_id' => 'Choose an available time slot.']);
                         }
-                        $takenSeats = Booking::where('time_slot_id', $slot->id)
+
+                        $slot = TimeSlot::where('service_id', $service->id)
+                            ->whereKey($schedule['time_slot_id'])
+                            ->where('is_active', true)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if (! $slot || ($slot->day_of_week !== null && $slot->day_of_week !== $date->dayOfWeek)) {
+                            throw ValidationException::withMessages(['time_slot_id' => 'This slot is not offered on the selected date.']);
+                        }
+
+                        $consumption = $mode === 'seat' ? $partySize : ($mode === 'slot' ? $reservationUnits : $partySize);
+                        $reserved = (int) Booking::where('time_slot_id', $slot->id)
                             ->whereDate('booking_date', $date)
                             ->whereIn('status', ['pending', 'confirmed'])
-                            ->get(['seat_labels'])
-                            ->flatMap(fn (Booking $booking) => $booking->seat_labels ?? [])
-                            ->map(fn ($seat) => strtoupper((string) $seat));
-                        if ($takenSeats->intersect($seatLabels)->isNotEmpty()) {
-                            throw ValidationException::withMessages(['seat_labels' => 'One or more selected seats are no longer available.']);
+                            ->sum($mode === 'slot' ? 'reservation_units' : 'party_size');
+                        if ($reserved + $consumption > $slot->capacity) {
+                            throw ValidationException::withMessages(['time_slot_id' => 'This time slot does not have enough space left.']);
                         }
-                    }
 
-                    $startTime = $slot->start_time;
-                    $endTime = $slot->end_time;
-                    $duration = $this->minutesBetween($date, $startTime, $endTime);
-                    if (Carbon::parse($date->toDateString().' '.$startTime)->isPast()) {
-                        throw ValidationException::withMessages(['time_slot_id' => 'Choose a future time slot.']);
+                        if ($mode === 'seat' && $seatLabels) {
+                            if (count($seatLabels) !== $partySize) {
+                                throw ValidationException::withMessages(['seat_labels' => 'Choose one unique seat for each guest.']);
+                            }
+                            $takenSeats = Booking::where('time_slot_id', $slot->id)
+                                ->whereDate('booking_date', $date)
+                                ->whereIn('status', ['pending', 'confirmed'])
+                                ->get(['seat_labels'])
+                                ->flatMap(fn (Booking $booking) => $booking->seat_labels ?? [])
+                                ->map(fn ($seat) => strtoupper((string) $seat));
+                            if ($takenSeats->intersect($seatLabels)->isNotEmpty()) {
+                                throw ValidationException::withMessages(['seat_labels' => 'One or more selected seats are no longer available.']);
+                            }
+                        }
+
+                        $startTime = $slot->start_time;
+                        $endTime = $slot->end_time;
+                        $duration = $this->minutesBetween($date, $startTime, $endTime);
+                        if (Carbon::parse($date->toDateString().' '.$startTime)->isPast()) {
+                            throw ValidationException::withMessages(['time_slot_id' => 'Choose a future time slot.']);
+                        }
+                        $unitPrice = (float) ($slot->price_override ?? $service->price);
+                        $price = $unitPrice * ($mode === 'seat' ? $partySize : ($mode === 'slot' ? $reservationUnits : 1));
                     }
-                    $unitPrice = (float) ($slot->price_override ?? $service->price);
-                    $price = $unitPrice * ($mode === 'seat' ? $partySize : ($mode === 'slot' ? $reservationUnits : 1));
                 } else {
                     $startTime = $schedule['start_time'] ?? null;
                     if (! $startTime) {
@@ -175,6 +195,7 @@ class BookingPlacementService
                     'client_reference' => $clientReference,
                     'business_id' => $business->id,
                     'service_id' => $service->id,
+                    'resource_id' => $fittedResourceId,
                     'time_slot_id' => $slot?->id,
                     'booking_type' => match ($mode) {
                         'stay' => 'stay',
@@ -204,6 +225,12 @@ class BookingPlacementService
                     'metadata' => ['payment_mode' => 'offline'],
                 ]);
 
+                try {
+                    NotificationService::newBooking($booking);
+                } catch (\Throwable $e) {
+                    // Notifications must never fail a booking placement.
+                }
+
                 return ['booking' => $booking->load('service'), 'duplicate' => false];
             });
         } catch (QueryException $exception) {
@@ -219,6 +246,82 @@ class BookingPlacementService
 
             return ['booking' => $existing->load('service'), 'duplicate' => true];
         }
+    }
+
+    private function placeResourceBooking(
+        Service $service,
+        array $schedule,
+        Carbon $date,
+        int $partySize,
+        int $reservationUnits,
+        array $seatLabels,
+        string $mode,
+    ): array {
+        $startTime = $schedule['start_time'] ?? null;
+        if (! $startTime) {
+            throw ValidationException::withMessages(['start_time' => 'Choose an available start time.']);
+        }
+        $startTime = substr((string) $startTime, 0, 5);
+        $start = Carbon::parse($date->toDateString().' '.$startTime);
+        if ($start->isPast()) {
+            throw ValidationException::withMessages(['start_time' => 'Choose a future time slot.']);
+        }
+
+        $endTime = $start->copy()->addMinutes(max(15, (int) $service->duration))->format('H:i');
+        $unitPrice = (float) $service->price;
+
+        if ($mode === 'seat' && $seatLabels) {
+            if (count($seatLabels) !== $partySize) {
+                throw ValidationException::withMessages(['seat_labels' => 'Choose one unique seat for each guest.']);
+            }
+            $takenSeats = Booking::where('service_id', $service->id)
+                ->whereDate('booking_date', $date)
+                ->whereIn('status', ['pending', 'confirmed'])
+                ->get(['seat_labels'])
+                ->flatMap(fn (Booking $booking) => $booking->seat_labels ?? [])
+                ->map(fn ($seat) => strtoupper((string) $seat));
+            if ($takenSeats->intersect($seatLabels)->isNotEmpty()) {
+                throw ValidationException::withMessages(['seat_labels' => 'One or more selected seats are no longer available.']);
+            }
+        }
+
+        $resources = $service->resources()->active()->lockForUpdate()->get();
+        if ($resources->isEmpty()) {
+            throw ValidationException::withMessages(['start_time' => 'This service has no active resources.']);
+        }
+
+        $totalCapacity = 0;
+        $fitsAny = false;
+        $fittedResourceId = null;
+        $duration = max(15, (int) $service->duration);
+        foreach ($resources as $resource) {
+            $slots = app(SlotGenerationService::class)->slotsForResource($service, $resource, $date, $partySize, $reservationUnits);
+            foreach ($slots as $slot) {
+                if ($slot['start_time'] === $startTime && $slot['can_accommodate']) {
+                    $fitsAny = true;
+                    $fittedResourceId = $resource->id;
+                    $totalCapacity = max($totalCapacity, $slot['available']);
+                    $duration = $slot['duration_minutes'];
+                    $unitPrice = (float) $slot['price'];
+                    $endTime = $slot['end_time'];
+                }
+            }
+        }
+
+        if (! $fitsAny) {
+            throw ValidationException::withMessages(['start_time' => 'This time does not have enough availability.']);
+        }
+
+        $price = $unitPrice * ($mode === 'seat' ? $partySize : ($mode === 'slot' ? $reservationUnits : 1));
+
+        return [
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'duration' => $duration,
+            'unit_price' => $unitPrice,
+            'price' => $price,
+            'resource_id' => $fittedResourceId,
+        ];
     }
 
     private function minutesBetween(Carbon $date, string $start, string $end): int

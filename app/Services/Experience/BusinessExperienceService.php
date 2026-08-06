@@ -5,6 +5,7 @@ namespace App\Services\Experience;
 use App\Models\Business;
 use App\Models\TimeSlot;
 use App\Services\BusinessModuleService;
+use Carbon\Carbon;
 
 class BusinessExperienceService
 {
@@ -24,6 +25,20 @@ class BusinessExperienceService
         $readiness = [];
 
         foreach ($enabledExperiences as $experience) {
+            $readiness[$experience] = $this->calculateExperienceReadiness($business, $experience, $modules, $experienceConfig[$experience] ?? []);
+        }
+
+        return $readiness;
+    }
+
+    public function calculateReadinessForExperiences(Business $business, array $experiences): array
+    {
+        $modules = $this->moduleService->effectiveFor($business);
+        $experienceConfig = $business->experience_config ?? [];
+
+        $readiness = [];
+
+        foreach ($experiences as $experience) {
             $readiness[$experience] = $this->calculateExperienceReadiness($business, $experience, $modules, $experienceConfig[$experience] ?? []);
         }
 
@@ -610,25 +625,33 @@ class BusinessExperienceService
         $service = $business->services()
             ->where('booking_mode', $bookingMode)
             ->where('is_active', true)
-            ->whereHas('timeSlots', function ($query) {
-                $query->where('is_active', true)
-                    ->where('date', '>=', now()->toDateString())
-                    ->where('available', '>', 0);
-            })
+            ->whereHas('timeSlots', fn ($query) => $query->where('is_active', true))
             ->first();
 
         if (! $service) {
             return null;
         }
 
-        $slot = $service->timeSlots()
-            ->where('is_active', true)
-            ->where('date', '>=', now()->toDateString())
-            ->where('available', '>', 0)
-            ->orderBy('date')
-            ->orderBy('start_time')
-            ->first();
+        $advanceDays = max(1, (int) ($service->advance_booking_days ?? 60));
+        $slots = $service->timeSlots()->where('is_active', true)->get();
 
-        return $slot ? $slot->date.' '.$slot->start_time : null;
+        for ($offset = 0; $offset < $advanceDays; $offset++) {
+            $date = today()->addDays($offset);
+            $dayOfWeek = $date->dayOfWeek;
+
+            foreach ($slots as $slot) {
+                if ($slot->day_of_week !== null && $slot->day_of_week !== $dayOfWeek) {
+                    continue;
+                }
+                if ($offset === 0 && Carbon::parse($date->toDateString().' '.$slot->start_time)->isPast()) {
+                    continue;
+                }
+                if ($slot->availableSlots($date->toDateString()) > 0) {
+                    return $date->toDateString().' '.$slot->start_time;
+                }
+            }
+        }
+
+        return null;
     }
 }

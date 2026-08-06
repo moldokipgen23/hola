@@ -13,12 +13,24 @@ class Review extends Model
         'rating',
         'comment',
         'owner_response',
+        'status',
+        'moderation_reason',
+        'flagged_at',
+        'photo',
     ];
 
     protected $casts = [
         'rating' => 'integer',
         'owner_response' => 'string',
+        'status' => 'string',
+        'flagged_at' => 'datetime',
     ];
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_HIDDEN = 'hidden';
 
     protected static function booted(): void
     {
@@ -39,5 +51,10 @@ class Review extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', self::STATUS_APPROVED);
     }
 }

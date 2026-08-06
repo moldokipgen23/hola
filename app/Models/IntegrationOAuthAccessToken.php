@@ -24,6 +24,7 @@ class IntegrationOAuthAccessToken extends Model
     ];
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     public function client()
@@ -40,6 +41,7 @@ class IntegrationOAuthAccessToken extends Model
     public function hasScope(string $scope): bool
     {
         $scopes = $this->scopes ?? [];
+
         return in_array('*', $scopes) || in_array($scope, $scopes);
     }
 }

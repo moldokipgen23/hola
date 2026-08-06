@@ -19,7 +19,7 @@ class PilotExperienceSeeder extends Seeder
 
         // TURF - 3 pilots
         $turfBusiness = Business::where('primary_experience', 'turf')->first();
-        if (!$turfBusiness) {
+        if (! $turfBusiness) {
             $turfBusiness = Business::where('name', 'Test Football Turf')->first();
             if ($turfBusiness) {
                 $turfBusiness->primary_experience = 'turf';
@@ -35,7 +35,7 @@ class PilotExperienceSeeder extends Seeder
 
         // TAXI - create pilot
         $taxiBusiness = Business::where('primary_experience', 'taxi')->first();
-        if (!$taxiBusiness) {
+        if (! $taxiBusiness) {
             $taxiBusiness = Business::create([
                 'category_id' => 1,
                 'area_id' => 1,
@@ -61,7 +61,7 @@ class PilotExperienceSeeder extends Seeder
 
         // SHARED TRANSPORT - create pilot
         $sharedBusiness = Business::where('primary_experience', 'shared_transport')->first();
-        if (!$sharedBusiness) {
+        if (! $sharedBusiness) {
             $sharedBusiness = Business::create([
                 'category_id' => 1,
                 'area_id' => 1,
@@ -87,7 +87,7 @@ class PilotExperienceSeeder extends Seeder
 
         // VEHICLE RENTAL - create pilot
         $rentalBusiness = Business::where('primary_experience', 'vehicle_rental')->first();
-        if (!$rentalBusiness) {
+        if (! $rentalBusiness) {
             $rentalBusiness = Business::create([
                 'category_id' => 1,
                 'area_id' => 1,
@@ -113,7 +113,7 @@ class PilotExperienceSeeder extends Seeder
 
         // GOODS TRANSPORT - create pilot
         $goodsBusiness = Business::where('primary_experience', 'goods_transport')->first();
-        if (!$goodsBusiness) {
+        if (! $goodsBusiness) {
             $goodsBusiness = Business::create([
                 'category_id' => 1,
                 'area_id' => 1,
@@ -139,7 +139,7 @@ class PilotExperienceSeeder extends Seeder
 
         // SEAT EVENT - create pilot
         $seatBusiness = Business::where('primary_experience', 'seat_event')->first();
-        if (!$seatBusiness) {
+        if (! $seatBusiness) {
             $seatBusiness = Business::create([
                 'category_id' => 1,
                 'area_id' => 1,

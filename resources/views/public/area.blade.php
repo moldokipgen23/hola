@@ -36,7 +36,7 @@
             <a href="/business/{{ $biz->slug }}" class="business-card bg-white rounded-xl border border-slate-100 overflow-hidden hover:border-primary-200">
                 <div class="h-44 bg-slate-100 relative overflow-hidden">
                     @if(!empty($biz->photos) && is_array($biz->photos) && count($biz->photos) > 0)
-                        <img src="{{ str_starts_with($biz->photos[0], 'http') ? $biz->photos[0] : asset($biz->photos[0]) }}" alt="{{ $biz->name }}" class="w-full h-full object-cover" loading="lazy">
+                        <img src="{{ str_starts_with($biz->primaryPhoto() ?? '', 'http') ? $biz->primaryPhoto() : asset($biz->primaryPhoto()) }}" alt="{{ $biz->name }}" class="w-full h-full object-cover" loading="lazy">
                     @else
                         <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50">
                             <span class="text-4xl">📍</span>

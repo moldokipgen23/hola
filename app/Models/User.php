@@ -111,7 +111,7 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return in_array($this->role, ['super_admin', 'admin', 'moderator']);
+        return in_array($this->role, ['super_admin', 'admin', 'moderator', 'manager']);
     }
 
     public function isSuperAdmin(): bool
@@ -124,9 +124,23 @@ class User extends Authenticatable
         return $this->role === 'moderator';
     }
 
+    public function isManager(): bool
+    {
+        return $this->role === 'manager';
+    }
+
     public function isOwner(): bool
     {
         return $this->role === 'owner';
+    }
+
+    /**
+     * Platform-wide powers (staff mgmt, settings, monetization, system).
+     * Only super_admin + admin. Managers and moderators are department-scoped.
+     */
+    public function canManagePlatform(): bool
+    {
+        return in_array($this->role, ['super_admin', 'admin'], true);
     }
 
     /**
@@ -134,7 +148,7 @@ class User extends Authenticatable
      */
     public function adminDepartment(): ?string
     {
-        if (! in_array($this->role, ['super_admin', 'admin', 'moderator'], true)) {
+        if (! in_array($this->role, ['super_admin', 'admin', 'moderator', 'manager'], true)) {
             return null;
         }
 
@@ -143,6 +157,21 @@ class User extends Authenticatable
         }
 
         return in_array($this->department, self::ADMIN_DEPARTMENTS, true) ? $this->department : null;
+    }
+
+    /**
+     * Staff hierarchy level: super_admin(3) > admin(2) > manager(1) > moderator(0).
+     * Used to prevent lower roles from managing higher ones.
+     */
+    public function staffLevel(): int
+    {
+        return match ($this->role) {
+            'super_admin' => 3,
+            'admin' => 2,
+            'manager' => 1,
+            'moderator' => 0,
+            default => -1,
+        };
     }
 
     public function isBanned(): bool

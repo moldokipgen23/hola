@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Integration;
 
 use App\Models\IntegrationWebhook;
 use App\Models\IntegrationWebhookDelivery;
+use App\Services\IntegrationWebhookService;
 use Illuminate\Http\Request;
 
 class WebhookSubscriptionController extends BaseController
@@ -81,12 +82,12 @@ class WebhookSubscriptionController extends BaseController
         }
 
         $webhook = $delivery->webhook;
-        if (!$webhook || !$webhook->is_active) {
+        if (! $webhook || ! $webhook->is_active) {
             return $this->error('Webhook endpoint is inactive.', 400);
         }
 
         $payload = is_array($delivery->payload) ? $delivery->payload : (json_decode($delivery->payload, true) ?? []);
-        $service = app(\App\Services\IntegrationWebhookService::class);
+        $service = app(IntegrationWebhookService::class);
         $result = $service->send($webhook, $delivery->event, $payload);
 
         return $this->ok($result);

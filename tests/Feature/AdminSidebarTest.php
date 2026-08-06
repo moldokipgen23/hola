@@ -25,29 +25,29 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('href="' . route('admin.settings') . '"', false)
-            ->assertSee('href="' . route('admin.import') . '"', false)
-            ->assertSee('href="' . route('admin.claims') . '"', false)
-            ->assertSee('href="' . route('admin.reviews') . '"', false)
-            ->assertSee('href="' . route('admin.vendors') . '"', false)
+            ->assertSee('href="'.route('admin.settings').'#general"', false)
+            ->assertSee('href="'.route('admin.import').'"', false)
+            ->assertSee('href="'.route('admin.claims').'"', false)
+            ->assertSee('href="'.route('admin.reviews').'"', false)
+            ->assertSee('href="'.route('admin.vendors').'"', false)
             ->assertSee('>Overview</span>', false)
-            ->assertSee('>Directory</span>', false)
-            ->assertSee('>Booking</span>', false)
-            ->assertSee('>Users</span>', false)
+            ->assertSee('>Directory &amp; Listings</span>', false)
+            ->assertSee('>Sales &amp; Customers</span>', false)
+            ->assertSee('>Bookings</span>', false)
             ->assertSee('>Analytics</span>', false)
-            ->assertSee('>Settings</span>', false)
+            ->assertSee('>Settings &amp; Branding</span>', false)
             ->assertSee('>System</span>', false)
-            ->assertSee('>AI Agents</span>', false)
+            ->assertSee('>AI &amp; Automation</span>', false)
             ->assertSeeInOrder([
                 '>Overview</span>',
-                '>Directory</span>',
-                '>Booking</span>',
-                '>Users</span>',
+                '>Directory &amp; Listings</span>',
+                '>Sales &amp; Customers</span>',
+                '>Bookings</span>',
                 '>Analytics</span>',
-                '>Settings</span>',
+                '>Settings &amp; Branding</span>',
                 '>System</span>',
-                '>AI Agents</span>',
-            ]);
+                '>AI &amp; Automation</span>',
+            ], false);
     }
 
     public function test_admin_sidebar_hides_shop_and_taxi_departments_in_phase_one_launch(): void
@@ -59,12 +59,12 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('>Shopping</span>', false)
-            ->assertDontSee('>Taxi / Transport</span>', false)
-            ->assertDontSee('href="' . route('admin.products') . '"', false)
-            ->assertDontSee('href="' . route('admin.orders') . '"', false)
-            ->assertDontSee('href="' . route('admin.vehicle-types') . '"', false)
-            ->assertSee('href="' . route('admin.businesses') . '"', false);
+            ->assertDontSee('>Commerce (Shopping)</span>', false)
+            ->assertDontSee('>Transport</span>', false)
+            ->assertDontSee('href="'.route('admin.products').'"', false)
+            ->assertDontSee('href="'.route('admin.orders').'"', false)
+            ->assertDontSee('href="'.route('admin.vehicle-types').'"', false)
+            ->assertSee('href="'.route('admin.businesses').'"', false);
     }
 
     public function test_admin_sidebar_shows_all_departments_when_worlds_enabled(): void
@@ -81,16 +81,16 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('>Shopping</span>', false)
-            ->assertSee('>Booking</span>', false)
-            ->assertSee('>Taxi / Transport</span>', false)
-            ->assertSee('href="' . route('admin.products') . '"', false)
-            ->assertSee('href="' . route('admin.orders') . '"', false)
-            ->assertSee('href="' . route('admin.services') . '"', false)
-            ->assertSee('href="' . route('admin.bookings') . '"', false)
-            ->assertSee('href="' . route('admin.vehicle-types') . '"', false)
-            ->assertSee('href="' . route('admin.pincodes') . '"', false)
-            ->assertSee('href="' . route('admin.businesses') . '"', false);
+            ->assertSee('>Commerce (Shopping)</span>', false)
+            ->assertSee('>Bookings</span>', false)
+            ->assertSee('>Transport</span>', false)
+            ->assertSee('href="'.route('admin.products').'"', false)
+            ->assertSee('href="'.route('admin.orders').'"', false)
+            ->assertSee('href="'.route('admin.services').'"', false)
+            ->assertSee('href="'.route('admin.bookings').'"', false)
+            ->assertSee('href="'.route('admin.vehicle-types').'"', false)
+            ->assertSee('href="'.route('admin.pincodes').'"', false)
+            ->assertSee('href="'.route('admin.businesses').'"', false);
     }
 
     public function test_admin_sidebar_hides_booking_department_when_book_world_disabled(): void
@@ -105,10 +105,10 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('>Booking</span>', false)
-            ->assertDontSee('href="' . route('admin.bookings') . '"', false)
-            ->assertDontSee('href="' . route('admin.services') . '"', false)
-            ->assertSee('href="' . route('admin.businesses') . '"', false);
+            ->assertDontSee('>Bookings</span>', false)
+            ->assertDontSee('href="'.route('admin.bookings').'"', false)
+            ->assertDontSee('href="'.route('admin.services').'"', false)
+            ->assertSee('href="'.route('admin.businesses').'"', false);
     }
 
     public function test_admin_sidebar_shows_pending_claim_badge(): void
@@ -140,22 +140,21 @@ class AdminSidebarTest extends TestCase
         $this->actingAs($staff)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertDontSee('href="' . route('admin.staff') . '"', false)
-            ->assertDontSee('href="' . route('admin.integration-keys') . '"', false)
-            ->assertDontSee('href="' . route('admin.activity-logs') . '"', false)
-            ->assertDontSee('href="' . route('admin.agents') . '"', false)
-            ->assertDontSee('>AI Agents</span>', false);
+            ->assertDontSee('href="'.route('admin.staff').'"', false)
+            ->assertDontSee('href="'.route('admin.integration-keys').'"', false)
+            ->assertDontSee('href="'.route('admin.activity-logs').'"', false)
+            ->assertDontSee('href="'.route('admin.agents').'"', false)
+            ->assertDontSee('>AI &amp; Automation</span>', false);
 
         $admin = User::factory()->create(['role' => 'super_admin']);
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('href="' . route('admin.staff') . '"', false)
-            ->assertSee('href="' . route('admin.integration-keys') . '"', false)
-            ->assertSee('href="' . route('admin.activity-logs') . '"', false)
-            ->assertSee('href="' . route('admin.autopilot') . '"', false)
-            ->assertSee('href="' . route('admin.agents') . '"', false)
-            ->assertSee('>Users</span>', false)
-            ->assertSee('>AI Agents</span>', false);
+            ->assertSee('href="'.route('admin.staff').'"', false)
+            ->assertSee('href="'.route('admin.activity-logs').'"', false)
+            ->assertSee('href="'.route('admin.autopilot').'"', false)
+            ->assertSee('href="'.route('admin.agents').'"', false)
+            ->assertSee('>Sales &amp; Customers</span>', false)
+            ->assertSee('>AI &amp; Automation</span>', false);
     }
 }

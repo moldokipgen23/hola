@@ -10,6 +10,12 @@ class MediaLibrary extends Model
 {
     use HasFactory;
 
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_HIDDEN = 'hidden';
+
     protected $table = 'media_library';
 
     protected $fillable = [
@@ -23,12 +29,20 @@ class MediaLibrary extends Model
         'disk',
         'alt_text',
         'category',
+        'sort_order',
+        'is_cover',
+        'status',
+        'moderation_reason',
+        'flagged_at',
     ];
 
     protected $casts = [
         'size_bytes' => 'integer',
         'user_id' => 'integer',
         'business_id' => 'integer',
+        'sort_order' => 'integer',
+        'is_cover' => 'boolean',
+        'flagged_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -49,5 +63,15 @@ class MediaLibrary extends Model
     public function scopeOfType($query, string $category)
     {
         return $query->where('category', $category);
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', self::STATUS_APPROVED);
+    }
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('is_cover', 'desc')->orderBy('sort_order')->orderByDesc('id');
     }
 }

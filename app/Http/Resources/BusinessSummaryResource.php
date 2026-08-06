@@ -51,6 +51,12 @@ class BusinessSummaryResource extends JsonResource
             'locality' => $business->locality,
             'district' => $business->district,
             'pincode' => $business->pincode,
+            'city' => $business->relationLoaded('city') && $business->city ? [
+                'id' => $business->city->id,
+                'name' => $business->city->name,
+                'slug' => $business->city->slug,
+                'state' => $business->city->state,
+            ] : null,
             'state' => $business->state,
             'latitude' => $business->latitude,
             'longitude' => $business->longitude,
@@ -58,7 +64,8 @@ class BusinessSummaryResource extends JsonResource
             'whatsapp' => $business->whatsapp,
             'email' => $business->email,
             'website' => $business->website,
-            'photos' => $business->photos,
+            'photos' => $business->photoUrls(),
+            'primary_photo' => $business->primaryPhoto() ?? ($business->photoUrls()[0] ?? null),
             'working_hours' => $business->working_hours,
             'is_active' => $business->is_active,
             'is_featured' => $business->is_featured,
@@ -77,6 +84,9 @@ class BusinessSummaryResource extends JsonResource
             'primary_experience' => $primaryExperience,
             'readiness' => $readiness,
             'primary_action' => $primaryAction,
+            'booking' => $business->bookingCapability(),
+            'plan' => $business->planInfo(),
+            'verification_status' => $business->verification_status,
         ];
     }
 }

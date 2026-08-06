@@ -51,27 +51,32 @@ class AdminDepartmentScope
      * Route prefixes owned by the Shopping department.
      */
     private const SHOPPING = [
-        'admin.products',
-        'admin.orders',
-        'admin.product-categories',
-        'admin.shop-sections',
-        'admin.areas',
+        'admin.products*',
+        'admin.orders*',
+        'admin.product-categories*',
+        'admin.shop-sections*',
+        'admin.areas*',
     ];
 
     /**
      * Route prefixes owned by the Booking department.
      */
     private const BOOKING = [
-        'admin.services',
-        'admin.bookings',
+        'admin.services*',
+        'admin.bookings*',
     ];
 
     /**
      * Route prefixes owned by the Taxi / Transport department.
      */
     private const TAXI = [
-        'admin.vehicle-types',
-        'admin.pincodes',
+        'admin.vehicle-types*',
+        'admin.transport-routes*',
+        'admin.transport-bookings*',
+        'admin.seat-bookings*',
+        'admin.vehicle-rentals*',
+        'admin.pincodes*',
+        'admin.trips*',
     ];
 
     /**
@@ -99,6 +104,19 @@ class AdminDepartmentScope
             return $next($request);
         }
 
+        // Moderators are content-only (reviews, reports, gallery) — never business CRUD.
+        if ($user->role === 'moderator') {
+            $allowed = array_merge(self::SHARED, self::SUPPORT);
+            $routeName = (string) $request->route()?->getName();
+            if ($routeName !== '' && $request->routeIs($allowed)) {
+                return $next($request);
+            }
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Unauthorized. Content moderation only.'], 403);
+            }
+            abort(403, 'Access outside your department.');
+        }
+
         $sets = [
             'directory' => [...self::DIRECTORY, ...self::ANALYTICS],
             'shopping' => [...self::SHOPPING, ...self::ANALYTICS],
@@ -110,6 +128,11 @@ class AdminDepartmentScope
         $allowed = array_merge(self::SHARED, $sets[$department] ?? []);
 
         $routeName = (string) $request->route()?->getName();
+
+        // Cross-module aggregate pages (universal orders) are full-access only.
+        if ($routeName === 'admin.orders.universal' && $department !== null) {
+            abort(403, 'Access outside your department.');
+        }
 
         if ($routeName !== '' && $request->routeIs($allowed)) {
             return $next($request);

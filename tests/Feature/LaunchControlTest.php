@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\FeatureFlag;
 use App\Models\Business;
 use App\Models\Category;
+use App\Models\FeatureFlag;
+use App\Models\User;
 use App\Models\World;
+use App\Services\BusinessModuleService;
+use App\Services\LaunchControlService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -84,7 +87,7 @@ class LaunchControlTest extends TestCase
 
     public function test_enabled_module_and_experience_key_helpers_reflect_global_toggles(): void
     {
-        $service = app(\App\Services\LaunchControlService::class);
+        $service = app(LaunchControlService::class);
 
         $this->assertContains('catalog', $service->enabledModuleKeys());
         $this->assertContains('transport', $service->enabledModuleKeys());
@@ -93,7 +96,7 @@ class LaunchControlTest extends TestCase
         $this->assertContains('directory', $service->enabledExperienceKeys());
 
         FeatureFlag::where('key', 'module.transport')->firstOrFail()->update(['is_enabled' => false]);
-        app(\App\Services\LaunchControlService::class)->clearCache();
+        app(LaunchControlService::class)->clearCache();
 
         $this->assertNotContains('transport', $service->enabledModuleKeys());
         $this->assertNotContains('taxi', $service->enabledExperienceKeys());
@@ -114,9 +117,9 @@ class LaunchControlTest extends TestCase
         ]);
 
         FeatureFlag::where('key', 'module.transport')->firstOrFail()->update(['is_enabled' => false]);
-        app(\App\Services\LaunchControlService::class)->clearCache();
+        app(LaunchControlService::class)->clearCache();
 
-        app(\App\Services\BusinessModuleService::class)->update($business, ['catalog' => true, 'transport' => true]);
+        app(BusinessModuleService::class)->update($business, ['catalog' => true, 'transport' => true]);
 
         $this->assertTrue($business->hasModule('catalog'));
         $this->assertFalse($business->hasModule('transport'));
@@ -124,7 +127,7 @@ class LaunchControlTest extends TestCase
 
     public function test_vendor_experience_update_drops_globally_disabled_experience(): void
     {
-        $owner = \App\Models\User::factory()->create(['role' => 'owner']);
+        $owner = User::factory()->create(['role' => 'owner']);
         $category = Category::firstOrFail();
         $business = Business::create([
             'category_id' => $category->id,
@@ -140,7 +143,7 @@ class LaunchControlTest extends TestCase
         ]);
 
         FeatureFlag::where('key', 'module.transport')->firstOrFail()->update(['is_enabled' => false]);
-        app(\App\Services\LaunchControlService::class)->clearCache();
+        app(LaunchControlService::class)->clearCache();
 
         $this->actingAs($owner)
             ->put(route('vendor.businesses.experiences.update', $business->id), [
@@ -152,22 +155,33 @@ class LaunchControlTest extends TestCase
         $this->assertSame(['directory'], $business->refresh()->enabled_experiences);
     }
 
-    public function test_phase3_ride_bucket_is_folded_into_booking(): void
+    public function test_transport_world_ride_is_independent_of_booking(): void
     {
         $this->getJson('/api/platform/features')
             ->assertOk()
             ->assertJsonPath('data.experiences.taxi', true)
-            ->assertJsonPath('data.worlds.ride', false);
+            ->assertJsonPath('data.worlds.ride', true);
 
-        $config = app(\App\Services\LaunchControlService::class)->publicConfig();
-        $this->assertNotContains('ride', $config['enabled_tabs'], 'enabled_tabs must never contain ride');
+        $config = app(LaunchControlService::class)->publicConfig();
+        $this->assertContains('ride', $config['enabled_tabs'], 'ride must be an independent transport tab');
         $this->assertContains('book', $config['enabled_tabs']);
 
-        // Taxi now gates under the Book world, not Ride.
-        app(\App\Services\LaunchControlService::class)->clearCache();
+        // Transport survives even when Booking is toggled OFF (and vice-versa).
+        app(LaunchControlService::class)->clearCache();
+        FeatureFlag::where('key', 'world.book')->firstOrFail()->update(['is_enabled' => false]);
+        $this->getJson('/api/platform/features')
+            ->assertOk()
+            ->assertJsonPath('data.experiences.taxi', true)
+            ->assertJsonPath('data.worlds.ride', true)
+            ->assertJsonPath('data.worlds.book', false);
+
+        // And turning transport OFF does not touch booking.
+        FeatureFlag::where('key', 'world.book')->firstOrFail()->update(['is_enabled' => true]);
         FeatureFlag::where('key', 'world.ride')->firstOrFail()->update(['is_enabled' => false]);
         $this->getJson('/api/platform/features')
             ->assertOk()
-            ->assertJsonPath('data.experiences.taxi', true);
+            ->assertJsonPath('data.experiences.taxi', false)
+            ->assertJsonPath('data.worlds.ride', false)
+            ->assertJsonPath('data.worlds.book', true);
     }
 }

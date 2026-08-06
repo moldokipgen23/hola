@@ -23,7 +23,7 @@ class HomepageContentController extends Controller
     public function create()
     {
         $worlds = World::active()->orderBy('name')->get();
-        $content = new WorldHomepageContent();
+        $content = new WorldHomepageContent;
 
         return view('admin.homepage.create', compact('worlds', 'content'));
     }

@@ -41,6 +41,22 @@ class TripWorkflowService
             }
             $locked->update($updates);
 
+            // Record platform commission when a trip completes.
+            if ($status === 'completed' && $locked->business) {
+                try {
+                    app(MonetizationService::class)->recordCommission(
+                        $locked->business,
+                        Trip::class,
+                        $locked->id,
+                        (float) ($locked->fare ?? 0),
+                    );
+                } catch (\Throwable $e) {
+                    // Commission must never fail the trip workflow.
+                }
+            }
+
+            NotificationService::tripStatusChanged($locked, $status);
+
             $vehicle = $locked->vehicle()->lockForUpdate()->first();
             if ($vehicle && $vehicle->availability_status !== 'offline') {
                 if ($status === 'started') {

@@ -102,6 +102,8 @@ class TripPlacementService
                     'notes' => $customer['notes'] ?? null,
                 ]);
 
+                NotificationService::newTrip($trip);
+
                 return ['trip' => $trip->load('vehicle'), 'duplicate' => false];
             });
         } catch (QueryException $exception) {

@@ -13,6 +13,7 @@ use App\Models\User;
 class AdminNavService
 {
     public const DEPARTMENTS = ['directory', 'shopping', 'booking', 'taxi'];
+
     public const SUPPORT_DEPARTMENT = 'support';
 
     public function badges(): array
@@ -29,7 +30,7 @@ class AdminNavService
 
     public function isPowerUser(): bool
     {
-        return in_array(auth()->user()?->role, ['super_admin', 'admin'], true);
+        return auth()->user() instanceof User && auth()->user()->canManagePlatform();
     }
 
     /**
@@ -95,40 +96,42 @@ class AdminNavService
         $isPower = $this->isPowerUser();
         $department = $this->userDepartment();
 
-        $usersItems = [
-            ['label' => 'Customers', 'route' => 'admin.users*', 'icon' => 'users'],
-            ['label' => 'Business Owners', 'route' => 'admin.vendors*', 'icon' => 'sellers'],
-        ];
-
-        if ($isPower && $department === null) {
-            $usersItems[] = ['label' => 'Staff', 'route' => 'admin.staff*', 'icon' => 'staff'];
-        }
-
         $menu = [
             [
-                'title' => 'Overview',
+                'title' => 'Dashboard',
                 'departments' => 'shared',
                 'items' => [
-                    ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'dashboard'],
+                    ['label' => 'Overview', 'route' => 'admin.dashboard', 'icon' => 'dashboard'],
                 ],
             ],
             [
-                'title' => 'Directory',
+                'title' => 'Directory & Listings',
                 'departments' => ['directory', self::SUPPORT_DEPARTMENT],
                 'items' => [
                     ['label' => 'All Businesses', 'route' => 'admin.businesses', 'icon' => 'businesses', 'departments' => ['directory']],
                     ['label' => 'Pending Claims', 'route' => 'admin.claims*', 'icon' => 'shield', 'badge' => $badges['pending_claims'] ?? 0, 'departments' => ['directory']],
-                    ['label' => 'AI Import Queue', 'route' => 'admin.import*', 'icon' => 'import', 'badge' => $badges['pending_imports'] ?? 0, 'departments' => ['directory']],
                     ['label' => 'Categories', 'route' => 'admin.category-tree*', 'icon' => 'categories', 'departments' => ['directory']],
                     ['label' => 'Reviews', 'route' => 'admin.reviews*', 'icon' => 'star', 'departments' => ['directory', self::SUPPORT_DEPARTMENT]],
+                    ['label' => 'Photo Gallery', 'route' => 'admin.gallery*', 'icon' => 'content', 'departments' => ['directory', self::SUPPORT_DEPARTMENT]],
                 ],
             ],
             [
-                'title' => 'Shopping',
+                'title' => 'Sales & Customers',
+                'departments' => 'shared',
+                'items' => [
+                    ['label' => 'Universal Orders', 'route' => 'admin.orders.universal*', 'icon' => 'orders', 'departments' => []],
+                    ['label' => 'Transactions', 'route' => 'admin.transactions*', 'icon' => 'transactions', 'departments' => []],
+                    ['label' => 'Customers', 'route' => 'admin.users*', 'icon' => 'users'],
+                    ['label' => 'Business Owners', 'route' => 'admin.vendors*', 'icon' => 'sellers'],
+                    ...($isPower ? [['label' => 'Staff & Roles', 'route' => 'admin.staff*', 'icon' => 'roles', 'departments' => []]] : []),
+                ],
+            ],
+            [
+                'title' => 'Commerce (Shopping)',
                 'feature' => 'world.shop',
                 'departments' => ['shopping'],
                 'items' => [
-                    ['label' => 'Products', 'route' => 'admin.products*', 'icon' => 'products'],
+                    ['label' => 'Products', 'route' => 'admin.products*', 'icon' => 'catalog'],
                     ['label' => 'Orders', 'route' => 'admin.orders*', 'icon' => 'orders', 'badge' => $badges['pending_orders'] ?? 0],
                     ['label' => 'Product Categories', 'route' => 'admin.product-categories*', 'icon' => 'categories'],
                     ['label' => 'Shop Sections', 'route' => 'admin.shop-sections*', 'icon' => 'sections'],
@@ -136,58 +139,75 @@ class AdminNavService
                 ],
             ],
             [
-                'title' => 'Booking',
+                'title' => 'Bookings',
                 'feature' => 'world.book',
                 'departments' => ['booking'],
                 'items' => [
                     ['label' => 'Services', 'route' => 'admin.services*', 'icon' => 'services'],
-                    ['label' => 'Bookings', 'route' => 'admin.bookings*', 'icon' => 'calendar', 'badge' => $badges['pending_bookings'] ?? 0],
+                    ['label' => 'All Bookings', 'route' => 'admin.bookings*', 'icon' => 'calendar', 'badge' => $badges['pending_bookings'] ?? 0],
                 ],
             ],
             [
-                'title' => 'Taxi / Transport',
+                'title' => 'Transport',
                 'feature' => 'world.ride',
                 'departments' => ['taxi'],
                 'items' => [
+                    ['label' => 'Transport Bookings', 'route' => 'admin.transport-bookings*', 'icon' => 'truck', 'badge' => $badges['pending_orders'] ?? 0],
                     ['label' => 'Vehicle Types', 'route' => 'admin.vehicle-types*', 'icon' => 'truck'],
-                    ['label' => 'Serviceable Areas', 'route' => 'admin.pincodes*', 'icon' => 'pincodes'],
+                    ['label' => 'Transport Routes', 'route' => 'admin.transport-routes*', 'icon' => 'pincodes'],
                 ],
             ],
-            ['title' => 'Users', 'departments' => 'shared', 'items' => $usersItems],
             [
                 'title' => 'Analytics',
                 'departments' => self::DEPARTMENTS,
                 'items' => [
                     ['label' => 'Overview', 'route' => 'admin.analytics*', 'icon' => 'analytics'],
+                    ['label' => 'Booking Analytics', 'route' => 'admin.booking-analytics*', 'icon' => 'analytics'],
                     ['label' => 'Search Insights', 'route' => 'admin.search-history*', 'icon' => 'search'],
                     ['label' => 'Reports', 'route' => 'admin.reports*', 'icon' => 'reports', 'badge' => $badges['pending_reports'] ?? 0],
                 ],
             ],
             [
-                'title' => 'Settings',
+                'title' => 'Communications',
+                'departments' => 'shared',
                 'items' => [
-                    ['label' => 'Launch Controls', 'route' => 'admin.feature-flags*', 'icon' => 'flag', 'badge' => $badges['enabled_flags'] ?? 0, 'badge_suffix' => ' ON'],
-                    ['label' => 'Settings', 'route' => 'admin.settings', 'icon' => 'settings'],
-                    ['label' => 'Capability Presets', 'route' => 'admin.capability-templates*', 'icon' => 'presets'],
+                    ['label' => 'Message Center', 'route' => 'admin.message-center*', 'icon' => 'comm'],
+                    ['label' => 'Serviceable Areas', 'route' => 'admin.pincodes*', 'icon' => 'pincodes'],
                 ],
             ],
         ];
 
-        $systemItems = [
-            ['label' => 'Transactions', 'route' => 'admin.transactions*', 'icon' => 'transactions'],
-        ];
-
-        if ($isPower && $department === null) {
-            $systemItems[] = ['label' => 'Activity Logs', 'route' => 'admin.activity-logs*', 'icon' => 'logs'];
-            $systemItems[] = ['label' => 'API Keys', 'route' => 'admin.integration-keys*', 'icon' => 'keys'];
-        }
-
-        $menu[] = ['title' => 'System', 'items' => $systemItems];
-
+        // Platform (power users only)
         if ($isPower && $department === null) {
             $menu[] = [
-                'title' => 'AI Agents',
+                'title' => 'Monetization',
                 'items' => [
+                    ['label' => 'Subscription Plans', 'route' => 'admin.subscription-plans*', 'icon' => 'plans'],
+                    ['label' => 'Platform Earnings', 'route' => 'admin.earnings', 'icon' => 'earnings'],
+                ],
+            ];
+
+            $menu[] = [
+                'title' => 'Settings & Branding',
+                'items' => [
+                    ['label' => 'Business Modules', 'route' => 'admin.feature-flags*', 'icon' => 'flag', 'badge' => $badges['enabled_flags'] ?? 0, 'badge_suffix' => ' ON'],
+                    ['label' => 'General Settings', 'route' => 'admin.settings', 'url' => route('admin.settings').'#general', 'icon' => 'settings'],
+                    ['label' => 'Payments & Gateways', 'route' => 'admin.settings', 'url' => route('admin.settings').'#payment', 'icon' => 'payments'],
+                ],
+            ];
+
+            $menu[] = [
+                'title' => 'System',
+                'items' => [
+                    ['label' => 'Activity Logs', 'route' => 'admin.activity-logs*', 'icon' => 'logs'],
+                ],
+            ];
+
+            $menu[] = [
+                'title' => 'AI & Automation',
+                'items' => [
+                    ['label' => 'AI Import Queue', 'route' => 'admin.import*', 'icon' => 'import', 'badge' => $badges['pending_imports'] ?? 0],
+                    ['label' => 'Import by Link', 'route' => 'admin.import.by-link', 'icon' => 'import'],
                     ['label' => 'Autopilot', 'route' => 'admin.autopilot', 'icon' => 'autopilot'],
                     ['label' => 'Agent Settings', 'route' => 'admin.agents*', 'icon' => 'agents'],
                 ],

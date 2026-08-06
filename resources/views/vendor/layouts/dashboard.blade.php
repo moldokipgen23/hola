@@ -298,6 +298,10 @@
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                     Experiences
                                 </a>
+                                <a href="{{ route('vendor.businesses.subscription', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.businesses.subscription*') ? 'active' : '' }}">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                    Subscription & Plans
+                                </a>
                                 @endif
                             </div>
                         </div>
@@ -348,9 +352,17 @@
                                 </a>
                                 @endif
                                 @if($mods['bookings'] ?? false)
-                                <a href="{{ route('vendor.bookings', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.bookings*') ? 'active' : '' }}">
+                                <a href="{{ route('vendor.bookings', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.bookings') ? 'active' : '' }}">
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     Bookings
+                                </a>
+                                <a href="{{ route('vendor.calendar', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.calendar') ? 'active' : '' }}">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Calendar
+                                </a>
+                                <a href="{{ route('vendor.bookings.stay-board', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.bookings.stay-board') ? 'active' : '' }}">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                    Stay Board
                                 </a>
                                 @endif
                             </div>
@@ -410,6 +422,18 @@
                                 <a href="{{ route('vendor.trips', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.trips*') ? 'active' : '' }}">
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
                                     Transport Requests
+                                </a>
+                                <a href="{{ route('vendor.schedules', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.schedules*') ? 'active' : '' }}">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Departures / Schedules
+                                </a>
+                                <a href="{{ route('vendor.schedule-bookings', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.schedule-bookings*') ? 'active' : '' }}">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
+                                    Seat Bookings
+                                </a>
+                                <a href="{{ route('vendor.rentals', $currentBizId) }}" class="sidebar-link {{ request()->routeIs('vendor.rentals*') ? 'active' : '' }}">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3M3 8h18m-16 5h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Hire / Rentals
                                 </a>
                             </div>
                         </div>

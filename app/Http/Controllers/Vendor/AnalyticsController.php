@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\Vendor;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\Business;
 use App\Models\Order;
 use App\Models\Product;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class AnalyticsController extends Controller
 {
@@ -28,7 +27,7 @@ class AnalyticsController extends Controller
             'revenue' => Order::whereIn('business_id', $businessIds)
                 ->where('status', 'delivered')
                 ->sum('total'),
-            'bookings' => \App\Models\Booking::whereIn('business_id', $businessIds)->count(),
+            'bookings' => Booking::whereIn('business_id', $businessIds)->count(),
         ];
 
         $popularProducts = Product::whereIn('business_id', $businessIds)

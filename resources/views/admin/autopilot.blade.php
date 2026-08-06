@@ -182,6 +182,27 @@
                     <p class="text-slate-600 text-xs mt-1">Add multiple: Lamka, Tuibong, New Lamka</p>
                 </div>
             </div>
+            <div class="p-3 bg-slate-800/40 rounded-lg border border-slate-700/40 mb-4">
+                <p class="text-slate-300 text-xs font-semibold mb-2">District bounds <span class="text-slate-500 font-normal">(optional — imports are filtered to this lat/lng box; leave blank for the district default)</span></p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">North (lat)</label>
+                        <input type="number" step="0.0001" name="search_bounds_north" value="{{ \App\Models\Setting::get('search_bounds_north', '') }}" class="input-dark" placeholder="e.g. 24.45">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">South (lat)</label>
+                        <input type="number" step="0.0001" name="search_bounds_south" value="{{ \App\Models\Setting::get('search_bounds_south', '') }}" class="input-dark" placeholder="e.g. 24.20">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">East (lng)</label>
+                        <input type="number" step="0.0001" name="search_bounds_east" value="{{ \App\Models\Setting::get('search_bounds_east', '') }}" class="input-dark" placeholder="e.g. 93.85">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">West (lng)</label>
+                        <input type="number" step="0.0001" name="search_bounds_west" value="{{ \App\Models\Setting::get('search_bounds_west', '') }}" class="input-dark" placeholder="e.g. 93.55">
+                    </div>
+                </div>
+            </div>
             <div class="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20 mb-4">
                 <p class="text-blue-400 text-xs font-semibold mb-1">Search queries will rotate through:</p>
                 <div class="text-slate-300 text-xs font-mono space-y-1" id="searchPreview">

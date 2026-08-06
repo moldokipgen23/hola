@@ -12,6 +12,8 @@ class CategoryController extends Controller
     {
         $categories = Category::active()
             ->with('subcategories')
+            ->withCount('businesses')
+            ->whereHas('businesses')
             ->orderBy('order')
             ->get();
 
@@ -25,6 +27,8 @@ class CategoryController extends Controller
         $categories = Category::active()
             ->featured()
             ->with('subcategories')
+            ->withCount('businesses')
+            ->whereHas('businesses')
             ->orderBy('order')
             ->get();
 
@@ -36,7 +40,7 @@ class CategoryController extends Controller
     public function show($slug)
     {
         $category = Category::where('slug', $slug)
-            ->with(['subcategories', 'businesses' => function ($query) {
+            ->with(['subcategories' => fn ($q) => $q->whereHas('businesses')->withCount('businesses'), 'businesses' => function ($query) {
                 $query->active()->limit(20);
             }])
             ->firstOrFail();

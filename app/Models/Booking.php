@@ -14,6 +14,7 @@ class Booking extends Model
         'client_reference',
         'business_id',
         'service_id',
+        'resource_id',
         'time_slot_id',
         'booking_type',
         'user_id',
@@ -45,6 +46,9 @@ class Booking extends Model
         'rescheduled_to_date',
         'rescheduled_to_time',
         'reschedule_reason',
+        'checked_in_at',
+        'checked_out_at',
+        'room_number',
         'metadata',
     ];
 
@@ -66,6 +70,8 @@ class Booking extends Model
         'rejected_at' => 'datetime',
         'rescheduled_at' => 'datetime',
         'rescheduled_to_date' => 'date',
+        'checked_in_at' => 'datetime',
+        'checked_out_at' => 'datetime',
         'metadata' => 'array',
     ];
 

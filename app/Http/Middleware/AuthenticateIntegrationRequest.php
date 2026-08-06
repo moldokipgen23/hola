@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\IntegrationApiKey;
-use App\Models\IntegrationAuditLog;
 use App\Models\IntegrationOAuthAccessToken;
 use Closure;
 use Illuminate\Http\Request;
@@ -15,17 +14,17 @@ class AuthenticateIntegrationRequest
     {
         $token = $this->resolveToken($request);
 
-        if (!$token) {
+        if (! $token) {
             return response()->json(['error' => 'missing_credentials', 'message' => 'No API key or OAuth token provided.'], 401);
         }
 
         $auth = $this->authenticate($token);
 
-        if (!$auth) {
+        if (! $auth) {
             return response()->json(['error' => 'invalid_credentials', 'message' => 'API key or OAuth token is invalid.'], 401);
         }
 
-        if ($auth instanceof IntegrationApiKey && !$auth->isValidForRequest($request->ip())) {
+        if ($auth instanceof IntegrationApiKey && ! $auth->isValidForRequest($request->ip())) {
             return response()->json(['error' => 'forbidden', 'message' => 'API key is revoked, expired, or not allowed from this IP.'], 403);
         }
 
@@ -65,8 +64,10 @@ class AuthenticateIntegrationRequest
             $key = IntegrationApiKey::where('key_hash', $hashed)->first();
             if ($key) {
                 $key->touchLastUsed();
+
                 return $key;
             }
+
             return null;
         }
 

@@ -9,7 +9,8 @@
 @section('og_title', $business->name)
 @section('og_description', $ogDescription)
 @if(!empty($business->photos) && count($business->photos) > 0)
-    @section('og_image', str_starts_with($business->photos[0], 'http') ? $business->photos[0] : asset($business->photos[0]))
+    @php $ogPhoto = $business->primaryPhoto(); @endphp
+    @section('og_image', $ogPhoto ? (str_starts_with($ogPhoto, 'http') ? $ogPhoto : asset($ogPhoto)) : null)
 @endif
 
 @section('content')

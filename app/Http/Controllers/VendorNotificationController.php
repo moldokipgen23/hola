@@ -12,7 +12,7 @@ class VendorNotificationController extends Controller
     {
         $businessId = $request->user()->currentBusiness?->id;
 
-        if (!$businessId) {
+        if (! $businessId) {
             return response()->json(['message' => 'No active business'], 404);
         }
 
@@ -32,7 +32,7 @@ class VendorNotificationController extends Controller
 
     public function show(VendorNotification $notification)
     {
-        if (!$notification->is_read) {
+        if (! $notification->is_read) {
             $notification->markRead();
         }
 
@@ -50,7 +50,7 @@ class VendorNotificationController extends Controller
     {
         $businessId = $request->user()->currentBusiness?->id;
 
-        if (!$businessId) {
+        if (! $businessId) {
             return response()->json(['message' => 'No active business'], 404);
         }
 
@@ -65,7 +65,7 @@ class VendorNotificationController extends Controller
     {
         $businessId = $request->user()->currentBusiness?->id;
 
-        if (!$businessId) {
+        if (! $businessId) {
             return response()->json(['unread_count' => 0]);
         }
 

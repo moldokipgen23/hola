@@ -23,7 +23,7 @@
         CSV Upload
     </button>
     <a href="{{ route('admin.import.review') }}" class="px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 text-sm font-medium">
-        Review Queue ({{ \App\Models\ImportItem::pending()->count() }})
+        Review Queue ({{ \App\Models\ImportItem::inPipeline()->count() }})
     </a>
 </div>
 
